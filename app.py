@@ -1,7 +1,8 @@
 # app.py
 # -*- coding: utf-8 -*-
 
-from flask import Flask, jsonify, abort
+from flask import Flask, jsonify, abort, request
+from flask_cors import CORS
 import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
@@ -14,6 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+cors = CORS(app)
 
 try:
     print("Đang tải dữ liệu từ các file CSV...")
@@ -174,6 +176,33 @@ def get_recommendations(profile):
     return recommendations
 
 
+def build_ai_evidence(profile):
+    """Sinh các dòng bằng chứng (evidence) để giải thích vì sao model dự đoán như vậy."""
+    evidences = []
+    avg_balance = profile.get('hdbank_summary', {}).get('average_balance', 0) or 0
+    is_biz = profile.get('vietjet_summary', {}).get('is_business_flyer', False)
+    total_debit_3m = profile.get('hdbank_summary', {}).get('total_debit_last_3m', 0) or 0
+
+    # Các ngưỡng minh họa, có thể điều chỉnh
+    evidences.append({
+        'label': 'Số dư trung bình cao',
+        'value': f"{avg_balance:,.0f} VND",
+        'ok': bool(avg_balance >= 300_000_000)
+    })
+    evidences.append({
+        'label': 'Thường xuyên bay hạng thương gia',
+        'value': 'Có' if is_biz else 'Không',
+        'ok': bool(is_biz)
+    })
+    evidences.append({
+        'label': 'Tổng chi tiêu 3 tháng gần đây',
+        'value': f"{total_debit_3m:,.0f} VND",
+        'ok': bool(total_debit_3m >= 50_000_000)
+    })
+
+    return evidences
+
+
 # =============================================================================
 # BƯỚC 4: TẠO API ENDPOINTS
 # =============================================================================
@@ -197,6 +226,97 @@ def get_recommendations_api(customer_id):
         abort(404, description=f"Không tìm thấy khách hàng với ID {customer_id}")
     recommendations = get_recommendations(profile)
     return jsonify(recommendations)
+
+
+@app.route('/customer/<int:customer_id>/insights', methods=['GET'])
+def get_insights_api(customer_id):
+    """API trả về persona dự đoán, evidence và đề xuất."""
+    profile = get_customer_360_profile(customer_id)
+    if profile is None:
+        abort(404, description=f"Không tìm thấy khách hàng với ID {customer_id}")
+
+    # Chuẩn bị input và dự đoán persona
+    input_data = {
+        'age': profile['basic_info'].get('age', 0),
+        'avg_balance': profile['hdbank_summary'].get('average_balance', 0),
+        'total_flights': profile['vietjet_summary'].get('total_flights_last_year', 0),
+        'is_business_flyer_int': int(profile['vietjet_summary'].get('is_business_flyer', False))
+    }
+    input_df = pd.DataFrame([input_data])[feature_columns]
+    predicted_persona = ai_model.predict(input_df)[0]
+
+    evidence = build_ai_evidence(profile)
+    recommendations = get_recommendations(profile)
+
+    return jsonify({
+        'predicted_persona': predicted_persona,
+        'evidence': evidence,
+        'recommendations': recommendations
+    })
+
+
+@app.route('/customers/suggestions', methods=['GET'])
+def get_customer_suggestions_api():
+    """API gợi ý một vài khách hàng đáng chú ý dựa trên dữ liệu hiện có."""
+    # Tính avg_balance
+    hdbank_agg = hdbank_df.groupby('customer_id')['balance'].mean().reset_index().rename(
+        columns={'balance': 'avg_balance'})
+    # Tính tổng chuyến bay và business flyer
+    vietjet_agg = vietjet_df.groupby('customer_id').agg(
+        total_flights=('flight_id', 'count'),
+        is_business_flyer=('ticket_class', lambda x: 'business' in x.unique())
+    ).reset_index()
+
+    merged = customers_df[['customer_id', 'name']].merge(hdbank_agg, on='customer_id', how='left') \
+        .merge(vietjet_agg, on='customer_id', how='left').fillna({'avg_balance': 0, 'total_flights': 0, 'is_business_flyer': False})
+
+    # Xếp hạng đơn giản: ưu tiên avg_balance cao và business flyer
+    merged['score'] = merged['avg_balance'] * 0.7 + merged['total_flights'] * 1_000_000 + merged['is_business_flyer'].astype(int) * 50_000_000
+    top = merged.sort_values('score', ascending=False).head(5)
+
+    def reason(row):
+        r = []
+        if row['avg_balance'] >= 300_000_000:
+            r.append('Số dư cao')
+        if row['is_business_flyer']:
+            r.append('Bay hạng thương gia')
+        if row['total_flights'] >= 5:
+            r.append('Bay thường xuyên')
+        return ', '.join(r) or 'Hoạt động nổi bật'
+
+    data = [
+        {
+            'customer_id': int(row['customer_id']),
+            'name': row['name'],
+            'reason': reason(row)
+        } for _, row in top.iterrows()
+    ]
+
+    return jsonify(data)
+
+
+@app.route('/customers/search', methods=['GET'])
+def search_customers_api():
+    """Tìm kiếm khách hàng theo từ khóa (theo tên hoặc ID)."""
+    q = (request.args.get('q') or '').strip().lower()
+    if not q:
+        return jsonify([])
+    try:
+        q_id = int(q)
+    except ValueError:
+        q_id = None
+
+    def match(row):
+        return (q in str(row['name']).lower()) or (q_id is not None and row['customer_id'] == q_id) or str(row['customer_id']).startswith(q)
+
+    matches = customers_df[customers_df.apply(match, axis=1)].head(20)
+    data = [
+        {
+            'customer_id': int(row['customer_id']),
+            'name': row['name']
+        } for _, row in matches.iterrows()
+    ]
+    return jsonify(data)
 
 
 # =============================================================================

@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f172a; /* slate-900 */
+  --panel: #0b1220;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: radial-gradient(1200px 600px at 20% -10%, rgba(45,159,255,.2), transparent 40%),
+              radial-gradient(800px 400px at 110% 10%, rgba(88,187,255,.18), transparent 35%),
+              #0f172a;
+  color: #e2e8f0; /* text-slate-200 */
+}
+
+.card {
+  @apply bg-slate-900/60 backdrop-blur rounded-xl border border-slate-700/50 shadow-card;
+}
+
+.btn {
+  @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-500 text-white hover:bg-brand-400 active:scale-[.99] transition;
+}
+
+.badge {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-slate-700/60 border border-slate-600/40;
+}
