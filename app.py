@@ -3,6 +3,8 @@
 
 from flask import Flask, jsonify, abort, request
 from flask_cors import CORS
+import jwt
+import datetime
 import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
@@ -15,6 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
+app.config['SECRET_KEY'] = 'dev-secret-change-me'
 cors = CORS(app)
 
 try:
@@ -75,6 +78,46 @@ def train_ai_model():
 
     ai_model = model
     print("Huấn luyện Model AI thành công!")
+
+# =============================================================================
+# AUTH (ĐƠN GIẢN - LƯU TẠM TRONG BỘ NHỚ)
+# =============================================================================
+users = {
+    # demo user
+    'user@sovico.vn': {
+        'password': '123456',
+        'name': 'Demo User'
+    }
+}
+
+def create_token(email: str):
+    payload = {
+        'sub': email,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    }
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+def verify_token(token: str):
+    try:
+        data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return data.get('sub')
+    except Exception:
+        return None
+
+def require_auth(func):
+    from functools import wraps
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+        token = auth_header.split(' ', 1)[1]
+        email = verify_token(token)
+        if not email or email not in users:
+            return jsonify({'error': 'Unauthorized'}), 401
+        request.user_email = email
+        return func(*args, **kwargs)
+    return wrapper
 
 
 # =============================================================================
@@ -317,6 +360,44 @@ def search_customers_api():
         } for _, row in matches.iterrows()
     ]
     return jsonify(data)
+
+# ----------------- AUTH ENDPOINTS -----------------
+@app.route('/auth/register', methods=['POST'])
+def register_api():
+    data = request.get_json(force=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    password = (data.get('password') or '').strip()
+    name = (data.get('name') or '').strip() or email.split('@')[0]
+    if not email or not password:
+        return jsonify({'error': 'Thiếu email hoặc mật khẩu'}), 400
+    if email in users:
+        return jsonify({'error': 'Email đã tồn tại'}), 409
+    users[email] = {'password': password, 'name': name}
+    token = create_token(email)
+    return jsonify({'token': token, 'user': {'email': email, 'name': name}})
+
+@app.route('/auth/login', methods=['POST'])
+def login_api():
+    data = request.get_json(force=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    password = (data.get('password') or '').strip()
+    user = users.get(email)
+    if not user or user.get('password') != password:
+        return jsonify({'error': 'Sai email hoặc mật khẩu'}), 401
+    token = create_token(email)
+    return jsonify({'token': token, 'user': {'email': email, 'name': user.get('name', '')}})
+
+@app.route('/auth/me', methods=['GET'])
+def me_api():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return jsonify({'error': 'Unauthorized'}), 401
+    token = auth_header.split(' ', 1)[1]
+    email = verify_token(token)
+    if not email or email not in users:
+        return jsonify({'error': 'Unauthorized'}), 401
+    user = users[email]
+    return jsonify({'email': email, 'name': user.get('name', '')})
 
 
 # =============================================================================

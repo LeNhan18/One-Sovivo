@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/modules/dashboard.tsx","./src/parts/aiinsights.tsx","./src/parts/actionspanel.tsx","./src/parts/authpanel.tsx","./src/parts/endcustomer.tsx","./src/parts/profile360.tsx","./src/parts/searchpanel.tsx","./src/services/auth.ts"],"version":"5.9.2"}
