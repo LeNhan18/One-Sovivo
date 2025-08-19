@@ -1,39 +1,110 @@
 import React, { useEffect, useState } from 'react'
 import { Dashboard } from './modules/Dashboard'
+import { SuperApp } from './modules/SuperApp'
 import { AuthPanel } from './parts/AuthPanel'
 import { me, setToken } from './services/auth'
 
+export type UserRole = 'admin' | 'customer'
+
+export type AuthUser = {
+  email: string
+  name: string
+  role: UserRole
+}
+
 export const App: React.FC = () => {
-  const [user, setUser] = useState<{ email: string; name: string } | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [checking, setChecking] = useState(true)
+  const [selectedApp, setSelectedApp] = useState<'dashboard' | 'superapp'>('dashboard')
 
   useEffect(() => {
-    me().then((u) => setUser(u)).finally(() => setChecking(false))
+    me().then((u) => {
+      if (u) {
+        // Determine user role based on email domain for demo
+        const role: UserRole = u.email.includes('@hdbank.') || u.email.includes('@sovico.') ? 'admin' : 'customer'
+        setUser({ ...u, role })
+        setSelectedApp(role === 'admin' ? 'dashboard' : 'superapp')
+      }
+    }).finally(() => setChecking(false))
   }, [])
 
-  if (checking) return null
+  const handleLogout = () => {
+    setToken(null)
+    setUser(null)
+  }
+
+  const handleLoginSuccess = (authUser: { email: string; name: string }) => {
+    // Determine role based on email for demo purposes
+    const role: UserRole = authUser.email.includes('@hdbank.') || authUser.email.includes('@sovico.') ? 'admin' : 'customer'
+    const user: AuthUser = { ...authUser, role }
+    setUser(user)
+    setSelectedApp(role === 'admin' ? 'dashboard' : 'superapp')
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">
+        <div className="text-white">Đang tải...</div>
+      </div>
+    )
+  }
 
   if (!user) {
-    return <AuthPanel onSuccess={(u) => setUser(u)} />
+    return <AuthPanel onSuccess={handleLoginSuccess} />
   }
 
   return (
-    <div>
-      <div className="p-3 flex justify-between items-center bg-[#0D1117] text-gray-200">
-        <div>
-          Xin chào, <span className="font-semibold">{user.name}</span>
+    <div className="min-h-screen bg-[#0D1117]">
+      {/* Top Navigation */}
+      <div className="bg-[#161B22] border-b border-gray-700 p-4 flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <div className="text-white font-bold text-lg">
+            {selectedApp === 'dashboard' ? '🧠 AI Insight Dashboard' : '📱 One-Sovico Super App'}
+          </div>
+          
+          {/* App Switcher for Admin */}
+          {user.role === 'admin' && (
+            <div className="flex bg-[#0D1117] rounded-lg p-1">
+              <button
+                onClick={() => setSelectedApp('dashboard')}
+                className={`px-3 py-1 rounded text-sm ${
+                  selectedApp === 'dashboard' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setSelectedApp('superapp')}
+                className={`px-3 py-1 rounded text-sm ${
+                  selectedApp === 'superapp' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Super App
+              </button>
+            </div>
+          )}
         </div>
-        <button
-          onClick={() => {
-            setToken(null)
-            setUser(null)
-          }}
-          className="text-sm bg-gray-700 hover:bg-red-600 px-3 py-1 rounded-md"
-        >
-          Đăng xuất
-        </button>
+
+        <div className="flex items-center space-x-4">
+          <div className="text-gray-300">
+            <span className="text-xs text-gray-500">{user.role === 'admin' ? 'Chuyên viên' : 'Khách hàng'}</span>
+            <div className="font-semibold">{user.name}</div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="bg-gray-700 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+          >
+            Đăng xuất
+          </button>
+        </div>
       </div>
-      <Dashboard />
+
+      {/* Main Content */}
+      {selectedApp === 'dashboard' ? <Dashboard /> : <SuperApp user={user} />}
     </div>
   )
 }
