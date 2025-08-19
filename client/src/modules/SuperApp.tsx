@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { AuthUser } from '../App'
+import SVTWallet from '../components/SVTWallet'
+import SVTMarketplace from '../components/SVTMarketplace'
+import AIFinancialAssistant from '../components/AIFinancialAssistant'
+import TransactionHistory from '../components/TransactionHistory'
 
 type Props = {
   user: AuthUser
@@ -43,6 +47,7 @@ const CubeIcon = () => (
 )
 
 export const SuperApp: React.FC<Props> = ({ user }) => {
+  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history'>('home')
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,22 +59,22 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
       // Mock user data based on email
       const mockUserData = {
         name: user.name,
-        memberTier: "Vàng",
+        memberTier: "Platinum",
         walletAddress: "0x1a2b...c3d4",
-        sovicoTokens: 12500,
+        sovicoTokens: 15750,
         services: {
           vietjet: { flights: 30, miles: 45000 },
-          hdbank: { avg_balance: 6382504630 },
+          hdbank: { avg_balance: 150000000 },
           resorts: { nights_stayed: 5 }
         },
         transactions: [
-          { txHash: "0xabc...", type: "Tích điểm Vietjet", amount: "+ 500 SVT", time: "1 ngày trước" },
-          { txHash: "0xdef...", type: "Đổi ưu đãi Resort", amount: "- 2,000 SVT", time: "3 ngày trước" },
-          { txHash: "0xghi...", type: "Thưởng hạng Vàng HDBank", amount: "+ 1,000 SVT", time: "1 tuần trước" },
+          { txHash: "0xabc...", type: "Hoàn thành nhiệm vụ", amount: "+ 2,000 SVT", time: "1 ngày trước" },
+          { txHash: "0xdef...", type: "Mua voucher", amount: "- 500 SVT", time: "3 ngày trước" },
+          { txHash: "0xghi...", type: "Bonus HDBank", amount: "+ 1,200 SVT", time: "1 tuần trước" },
         ],
         ai_input: {
-          age: 40,
-          avg_balance: 6382504630,
+          age: 28,
+          avg_balance: 150000000,
           total_flights: 30,
           is_business_flyer: true,
           total_nights_stayed: 5,
@@ -78,29 +83,32 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
       }
       setUserData(mockUserData)
       
-      // Call AI prediction API
-      try {
-        const response = await fetch('/api/predict', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mockUserData.ai_input)
-        })
-        if (response.ok) {
-          const aiData = await response.json()
-          setRecommendations(aiData.recommendations || [])
+      // Call AI prediction API (mock for now)
+      setRecommendations([
+        { 
+          offer_code: 'AI001', 
+          title: 'Đầu tư Quỹ cân bằng', 
+          description: 'Với 150M tiết kiệm, bạn nên đầu tư 40% vào quỹ cân bằng để tăng trưởng 8-10%/năm' 
+        },
+        { 
+          offer_code: 'AI002', 
+          title: 'Nhiệm vụ Sky Explorer', 
+          description: 'Hoàn thành 2 chuyến bay nữa để đạt thành tựu "Sky Explorer" và nhận 3,500 SVT' 
         }
-      } catch (error) {
-        console.error("Lỗi khi gọi API AI:", error)
-        setRecommendations([
-          { offer_code: 'ERR01', title: 'Không thể tải đề xuất', description: 'Vui lòng thử lại sau.' }
-        ])
-      } finally {
-        setLoading(false)
-      }
+      ])
+      
+      setLoading(false)
     }
     
     fetchData()
   }, [user])
+
+  const quickActions = [
+    { id: 'wallet', label: 'Ví SVT', icon: '🪙', description: 'Quản lý token và nhiệm vụ' },
+    { id: 'marketplace', label: 'Marketplace', icon: '🛍️', description: 'Mua sắm với SVT' },
+    { id: 'ai-assistant', label: 'AI Advisor', icon: '🤖', description: 'Tư vấn tài chính thông minh' },
+    { id: 'history', label: 'Blockchain', icon: '⛓️', description: 'Lịch sử & NFT' }
+  ]
 
   if (loading) {
     return (
@@ -113,6 +121,88 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
     )
   }
 
+  // Render different sections based on activeSection
+  if (activeSection === 'wallet') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+          <button 
+            onClick={() => setActiveSection('home')}
+            className="text-blue-400 hover:text-blue-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">Ví Sovico Token</h1>
+          <div></div>
+        </div>
+        <div className="p-6">
+          <SVTWallet />
+        </div>
+      </div>
+    )
+  }
+
+  if (activeSection === 'marketplace') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+          <button 
+            onClick={() => setActiveSection('home')}
+            className="text-blue-400 hover:text-blue-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">SVT Marketplace</h1>
+          <div></div>
+        </div>
+        <div className="p-6">
+          <SVTMarketplace />
+        </div>
+      </div>
+    )
+  }
+
+  if (activeSection === 'ai-assistant') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+          <button 
+            onClick={() => setActiveSection('home')}
+            className="text-blue-400 hover:text-blue-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">AI Financial Advisor</h1>
+          <div></div>
+        </div>
+        <div className="h-[calc(100vh-80px)]">
+          <AIFinancialAssistant />
+        </div>
+      </div>
+    )
+  }
+
+  if (activeSection === 'history') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+          <button 
+            onClick={() => setActiveSection('home')}
+            className="text-blue-400 hover:text-blue-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">Blockchain Explorer</h1>
+          <div></div>
+        </div>
+        <div className="p-6">
+          <TransactionHistory />
+        </div>
+      </div>
+    )
+  }
+
+  // Home page
   return (
     <div className="text-gray-200 font-sans">
       {/* Header with User Info */}
@@ -128,7 +218,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
         </div>
         <div className="flex items-center space-x-2">
           <span className="text-xs text-gray-400">Hạng thành viên:</span>
-          <span className="text-yellow-400 font-semibold flex items-center">
+          <span className="text-purple-400 font-semibold flex items-center">
             <StarIcon />
             <span className="ml-1">{userData?.memberTier}</span>
           </span>
@@ -136,23 +226,71 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
       </div>
 
       <main className="p-6 space-y-8">
-        {/* Sovico Token Card */}
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white text-center shadow-lg">
-          <p className="text-sm opacity-80 font-semibold">SOVICO TOKEN (SVT)</p>
-          <p className="text-4xl font-bold mt-2">{userData?.sovicoTokens?.toLocaleString('vi-VN')}</p>
-          <div className="flex justify-center space-x-3 mt-4">
-            <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-full text-sm font-semibold">
-              Sử dụng Token
+        {/* Enhanced Sovico Token Card */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm opacity-80 font-semibold">SOVICO TOKEN (SVT)</p>
+              <p className="text-4xl font-bold mt-2">{userData?.sovicoTokens?.toLocaleString('vi-VN')}</p>
+              <p className="text-purple-200 text-sm mt-1">≈ {(userData?.sovicoTokens * 1000)?.toLocaleString('vi-VN')} VND</p>
+            </div>
+            <div className="text-6xl">🪙</div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4 mb-4 pt-4 border-t border-purple-400">
+            <div className="text-center">
+              <div className="text-xl font-bold">3</div>
+              <div className="text-purple-200 text-xs">Nhiệm vụ hoàn thành</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold">4</div>
+              <div className="text-purple-200 text-xs">NFT sở hữu</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold">Platinum</div>
+              <div className="text-purple-200 text-xs">Cấp độ</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button 
+              onClick={() => setActiveSection('wallet')}
+              className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center space-x-2 transition-all"
+            >
+              <span>🎯</span>
+              <span>Nhiệm vụ</span>
             </button>
-            <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-full text-sm font-semibold">
-              Lịch sử
+            <button 
+              onClick={() => setActiveSection('marketplace')}
+              className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center space-x-2 transition-all"
+            >
+              <span>🛍️</span>
+              <span>Mua sắm</span>
             </button>
+          </div>
+        </div>
+
+        {/* Quick Actions Grid */}
+        <div>
+          <h2 className="text-xl font-bold mb-4 text-white">🚀 Hệ sinh thái Sovico</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {quickActions.map(action => (
+              <div
+                key={action.id}
+                onClick={() => setActiveSection(action.id as any)}
+                className="bg-[#161B22] border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:bg-blue-900/20 transition-all"
+              >
+                <div className="text-3xl mb-2">{action.icon}</div>
+                <h3 className="font-semibold text-white text-sm">{action.label}</h3>
+                <p className="text-xs text-gray-400 mt-1">{action.description}</p>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Services Overview */}
         <div>
-          <h2 className="text-xl font-bold mb-4 text-white">Dịch vụ của bạn</h2>
+          <h2 className="text-xl font-bold mb-4 text-white">💎 Dịch vụ của bạn</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ServiceCard 
               icon={<PlaneIcon />} 
@@ -181,7 +319,16 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
         
         {/* AI Recommendations */}
         <div>
-          <h2 className="text-xl font-bold mb-4 text-white">🤖 Ưu đãi AI đề xuất</h2>
+          <h2 className="text-xl font-bold mb-4 text-white flex items-center space-x-2">
+            <span>🤖</span>
+            <span>Tư vấn AI cá nhân</span>
+            <button 
+              onClick={() => setActiveSection('ai-assistant')}
+              className="ml-auto text-sm bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-lg"
+            >
+              Chat với AI
+            </button>
+          </h2>
           <div className="space-y-4">
             {recommendations.map((rec, index) => (
               <RecommendationCard key={rec.offer_code || index} {...rec} />
@@ -189,12 +336,21 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           </div>
         </div>
 
-        {/* Blockchain Transaction History */}
+        {/* Recent SVT Activity */}
         <div>
-          <h2 className="text-xl font-bold mb-4 text-white">⛓️ Lịch sử Giao dịch Token</h2>
+          <h2 className="text-xl font-bold mb-4 text-white flex items-center space-x-2">
+            <span>⛓️</span>
+            <span>Hoạt động SVT gần đây</span>
+            <button 
+              onClick={() => setActiveSection('history')}
+              className="ml-auto text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
+            >
+              Xem tất cả
+            </button>
+          </h2>
           <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
             <div className="space-y-3">
-              {userData?.transactions?.map((tx: any, index: number) => (
+              {userData?.transactions?.slice(0, 3).map((tx: any, index: number) => (
                 <TransactionRow key={tx.txHash || index} tx={tx} />
               ))}
             </div>
