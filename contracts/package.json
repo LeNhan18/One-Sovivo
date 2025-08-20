@@ -1,0 +1,71 @@
+{
+  "name": "sovico-passport-nft",
+  "version": "1.0.0",
+  "description": "Sovico Passport NFT Smart Contract - ERC721 based digital identity for Sovico ecosystem",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:hardhat": "hardhat run scripts/deploy.js --network hardhat",
+    "deploy:bsc-testnet": "hardhat run scripts/deploy.js --network bscTestnet",
+    "deploy:bsc-mainnet": "hardhat run scripts/deploy.js --network bscMainnet",
+    "deploy:polygon-mumbai": "hardhat run scripts/deploy.js --network polygonMumbai",
+    "deploy:polygon": "hardhat run scripts/deploy.js --network polygon",
+    "verify:bsc-testnet": "hardhat verify --network bscTestnet",
+    "verify:bsc-mainnet": "hardhat verify --network bscMainnet",
+    "verify:polygon-mumbai": "hardhat verify --network polygonMumbai",
+    "verify:polygon": "hardhat verify --network polygon",
+    "node": "hardhat node",
+    "clean": "hardhat clean",
+    "size": "hardhat size-contracts",
+    "gas-report": "REPORT_GAS=true hardhat test"
+  },
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "smart-contracts",
+    "nft",
+    "erc721",
+    "sovico",
+    "passport",
+    "identity",
+    "blockchain",
+    "web3"
+  ],
+  "author": "Sovico Group",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^1.0.0",
+    "@typechain/ethers-v6": "^0.4.0",
+    "@typechain/hardhat": "^8.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "chai": "^4.2.0",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.17.1",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "typechain": "^8.3.0",
+    "typescript": ">=4.5.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LeNhan18/One-Sovivo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LeNhan18/One-Sovivo/issues"
+  },
+  "homepage": "https://github.com/LeNhan18/One-Sovivo#readme"
+}

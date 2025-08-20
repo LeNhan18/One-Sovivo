@@ -126,7 +126,7 @@ def main():
         return False
     
     print("\n🎉 Thiết lập database thành công!")
-    print("💡 Bạn có thể chạy: python app_new.py để khởi động server")
+    print("💡 Bạn có thể chạy: python để khởi động server")
     return True
 
 if __name__ == '__main__':
