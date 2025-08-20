@@ -4,6 +4,7 @@ import SVTWallet from '../components/SVTWallet'
 import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
 import TransactionHistory from '../components/TransactionHistory'
+import NFTPassport from '../components/NFTPassport'
 
 type Props = {
   user: AuthUser
@@ -51,6 +52,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,6 +60,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
       
       // Mock user data based on email
       const mockUserData = {
+        customerId: 1, // Add customer ID for NFT passport
         name: user.name,
         memberTier: "Platinum",
         walletAddress: "0x1a2b...c3d4",
@@ -102,6 +105,42 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
     
     fetchData()
   }, [user])
+
+  // Handle VIP simulation
+  const handleVIPSimulation = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:5000/simulate_event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          event_type: 'vip_upgrade',
+          customer_id: userData?.customerId || 1
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`🎉 VIP simulation successful! ${result.achievements_earned} achievements earned, ${result.total_svt_reward} SVT tokens rewarded.`)
+        
+        // Trigger NFT passport refresh
+        setRefreshTrigger(prev => prev + 1)
+        
+        // Update user data with new SVT tokens
+        setUserData(prev => ({
+          ...prev,
+          sovicoTokens: prev.sovicoTokens + result.total_svt_reward
+        }))
+      } else {
+        alert('❌ VIP simulation failed: ' + result.message)
+      }
+    } catch (error) {
+      console.error('VIP simulation error:', error)
+      alert('❌ Error connecting to backend. Make sure Flask server is running.')
+    }
+  }
 
   const quickActions = [
     { id: 'wallet', label: 'Ví SVT', icon: '🪙', description: 'Quản lý token và nhiệm vụ' },
@@ -195,8 +234,30 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           <h1 className="text-xl font-bold text-white">Blockchain Explorer</h1>
           <div></div>
         </div>
-        <div className="p-6">
-          <TransactionHistory />
+        <div className="p-6 space-y-6">
+          {/* NFT Passport Section */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-white flex items-center">
+                🎫 <span className="ml-2">Sovico Passport NFT</span>
+              </h2>
+              <button
+                onClick={handleVIPSimulation}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+              >
+                👑 Mô phỏng VIP
+              </button>
+            </div>
+            <NFTPassport tokenId={userData?.customerId || 1} refreshTrigger={refreshTrigger} />
+          </div>
+          
+          {/* Transaction History Section */}
+          <div>
+            <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+              ⛓️ <span className="ml-2">Blockchain Explorer</span>
+            </h2>
+            <TransactionHistory />
+          </div>
         </div>
       </div>
     )

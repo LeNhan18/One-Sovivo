@@ -5,6 +5,7 @@ import { Profile360 } from '../parts/Profile360'
 import { AIInsights } from '../parts/AIInsights'
 import { ActionsPanel } from '../parts/ActionsPanel'
 import { ModelMetrics } from '../parts/ModelMetrics'
+import BlockchainDashboard from '../components/BlockchainDashboard'
 
 export type CustomerBasic = {
   customer_id: number
@@ -45,6 +46,7 @@ export const Dashboard: React.FC = () => {
   const [insight, setInsight] = useState<Insight | null>(null)
   const [loading, setLoading] = useState(false)
   const [showMetrics, setShowMetrics] = useState(false)
+  const [activeTab, setActiveTab] = useState<'analysis' | 'blockchain'>('analysis')
 
   useEffect(() => {
     if (!selectedId) return
@@ -105,11 +107,39 @@ export const Dashboard: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        <div className="mt-6 border-b border-gray-700">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('analysis')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'analysis'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+              }`}
+            >
+              🔍 Customer Analysis
+            </button>
+            <button
+              onClick={() => setActiveTab('blockchain')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'blockchain'
+                  ? 'border-purple-500 text-purple-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+              }`}
+            >
+              🔗 Blockchain Achievements
+            </button>
+          </nav>
+        </div>
       </div>
 
       <div className="max-w-[1400px] mx-auto">
         {showMetrics ? (
           <ModelMetrics onClose={() => setShowMetrics(false)} />
+        ) : activeTab === 'blockchain' ? (
+          <BlockchainDashboard customerId={selectedId || 1} />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Column 1: Search & Suggestions */}
