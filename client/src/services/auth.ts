@@ -2,7 +2,12 @@ import axios from 'axios'
 
 const TOKEN_KEY = 'auth_token'
 
-export type AuthUser = { email: string; name: string }
+export type AuthUser = { 
+  email: string; 
+  name: string; 
+  role: 'admin' | 'customer';
+  customer_id?: number;
+}
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)

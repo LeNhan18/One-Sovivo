@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { AuthUser } from '../App'
+import { AuthUser } from '../services/auth'
 import SVTWallet from '../components/SVTWallet'
 import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
@@ -58,47 +58,114 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
     const fetchData = async () => {
       setLoading(true)
       
-      // Mock user data based on email
-      const mockUserData = {
-        customerId: 1, // Add customer ID for NFT passport
-        name: user.name,
-        memberTier: "Platinum",
-        walletAddress: "0x1a2b...c3d4",
-        sovicoTokens: 15750,
-        services: {
-          vietjet: { flights: 30, miles: 45000 },
-          hdbank: { avg_balance: 150000000 },
-          resorts: { nights_stayed: 5 }
-        },
-        transactions: [
-          { txHash: "0xabc...", type: "Hoàn thành nhiệm vụ", amount: "+ 2,000 SVT", time: "1 ngày trước" },
-          { txHash: "0xdef...", type: "Mua voucher", amount: "- 500 SVT", time: "3 ngày trước" },
-          { txHash: "0xghi...", type: "Bonus HDBank", amount: "+ 1,200 SVT", time: "1 tuần trước" },
-        ],
-        ai_input: {
-          age: 28,
-          avg_balance: 150000000,
-          total_flights: 30,
-          is_business_flyer: true,
-          total_nights_stayed: 5,
-          total_resort_spending: 25000000
+      try {
+        // Lấy dữ liệu thực từ backend sử dụng customer_id của user
+        const customerId = user.customer_id || 1001; // Sử dụng customer_id từ user, fallback 1001
+        const response = await fetch(`http://127.0.0.1:5000/customer/${customerId}`)
+        if (response.ok) {
+          const customerData = await response.json()
+          
+          // Lấy dữ liệu token từ blockchain/database  
+          const tokenResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}`)
+          const tokenData = tokenResponse.ok ? await tokenResponse.json() : null
+          
+          // Tính tổng SVT tokens thực từ token_transactions
+          const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`)
+          const tokensInfo = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0 }
+          
+          const realUserData = {
+            customerId: customerData.basic_info?.customer_id || customerId,
+            name: customerData.basic_info?.name || user.name,
+            memberTier: tokenData?.metadata?.attributes?.find(attr => attr.trait_type === 'Level')?.value || "Bronze",
+            walletAddress: "0x" + customerId.toString().padStart(40, '0'),
+            sovicoTokens: tokensInfo.total_svt || 0, // SVT thực từ DB
+            services: {
+              vietjet: {
+                flights: customerData.vietjet_summary?.total_flights_last_year || 0,
+                miles: (customerData.vietjet_summary?.total_flights_last_year || 0) * 1500
+              },
+              hdbank: {
+                avg_balance: customerData.hdbank_summary?.average_balance || 0
+              },
+              resorts: {
+                nights_stayed: customerData.resort_summary?.total_nights_stayed || 0
+              }
+            },
+            transactions: [], // Sẽ load từ token_transactions
+            ai_input: {
+              age: customerData.basic_info?.age || 25,
+              avg_balance: customerData.hdbank_summary?.average_balance || 0,
+              total_flights: customerData.vietjet_summary?.total_flights_last_year || 0,
+              is_business_flyer: customerData.vietjet_summary?.is_business_flyer || false,
+              total_nights_stayed: customerData.resort_summary?.total_nights_stayed || 0,
+              total_resort_spending: customerData.resort_summary?.total_spending || 0
+            }
+          }
+          setUserData(realUserData)
+          
+          // Lấy recommendations từ AI
+          const aiResponse = await fetch(`http://127.0.0.1:5000/customer/${customerId}/insights`)
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json()
+            setRecommendations(aiData.recommendations || [])
+          }
+          
+        } else {
+          // Fallback cho user mới (chưa có customer record)
+          const newUserData = {
+            customerId: 1001,
+            name: user.name,
+            memberTier: "Bronze",
+            walletAddress: "0x" + '1001'.padStart(40, '0'),
+            sovicoTokens: 0, // User mới không có token
+            services: {
+              vietjet: { flights: 0, miles: 0 },
+              hdbank: { avg_balance: 0 },
+              resorts: { nights_stayed: 0 }
+            },
+            transactions: [],
+            ai_input: {
+              age: 25,
+              avg_balance: 0,
+              total_flights: 0,
+              is_business_flyer: false,
+              total_nights_stayed: 0,
+              total_resort_spending: 0
+            }
+          }
+          setUserData(newUserData)
+          setRecommendations([{
+            offer_code: 'WELCOME',
+            title: 'Chào mừng thành viên mới!',
+            description: 'Hoàn thành hồ sơ để nhận 1000 SVT đầu tiên'
+          }])
         }
+      } catch (error) {
+        console.error('Error fetching user data:', error)
+        // Fallback data for new user
+        const fallbackData = {
+          customerId: 1001,
+          name: user.name,
+          memberTier: "Bronze", 
+          walletAddress: "0x0000000000000000000000000000000000000000",
+          sovicoTokens: 0,
+          services: {
+            vietjet: { flights: 0, miles: 0 },
+            hdbank: { avg_balance: 0 },
+            resorts: { nights_stayed: 0 }
+          },
+          transactions: [],
+          ai_input: {
+            age: 25,
+            avg_balance: 0,
+            total_flights: 0,
+            is_business_flyer: false,
+            total_nights_stayed: 0,
+            total_resort_spending: 0
+          }
+        }
+        setUserData(fallbackData)
       }
-      setUserData(mockUserData)
-      
-      // Call AI prediction API (mock for now)
-      setRecommendations([
-        { 
-          offer_code: 'AI001', 
-          title: 'Đầu tư Quỹ cân bằng', 
-          description: 'Với 150M tiết kiệm, bạn nên đầu tư 40% vào quỹ cân bằng để tăng trưởng 8-10%/năm' 
-        },
-        { 
-          offer_code: 'AI002', 
-          title: 'Nhiệm vụ Sky Explorer', 
-          description: 'Hoàn thành 2 chuyến bay nữa để đạt thành tựu "Sky Explorer" và nhận 3,500 SVT' 
-        }
-      ])
       
       setLoading(false)
     }

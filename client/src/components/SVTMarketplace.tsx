@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface MarketplaceItem {
   id: string;
@@ -32,427 +32,398 @@ interface ExchangeItem {
 const SVTMarketplace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'marketplace' | 'exchange' | 'my-items'>('marketplace');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [userSVT, setUserSVT] = useState(15750);
+  const [userSVT, setUserSVT] = useState(0);
+  const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItem[]>([]);
+  const [exchangeItems, setExchangeItems] = useState<ExchangeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [customerId, setCustomerId] = useState<number | null>(null);
 
-  const marketplaceItems: MarketplaceItem[] = [
-    {
-      id: 'MP001',
-      name: 'Voucher ăn uống 100K',
-      description: 'Voucher giảm giá 100,000 VND cho các nhà hàng đối tác',
-      price: 500,
-      originalPrice: 600,
-      category: 'voucher',
-      provider: 'sovico',
-      image: '🍽️',
-      availability: 50,
-      rating: 4.8,
-      isExclusive: false,
-      validUntil: '2025-12-31'
-    },
-    {
-      id: 'MP002',
-      name: 'Vé máy bay giảm 500K',
-      description: 'Giảm 500,000 VND cho chuyến bay nội địa Vietjet',
-      price: 2500,
-      originalPrice: 3000,
-      category: 'voucher',
-      provider: 'vietjet',
-      image: '✈️',
-      availability: 20,
-      rating: 4.9,
-      isExclusive: true,
-      validUntil: '2025-10-31'
-    },
-    {
-      id: 'MP003',
-      name: 'Lãi suất tiết kiệm ưu đãi',
-      description: 'Tăng 0.5% lãi suất tiết kiệm trong 6 tháng',
-      price: 1000,
-      category: 'service',
-      provider: 'hdbank',
-      image: '💰',
-      availability: 100,
-      rating: 4.7,
-      isExclusive: false,
-      validUntil: '2025-09-30'
-    },
-    {
-      id: 'MP004',
-      name: 'Cashback 20% HDSaison',
-      description: 'Cashback 20% cho 5 giao dịch tiếp theo (tối đa 200K)',
-      price: 800,
-      category: 'service',
-      provider: 'hdsaison',
-      image: '💳',
-      availability: 75,
-      rating: 4.6,
-      isExclusive: false,
-      validUntil: '2025-09-15'
-    },
-    {
-      id: 'MP005',
-      name: 'Resort Phú Quốc 2N1Đ',
-      description: 'Gói nghỉ dưỡng 2 ngày 1 đêm tại resort 5 sao Phú Quốc',
-      price: 8000,
-      originalPrice: 10000,
-      category: 'experience',
-      provider: 'sovico',
-      image: '🏖️',
-      availability: 5,
-      rating: 5.0,
-      isExclusive: true,
-      validUntil: '2025-12-31'
-    },
-    {
-      id: 'MP006',
-      name: 'iPhone 15 Pro Max',
-      description: 'iPhone 15 Pro Max 256GB - Hàng chính hãng',
-      price: 35000,
-      originalPrice: 40000,
-      category: 'product',
-      provider: 'sovico',
-      image: '📱',
-      availability: 3,
-      rating: 4.9,
-      isExclusive: true,
-      validUntil: '2025-09-30'
-    }
-  ];
+  // Get customer ID and SVT balance
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+        
+        const userResponse = await fetch('http://127.0.0.1:5000/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (userResponse.ok) {
+          const user = await userResponse.json();
+          const cId = user.customer_id || 1001;
+          setCustomerId(cId);
+          
+          // Get SVT balance
+          const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${cId}`);
+          if (tokensResponse.ok) {
+            const tokensData = await tokensResponse.json();
+            setUserSVT(tokensData.total_svt || 0);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing marketplace:', error);
+        setCustomerId(1001);
+      }
+    };
+    
+    initializeData();
+  }, []);
 
-  const exchangeItems: ExchangeItem[] = [
-    {
-      id: 'EX001',
-      name: 'Voucher Spa 500K',
-      description: 'Voucher massage và spa cao cấp, chưa sử dụng',
-      offerPrice: 1200,
-      originalPrice: 2500,
-      sellerName: 'NguyenVanA',
-      sellerRating: 4.8,
-      condition: 'new',
-      category: 'voucher',
-      image: '💆',
-      postedDate: '2025-08-18'
-    },
-    {
-      id: 'EX002',
-      name: 'Tai nghe AirPods Pro',
-      description: 'AirPods Pro Gen 2, đã dùng 3 tháng, còn bảo hành',
-      offerPrice: 8000,
-      originalPrice: 12000,
-      sellerName: 'TranThiB',
-      sellerRating: 4.9,
-      condition: 'like-new',
-      category: 'product',
-      image: '🎧',
-      postedDate: '2025-08-17'
-    },
-    {
-      id: 'EX003',
-      name: 'Voucher Golf 1M',
-      description: 'Voucher chơi golf tại sân golf cao cấp, hạn 6 tháng',
-      offerPrice: 3500,
-      originalPrice: 5000,
-      sellerName: 'LeVanC',
-      sellerRating: 4.7,
-      condition: 'new',
-      category: 'voucher',
-      image: '⛳',
-      postedDate: '2025-08-16'
-    }
-  ];
+  // Fetch marketplace data
+  useEffect(() => {
+    const fetchMarketplaceData = async () => {
+      setLoading(true);
+      try {
+        // Fetch marketplace items from database
+        const itemsResponse = await fetch('http://127.0.0.1:5000/api/marketplace/items');
+        if (itemsResponse.ok) {
+          const itemsData = await itemsResponse.json();
+          const formattedItems = itemsData.items.map((item: any) => ({
+            id: item.id.toString(),
+            name: item.name,
+            description: item.description,
+            price: item.price_svt,
+            category: 'voucher' as const, // Default category
+            provider: (item.partner_brand?.toLowerCase() || 'sovico') as any,
+            image: getItemIcon(item.partner_brand, item.name),
+            availability: item.quantity,
+            rating: 4.8, // Default rating
+            isExclusive: item.quantity < 50,
+            validUntil: '2025-12-31'
+          }));
+          setMarketplaceItems(formattedItems);
+        }
 
-  const [myItems, setMyItems] = useState([
-    {
-      id: 'MY001',
-      name: 'Voucher ăn uống 50K',
-      type: 'owned',
-      expiryDate: '2025-09-30',
-      image: '🍕'
-    },
-    {
-      id: 'MY002',
-      name: 'Cashback 15% HDSaison',
-      type: 'active',
-      expiryDate: '2025-09-15',
-      image: '💳'
-    }
-  ]);
+        // Fetch P2P listings
+        const p2pResponse = await fetch('http://127.0.0.1:5000/api/p2p/listings');
+        if (p2pResponse.ok) {
+          const p2pData = await p2pResponse.json();
+          const formattedP2P = p2pData.listings.map((listing: any) => ({
+            id: listing.id.toString(),
+            name: listing.item_name,
+            description: listing.description || 'Sản phẩm từ người dùng khác',
+            offerPrice: listing.price_svt,
+            originalPrice: Math.floor(listing.price_svt * 1.2), // Estimate original price
+            sellerName: listing.seller.name,
+            sellerRating: 4.5, // Default rating
+            condition: 'good' as const,
+            category: 'Khác',
+            image: '📦',
+            postedDate: new Date(listing.created_at).toLocaleDateString('vi-VN')
+          }));
+          setExchangeItems(formattedP2P);
+        }
 
-  const formatSVT = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN').format(amount);
+      } catch (error) {
+        console.error('Error fetching marketplace data:', error);
+        // Fallback to some basic items
+        setMarketplaceItems([
+          {
+            id: 'fallback1',
+            name: 'Kết nối lại với server',
+            description: 'Vui lòng kiểm tra kết nối mạng',
+            price: 0,
+            category: 'service',
+            provider: 'sovico',
+            image: '🔗',
+            availability: 0,
+            rating: 0,
+            isExclusive: false,
+            validUntil: '2025-12-31'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMarketplaceData();
+  }, []);
+
+  const getItemIcon = (partner: string, itemName: string): string => {
+    if (itemName.toLowerCase().includes('voucher') && itemName.toLowerCase().includes('ăn')) return '🍽️';
+    if (itemName.toLowerCase().includes('vé') || itemName.toLowerCase().includes('bay')) return '✈️';
+    if (itemName.toLowerCase().includes('lãi suất') || partner?.toLowerCase() === 'hdbank') return '💰';
+    if (itemName.toLowerCase().includes('cashback') || partner?.toLowerCase() === 'hdsaison') return '💳';
+    if (itemName.toLowerCase().includes('resort') || itemName.toLowerCase().includes('phòng')) return '🏖️';
+    return '🎁';
   };
 
-  const getProviderColor = (provider: string) => {
-    switch (provider) {
-      case 'vietjet': return 'bg-orange-500';
-      case 'hdbank': return 'bg-blue-500';
-      case 'hdsaison': return 'bg-purple-500';
-      case 'sovico': return 'bg-green-500';
-      default: return 'bg-gray-500';
+  const handlePurchase = async (item: MarketplaceItem) => {
+    if (!customerId) {
+      alert('Vui lòng đăng nhập để mua hàng');
+      return;
     }
-  };
 
-  const getConditionColor = (condition: string) => {
-    switch (condition) {
-      case 'new': return 'text-green-600';
-      case 'like-new': return 'text-blue-600';
-      case 'good': return 'text-yellow-600';
-      default: return 'text-gray-600';
+    if (userSVT < item.price) {
+      alert(`Không đủ SVT! Bạn cần ${item.price} SVT nhưng chỉ có ${userSVT} SVT`);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch('http://127.0.0.1:5000/api/marketplace/purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          item_id: parseInt(item.id),
+          quantity: 1
+        })
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`🎉 Mua thành công ${item.name}! Còn lại ${result.remaining_svt} SVT`);
+        setUserSVT(result.remaining_svt);
+        
+        // Update item availability
+        setMarketplaceItems(prev => prev.map(i => 
+          i.id === item.id ? { ...i, availability: i.availability - 1 } : i
+        ));
+      } else {
+        alert(`❌ Lỗi: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      alert('❌ Lỗi kết nối. Vui lòng thử lại sau.');
     }
   };
 
-  const purchaseItem = (item: MarketplaceItem) => {
-    if (userSVT >= item.price) {
-      setUserSVT(prev => prev - item.price);
-      setMyItems(prev => [...prev, {
-        id: `MY${Date.now()}`,
-        name: item.name,
-        type: 'owned',
-        expiryDate: item.validUntil,
-        image: item.image
-      }]);
-      alert(`Đã mua thành công ${item.name}! Còn lại ${formatSVT(userSVT - item.price)} SVT`);
-    } else {
-      alert('Không đủ SVT để mua item này!');
-    }
-  };
+  const filteredItems = marketplaceItems.filter(item => 
+    selectedCategory === 'all' || item.category === selectedCategory
+  );
 
-  const filteredMarketplace = selectedCategory === 'all' 
-    ? marketplaceItems 
-    : marketplaceItems.filter(item => item.category === selectedCategory);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div>Đang tải marketplace...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="bg-[#0D1117] text-white p-6 rounded-lg max-w-7xl mx-auto">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Sàn Giao dịch SVT</h2>
-            <p className="text-green-100">Mua sắm và trao đổi với Sovico Token</p>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold">{formatSVT(userSVT)} SVT</div>
-            <div className="text-green-200 text-sm">Số dư hiện tại</div>
-          </div>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            SVT Marketplace
+          </h1>
+          <p className="text-gray-400">Mua sắm với Sovico Token</p>
+        </div>
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 rounded-lg">
+          <p className="text-purple-200 text-sm">Số dư của bạn</p>
+          <p className="text-2xl font-bold">{userSVT.toLocaleString('vi-VN')} SVT</p>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+      {/* Tabs */}
+      <div className="flex space-x-1 mb-6 bg-[#161B22] rounded-lg p-1">
         {[
-          { key: 'marketplace', label: 'Cửa hàng', icon: '🛍️' },
-          { key: 'exchange', label: 'Trao đổi P2P', icon: '🤝' },
-          { key: 'my-items', label: 'Của tôi', icon: '📦' }
+          { id: 'marketplace', label: 'Cửa hàng', icon: '🛍️' },
+          { id: 'exchange', label: 'P2P Exchange', icon: '🔄' },
+          { id: 'my-items', label: 'Của tôi', icon: '📦' }
         ].map(tab => (
           <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md font-medium transition-all ${
-              activeTab === tab.key
-                ? 'bg-white shadow-sm text-green-600'
-                : 'text-gray-600 hover:text-green-600'
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex-1 py-3 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
             }`}
           >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
+            <span className="mr-2">{tab.icon}</span>
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      <div className="space-y-4">
-        {activeTab === 'marketplace' && (
-          <div className="space-y-4">
-            {/* Category Filter */}
-            <div className="flex space-x-2 overflow-x-auto pb-2">
-              {[
-                { key: 'all', label: 'Tất cả', icon: '🔍' },
-                { key: 'voucher', label: 'Voucher', icon: '🎫' },
-                { key: 'experience', label: 'Trải nghiệm', icon: '🌟' },
-                { key: 'product', label: 'Sản phẩm', icon: '📦' },
-                { key: 'service', label: 'Dịch vụ', icon: '⚡' }
-              ].map(category => (
-                <button
-                  key={category.key}
-                  onClick={() => setSelectedCategory(category.key)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-full whitespace-nowrap transition-all ${
-                    selectedCategory === category.key
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  <span>{category.icon}</span>
-                  <span>{category.label}</span>
-                </button>
-              ))}
-            </div>
+      {/* Marketplace Tab */}
+      {activeTab === 'marketplace' && (
+        <div className="space-y-6">
+          {/* Category Filter */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: 'voucher', label: 'Voucher' },
+              { id: 'experience', label: 'Trải nghiệm' },
+              { id: 'service', label: 'Dịch vụ' },
+              { id: 'product', label: 'Sản phẩm' }
+            ].map(category => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === category.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-[#161B22] text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Marketplace Items */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredMarketplace.map(item => (
-                <div key={item.id} className="card p-4 hover:shadow-lg transition-all">
-                  <div className="flex items-start justify-between mb-3">
+          {/* Items Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredItems.map(item => (
+              <div key={item.id} className="bg-[#161B22] border border-gray-700 rounded-lg overflow-hidden hover:border-blue-500 transition-colors">
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-4">
                     <div className="text-4xl">{item.image}</div>
-                    <div className="flex flex-col items-end space-y-1">
+                    <div className="text-right">
                       {item.isExclusive && (
-                        <span className="badge bg-yellow-500 text-white text-xs">Độc quyền</span>
-                      )}
-                      <span className={`badge text-white text-xs ${getProviderColor(item.provider)}`}>
-                        {item.provider.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <h4 className="font-bold mb-2">{item.name}</h4>
-                  <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-
-                  <div className="flex items-center space-x-2 mb-3">
-                    <div className="flex text-yellow-400">
-                      {[...Array(5)].map((_, i) => (
-                        <span key={i}>{i < Math.floor(item.rating) ? '⭐' : '☆'}</span>
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-600">({item.rating})</span>
-                  </div>
-
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg font-bold text-green-600">
-                          {formatSVT(item.price)} SVT
+                        <span className="bg-yellow-600 text-yellow-100 px-2 py-1 rounded-full text-xs font-bold mb-2 block">
+                          EXCLUSIVE
                         </span>
-                        {item.originalPrice && (
-                          <span className="text-sm text-gray-500 line-through">
-                            {formatSVT(item.originalPrice)} SVT
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        Còn lại: {item.availability} items
-                      </div>
+                      )}
+                      <div className="text-2xl font-bold text-blue-400">{item.price} SVT</div>
+                      {item.originalPrice && (
+                        <div className="text-sm text-gray-500 line-through">{item.originalPrice} SVT</div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="text-xs text-gray-500 mb-3">
-                    Hạn: {new Date(item.validUntil).toLocaleDateString('vi-VN')}
+                  
+                  <h3 className="text-lg font-bold text-white mb-2">{item.name}</h3>
+                  <p className="text-gray-400 text-sm mb-4">{item.description}</p>
+                  
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center">
+                      <span className="text-yellow-400">★</span>
+                      <span className="text-sm text-gray-400 ml-1">{item.rating}</span>
+                    </div>
+                    <div className="text-sm text-gray-400">
+                      Còn {item.availability} sản phẩm
+                    </div>
                   </div>
-
+                  
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xs bg-gray-700 px-2 py-1 rounded uppercase text-gray-300">
+                      {item.provider}
+                    </span>
+                    <span className="text-xs text-gray-500">Hết hạn: {item.validUntil}</span>
+                  </div>
+                  
                   <button
-                    onClick={() => purchaseItem(item)}
-                    disabled={userSVT < item.price || item.availability === 0}
-                    className={`w-full py-2 px-4 rounded-lg font-medium transition-all ${
-                      userSVT >= item.price && item.availability > 0
-                        ? 'bg-green-500 text-white hover:bg-green-600'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    onClick={() => handlePurchase(item)}
+                    disabled={item.availability === 0 || userSVT < item.price}
+                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                      item.availability === 0
+                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                        : userSVT < item.price
+                        ? 'bg-red-900 text-red-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
                     }`}
                   >
-                    {userSVT >= item.price ? 'Mua ngay' : 'Không đủ SVT'}
+                    {item.availability === 0
+                      ? '🚫 Hết hàng'
+                      : userSVT < item.price
+                      ? '💰 Không đủ SVT'
+                      : '🛒 Mua ngay'
+                    }
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
 
-        {activeTab === 'exchange' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold">Trao đổi Peer-to-Peer</h3>
-              <button className="btn btn-primary">+ Đăng bán</button>
+          {filteredItems.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🛍️</div>
+              <h3 className="text-xl font-bold text-gray-400 mb-2">Không có sản phẩm</h3>
+              <p className="text-gray-500">Thử thay đổi bộ lọc hoặc quay lại sau!</p>
             </div>
+          )}
+        </div>
+      )}
 
-            <div className="space-y-4">
-              {exchangeItems.map(item => (
-                <div key={item.id} className="card p-4 flex items-center space-x-4">
-                  <div className="text-5xl">{item.image}</div>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-bold mb-1">{item.name}</h4>
-                        <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                        
-                        <div className="flex items-center space-x-4 text-sm">
-                          <span className={`font-medium ${getConditionColor(item.condition)}`}>
-                            {item.condition === 'new' ? 'Mới' : 
-                             item.condition === 'like-new' ? 'Như mới' : 'Tốt'}
-                          </span>
-                          <span className="text-gray-600">
-                            Đăng: {new Date(item.postedDate).toLocaleDateString('vi-VN')}
-                          </span>
-                        </div>
-                      </div>
+      {/* P2P Exchange Tab */}
+      {activeTab === 'exchange' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Sàn giao dịch P2P</h2>
+            <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium">
+              + Đăng tin bán
+            </button>
+          </div>
 
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-green-600">
-                          {formatSVT(item.offerPrice)} SVT
-                        </div>
-                        <div className="text-sm text-gray-500 line-through">
-                          {formatSVT(item.originalPrice)} SVT
-                        </div>
-                        <div className="text-xs text-green-600">
-                          Tiết kiệm {Math.round((1 - item.offerPrice/item.originalPrice) * 100)}%
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{item.sellerName}</span>
-                        <div className="flex text-yellow-400 text-xs">
-                          {[...Array(5)].map((_, i) => (
-                            <span key={i}>{i < Math.floor(item.sellerRating) ? '⭐' : '☆'}</span>
-                          ))}
-                        </div>
-                        <span className="text-xs text-gray-600">({item.sellerRating})</span>
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <button className="btn btn-outline text-sm">Nhắn tin</button>
-                        <button 
-                          className="btn btn-primary text-sm"
-                          disabled={userSVT < item.offerPrice}
-                        >
-                          Mua ngay
-                        </button>
-                      </div>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {exchangeItems.map(item => (
+              <div key={item.id} className="bg-[#161B22] border border-gray-700 rounded-lg p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="text-3xl">{item.image}</div>
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-green-400">{item.offerPrice} SVT</div>
+                    <div className="text-sm text-gray-500 line-through">{item.originalPrice} SVT</div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'my-items' && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">Vật phẩm của tôi</h3>
-            
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myItems.map(item => (
-                <div key={item.id} className="card p-4">
-                  <div className="text-4xl mb-3">{item.image}</div>
-                  <h4 className="font-bold mb-2">{item.name}</h4>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={`badge ${
-                      item.type === 'active' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'
+                
+                <h3 className="text-lg font-bold text-white mb-2">{item.name}</h3>
+                <p className="text-gray-400 text-sm mb-4">{item.description}</p>
+                
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <p className="text-sm text-gray-400">Người bán</p>
+                    <p className="text-white font-medium">{item.sellerName}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center">
+                      <span className="text-yellow-400">★</span>
+                      <span className="text-sm text-gray-400 ml-1">{item.sellerRating}</span>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      item.condition === 'new' ? 'bg-green-900 text-green-400' :
+                      item.condition === 'like-new' ? 'bg-blue-900 text-blue-400' :
+                      'bg-yellow-900 text-yellow-400'
                     }`}>
-                      {item.type === 'active' ? 'Đang dùng' : 'Đã mua'}
+                      {item.condition === 'new' ? 'Mới' : item.condition === 'like-new' ? 'Như mới' : 'Tốt'}
                     </span>
-                    <span className="text-gray-600">
-                      HSD: {new Date(item.expiryDate).toLocaleDateString('vi-VN')}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex space-x-2">
-                    <button className="flex-1 btn btn-outline text-sm">Sử dụng</button>
-                    <button className="flex-1 btn btn-primary text-sm">Trao đổi</button>
                   </div>
                 </div>
-              ))}
-            </div>
+                
+                <p className="text-xs text-gray-500 mb-4">Đăng ngày: {item.postedDate}</p>
+                
+                <button
+                  disabled={userSVT < item.offerPrice}
+                  className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                    userSVT < item.offerPrice
+                      ? 'bg-red-900 text-red-400 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  {userSVT < item.offerPrice ? '💰 Không đủ SVT' : '💬 Liên hệ mua'}
+                </button>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+
+          {exchangeItems.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🔄</div>
+              <h3 className="text-xl font-bold text-gray-400 mb-2">Chưa có tin đăng</h3>
+              <p className="text-gray-500">Hãy là người đầu tiên đăng tin bán trên sàn P2P!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* My Items Tab */}
+      {activeTab === 'my-items' && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📦</div>
+          <h3 className="text-xl font-bold text-gray-400 mb-2">Kho đồ của tôi</h3>
+          <p className="text-gray-500">Chức năng đang được phát triển</p>
+        </div>
+      )}
     </div>
   );
 };
