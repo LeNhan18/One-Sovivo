@@ -19,10 +19,24 @@ interface UserProfile {
   investmentGoals?: string[];
 }
 
-// Initialize Gemini AI
+// Initialize Gemini AI with multiple model fallbacks
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDxF5rCqGT8v-7hP8j2mN9kL3nQ1rS6wE4';
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+// Try different models in order of preference
+const getModel = () => {
+  const modelNames = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro", 
+    "gemini-pro",
+    "gemini-1.0-pro"
+  ];
+  
+  // For now, use the most stable one
+  return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+};
+
+const model = getModel();
 
 const AIFinancialAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -53,17 +67,15 @@ const AIFinancialAssistant: React.FC = () => {
         if (response.ok) {
           const userData = await response.json();
           
-          // Get SVT balance
-          const svtResponse = await fetch(`http://127.0.0.1:5000/api/tokens?customer_id=${userData.customer_id}`);
+          // Get SVT balance from correct endpoint
+          const svtResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${userData.customer_id}`);
           let svtBalance = 0;
           let transactionCount = 0;
           
           if (svtResponse.ok) {
             const svtData = await svtResponse.json();
-            transactionCount = svtData.length;
-            if (svtData.length > 0) {
-              svtBalance = parseFloat(svtData[0]?.balance_after) || 0;
-            }
+            svtBalance = svtData.total_svt || 0;
+            transactionCount = svtData.transactions?.length || 0;
           }
 
           setUserProfile({
@@ -101,11 +113,19 @@ const AIFinancialAssistant: React.FC = () => {
     "Lập kế hoạch tài chính 5 năm dựa trên thu nhập của tôi"
   ];
 
-  // Enhanced AI response using Gemini with professional system prompt
+  // Enhanced AI response using Gemini with model fallback
   const generateGeminiResponse = async (userMessage: string): Promise<string> => {
-    try {
-      // Professional System Prompt
-      const systemPrompt = `Bạn là một Trợ lý Tài chính AI chuyên nghiệp của Tập đoàn Sovico.
+    const modelNames = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
+    
+    for (const modelName of modelNames) {
+      try {
+        console.log(`🤖 Trying Gemini model: ${modelName}`);
+        
+        // Try each model
+        const currentModel = genAI.getGenerativeModel({ model: modelName });
+        
+        // Professional System Prompt
+        const systemPrompt = `Bạn là một Trợ lý Tài chính AI chuyên nghiệp của Tập đoàn Sovico.
 Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên dữ liệu 360° của khách hàng.
 
 **KIẾN THỨC NỀN TẢNG VỀ HỆ SINH THÁI SOVICO:**
@@ -142,8 +162,8 @@ Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên d
 6. Đưa ra timeline và action steps cụ thể
 7. Tính toán ROI và lợi ích số liệu cụ thể`;
 
-      // Build complete prompt with user profile
-      const fullPrompt = `${systemPrompt}
+        // Build complete prompt with user profile
+        const fullPrompt = `${systemPrompt}
 
 **HỒ SƠ KHÁCH HÀNG HIỆN TẠI:**
 - 👤 Tên: ${userProfile?.name || 'Khách hàng'}
@@ -161,13 +181,28 @@ Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên d
 
 Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chính cá nhân hóa, bao gồm chiến lược sử dụng hệ sinh thái Sovico một cách tối ưu.`;
 
-      const result = await model.generateContent(fullPrompt);
-      const response = await result.response;
-      return response.text();
-    } catch (error) {
-      console.error('Gemini API Error:', error);
-      return generateLocalResponse(userMessage);
+        const result = await currentModel.generateContent(fullPrompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        console.log(`✅ Success with ${modelName}! Response length:`, text.length);
+        return text;
+        
+      } catch (error: any) {
+        console.warn(`⚠️ Model ${modelName} failed:`, error.message);
+        
+        // If this is the last model, throw the error
+        if (modelName === modelNames[modelNames.length - 1]) {
+          throw error;
+        }
+        
+        // Otherwise continue to next model
+        continue;
+      }
     }
+    
+    // This should never be reached, but just in case
+    throw new Error('All Gemini models failed');
   };
 
   const generateLocalResponse = (userMessage: string): string => {
@@ -333,12 +368,32 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
       };
 
       setMessages(prev => [...prev, aiResponse]);
-    } catch (error) {
-      console.error('Error generating response:', error);
+    } catch (error: any) {
+      console.error('❌ Error generating response:', error);
+      
+      let errorMessage = '❌ **Xin lỗi, AI gặp sự cố**\n\n';
+      
+      if (error.message && error.message.includes('GoogleGenerativeAI')) {
+        errorMessage += '🔧 **Vấn đề Gemini AI:**\n';
+        errorMessage += '• API có thể bị giới hạn hoặc model không khả dụng\n';
+        errorMessage += '• Đang chuyển sang chế độ tư vấn cơ bản\n\n';
+        errorMessage += generateLocalResponse(currentInput);
+      } else if (error.message && error.message.includes('fetch')) {
+        errorMessage += '🌐 **Vấn đề kết nối mạng:**\n';
+        errorMessage += '• Kiểm tra kết nối internet\n';
+        errorMessage += '• Thử lại sau vài giây\n';
+      } else {
+        errorMessage += '⚠️ **Lỗi không xác định:**\n';
+        errorMessage += '• Vui lòng thử lại hoặc liên hệ support\n';
+        errorMessage += '• Hotline: 1900-1234\n';
+      }
+      
+      errorMessage += '\n---\n💡 *Tip: Bạn có thể toggle sang "Local AI" để sử dụng tư vấn offline*';
+      
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: '❌ Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau hoặc liên hệ support.',
+        content: errorMessage,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorResponse]);
