@@ -1889,15 +1889,10 @@ def complete_mission_api(customer_id):
             'error': 'Failed to complete mission',
             'details': str(e)
         }), 500
-                transaction_type='mission_reward',
-                description=f'Hoàn thành nhiệm vụ: {mission_record.mission_title}',
-                tx_hash=tx_hash
-            )
-            db.session.add(reward_transaction)
-        
-        db.session.commit()
-        
-        # Kiểm tra xem có unlock missions mới không
+
+
+@app.route('/api/missions/<int:customer_id>/progress/<mission_id>', methods=['GET'])
+def get_mission_progress_api(customer_id, mission_id):
         updated_customer_data = get_customer_data_for_missions(customer_id)
         completed_missions_query = CustomerMission.query.filter_by(
             customer_id=customer_id, 
