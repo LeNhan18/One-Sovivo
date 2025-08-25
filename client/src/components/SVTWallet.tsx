@@ -164,26 +164,28 @@ const SVTWallet: React.FC = () => {
     fetchData();
   }, [customerId]);
 
-  // Load missions with progression system
-  const loadProgressiveMissions = async () => {
-    if (!customerId) return [];
+  // Load missions data
+  const loadMissions = async () => {
+    if (!customerId) return;
 
     try {
+      // Try to load from mission progression system first
       const response = await fetch(`http://127.0.0.1:5000/api/missions/${customerId}`);
       const data = await response.json();
 
       if (data.success) {
+        // Update progression info
         setCustomerLevel(data.customer_level || 'Beginner');
         setCustomerType(data.customer_type || 'new');
         setProgressionStats(data.progression_stats || {});
 
         // Convert API missions to component format
-        return data.recommended_missions.map((mission: any) => ({
+        const progressiveMissions = data.recommended_missions.map((mission: any) => ({
           id: mission.id,
           title: mission.title,
           description: mission.description,
           reward: mission.svt_reward,
-          progress: 0,
+          progress: 0, // Will be updated with real progress
           maxProgress: 100,
           isCompleted: false,
           deadline: mission.estimated_time || 'Không giới hạn',
@@ -192,11 +194,24 @@ const SVTWallet: React.FC = () => {
           level: mission.level || 'beginner',
           customerType: mission.customer_type || 'new'
         }));
+
+        setMissions(progressiveMissions);
+        console.log(`🎯 Loaded ${progressiveMissions.length} progressive missions for ${data.customer_type} customer (${data.customer_level})`);
+        return;
       }
     } catch (error) {
-      console.error('Error loading progressive missions:', error);
+      console.error('Mission progression system not available, using fallback:', error);
     }
-    return [];
+
+    // Fallback to dynamic missions if progression system fails
+    try {
+      const customerData = { customer_id: customerId };
+      const dynamicMissions = generateDynamicMissions(customerData);
+      setMissions(dynamicMissions);
+      console.log(`🔄 Using fallback dynamic missions: ${dynamicMissions.length} missions`);
+    } catch (error) {
+      console.error('Error loading missions:', error);
+    }
   };
 
   // Helper function to map API category to component category type
@@ -427,6 +442,50 @@ const SVTWallet: React.FC = () => {
 
   const claimMissionReward = async (missionId: string) => {
     try {
+      console.log(`🏆 Claiming reward for mission: ${missionId}`);
+
+      // Try to complete mission through progression system first
+      try {
+        const completeResponse = await fetch(`http://127.0.0.1:5000/api/missions/${customerId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            mission_id: missionId,
+            log_blockchain: true 
+          })
+        });
+
+        const completeData = await completeResponse.json();
+
+        if (completeData.success) {
+          // Mission completed successfully through progression system
+          alert(`🎉 ${completeData.message}\n💰 Nhận được: ${completeData.svt_reward} SVT\n🔗 TX Hash: ${completeData.tx_hash || 'N/A'}`);
+          
+          // Reload missions to get new available ones
+          await loadMissions();
+          
+          // Reload SVT balance
+          const balanceResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`);
+          if (balanceResponse.ok) {
+            const balanceData = await balanceResponse.json();
+            setSvtBalance(balanceData.total_svt || 0);
+          }
+
+          console.log(`✅ Mission completed! New missions unlocked: ${completeData.newly_unlocked_missions}`);
+          
+          if (completeData.next_recommendations?.length > 0) {
+            console.log('🎯 Next recommended missions:', completeData.next_recommendations.map((m: any) => m.title));
+          }
+          
+          return;
+        } else if (completeResponse.status === 400) {
+          console.log('⚠️ Mission not ready for completion through progression system, using fallback');
+        }
+      } catch (progressionError) {
+        console.log('Mission progression system not available, using fallback:', progressionError);
+      }
+
+      // Fallback to old mission system
       const mission = missions.find(m => m.id === missionId);
       if (!mission || !mission.isCompleted || mission.claimed) return;
 
@@ -461,6 +520,12 @@ const SVTWallet: React.FC = () => {
         
         // Show success with blockchain transaction hash
         alert(`🎉 Nhận thành công ${mission.reward} SVT!\n\n🔗 Blockchain TX: ${result.tx_hash || 'Pending...'}\n⛽ Gas Used: ${result.gas_used || 'N/A'}`);
+
+        // Generate new missions after claiming
+        setTimeout(async () => {
+          await loadMissions();
+          console.log('🔄 Missions reloaded after reward claim');
+        }, 1000);
       } else {
         throw new Error('Failed to claim reward');
       }
