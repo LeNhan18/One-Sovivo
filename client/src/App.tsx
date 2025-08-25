@@ -2,15 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { Dashboard } from './modules/Dashboard'
 import { SuperApp } from './modules/SuperApp'
 import { AuthPanel } from './parts/AuthPanel'
-import { me, setToken } from './services/auth'
+import { me, setToken, AuthUser } from './services/auth'
 
 export type UserRole = 'admin' | 'customer'
-
-export type AuthUser = {
-  email: string
-  name: string
-  role: UserRole
-}
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -20,10 +14,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     me().then((u) => {
       if (u) {
-        // Determine user role based on email domain for demo
-        const role: UserRole = u.email.includes('@hdbank.') || u.email.includes('@sovico.') ? 'admin' : 'customer'
-        setUser({ ...u, role })
-        setSelectedApp(role === 'admin' ? 'dashboard' : 'superapp')
+        setUser(u) // Backend đã trả về role, không cần xử lý thêm
+        setSelectedApp(u.role === 'admin' ? 'dashboard' : 'superapp')
       }
     }).finally(() => setChecking(false))
   }, [])
@@ -33,12 +25,9 @@ export const App: React.FC = () => {
     setUser(null)
   }
 
-  const handleLoginSuccess = (authUser: { email: string; name: string }) => {
-    // Determine role based on email for demo purposes
-    const role: UserRole = authUser.email.includes('@hdbank.') || authUser.email.includes('@sovico.') ? 'admin' : 'customer'
-    const user: AuthUser = { ...authUser, role }
-    setUser(user)
-    setSelectedApp(role === 'admin' ? 'dashboard' : 'superapp')
+  const handleLoginSuccess = (authUser: AuthUser) => {
+    setUser(authUser)
+    setSelectedApp(authUser.role === 'admin' ? 'dashboard' : 'superapp')
   }
 
   if (checking) {

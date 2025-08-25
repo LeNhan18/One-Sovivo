@@ -12,6 +12,7 @@ interface Mission {
   isCompleted: boolean;
   deadline: string;
   category: 'aviation' | 'finance' | 'shopping' | 'travel' | 'combo';
+  claimed?: boolean;
 }
 
 interface Achievement {
@@ -34,394 +35,761 @@ interface SVTTransaction {
 }
 
 const SVTWallet: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'wallet' | 'missions' | 'achievements' | 'history'>('wallet');
-  const [svtBalance, setSvtBalance] = useState(15750);
-  const [totalLifetimeEarned, setTotalLifetimeEarned] = useState(45230);
+  const [activeTab, setActiveTab] = useState<'wallet' | 'missions' | 'achievements' | 'history' | 'leaderboard'>('wallet');
+  const [svtBalance, setSvtBalance] = useState(0);
+  const [totalLifetimeEarned, setTotalLifetimeEarned] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [transactions, setTransactions] = useState<SVTTransaction[]>([]);
+  const [customerLevel, setCustomerLevel] = useState<string>('Beginner');
+  const [customerType, setCustomerType] = useState<string>('new');
+  const [progressionStats, setProgressionStats] = useState<any>({});
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
-  const [missions, setMissions] = useState<Mission[]>([
-    {
-      id: 'M001',
-      title: 'Nhà Du hành Thông thái',
-      description: 'Thực hiện 1 chuyến bay và gửi tiết kiệm 10 triệu trong tháng này',
-      requirements: ['Đặt và hoàn thành 1 chuyến bay Vietjet', 'Gửi tiết kiệm tối thiểu 10,000,000 VND tại HDBank'],
-      reward: 2000,
-      badge: '🧠✈️',
+  // Get customer ID from auth
+  useEffect(() => {
+    const getCustomerId = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+        
+        const response = await fetch('http://127.0.0.1:5000/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const user = await response.json();
+          setCustomerId(user.customer_id || 1001);
+        }
+      } catch (error) {
+        console.error('Error getting customer ID:', error);
+        setCustomerId(1001); // fallback
+      }
+    };
+    
+    getCustomerId();
+  }, []);
+
+  // Fetch real data when customerId is available
+  useEffect(() => {
+    if (!customerId) return;
+    
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch SVT balance
+        const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`);
+        if (tokensResponse.ok) {
+          const tokensData = await tokensResponse.json();
+          setSvtBalance(tokensData.total_svt || 0);
+          
+          // Calculate lifetime earned (sum of all positive transactions)
+          const lifetime = tokensData.transactions?.filter((t: any) => t.amount > 0)
+            .reduce((sum: number, t: any) => sum + t.amount, 0) || 0;
+          setTotalLifetimeEarned(lifetime);
+          
+          // Format transactions for display
+          const formattedTxs = tokensData.transactions?.map((tx: any) => ({
+            id: tx.id.toString(),
+            type: tx.amount > 0 ? 'earn' as const : 'spend' as const,
+            amount: Math.abs(tx.amount),
+            description: tx.description || tx.transaction_type,
+            date: new Date(tx.created_at).toLocaleDateString('vi-VN'),
+            source: tx.transaction_type,
+            balance: tokensData.total_svt
+          })) || [];
+          setTransactions(formattedTxs);
+        }
+
+        // Fetch achievements
+        const achievementsResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}/achievements`);
+        if (achievementsResponse.ok) {
+          const achievementsData = await achievementsResponse.json();
+          const formattedAchievements = achievementsData.achievements?.map((ach: any) => ({
+            id: ach.id.toString(),
+            name: ach.name,
+            description: ach.description,
+            icon: ach.badge_image_url || '🏆',
+            earnedDate: new Date(ach.unlocked_at).toLocaleDateString('vi-VN')
+          })) || [];
+          setAchievements(formattedAchievements);
+        }
+
+        // For missions, we'll create some dynamic missions based on customer data
+        const customerResponse = await fetch(`http://127.0.0.1:5000/customer/${customerId}`);
+        if (customerResponse.ok) {
+          const customerData = await customerResponse.json();
+          const dynamicMissions = generateDynamicMissions(customerData);
+          setMissions(dynamicMissions);
+        }
+
+      } catch (error) {
+        console.error('Error fetching wallet data:', error);
+        // Fallback missions với business logic thực tế
+        setMissions([
+          {
+            id: 'M001',
+            title: 'Khám Phá Sovico',
+            description: 'Đăng nhập và khám phá các dịch vụ Sovico để nhận thưởng',
+            requirements: ['Đăng nhập hệ thống', 'Xem profile NFT'],
+            reward: 100,
+            badge: '🎯',
+            progress: 1,
+            maxProgress: 1,
+            isCompleted: true,
+            deadline: '2025-12-31',
+            category: 'combo'
+          },
+          {
+            id: 'M002', 
+            title: 'Nhà Đầu Tư Mới',
+            description: 'Bắt đầu hành trình đầu tư với gói cơ bản',
+            requirements: ['Nạp tối thiểu 1,000,000 VND'],
+            reward: 500,
+            badge: '�',
+            progress: 0,
+            maxProgress: 1,
+            isCompleted: false,
+            deadline: '2025-12-31',
+            category: 'finance'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [customerId]);
+
+  // Load missions data
+  const loadMissions = async () => {
+    if (!customerId) return;
+
+    try {
+      // Try to load from mission progression system first
+      const response = await fetch(`http://127.0.0.1:5000/api/missions/${customerId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        // Update progression info
+        setCustomerLevel(data.customer_level || 'Beginner');
+        setCustomerType(data.customer_type || 'new');
+        setProgressionStats(data.progression_stats || {});
+
+        // Convert API missions to component format
+        const progressiveMissions = data.recommended_missions.map((mission: any) => ({
+          id: mission.id,
+          title: mission.title,
+          description: mission.description,
+          reward: mission.svt_reward,
+          progress: 0, // Will be updated with real progress
+          maxProgress: 100,
+          isCompleted: false,
+          deadline: mission.estimated_time || 'Không giới hạn',
+          category: mapCategoryToType(mission.category),
+          icon: mission.icon || '🎯',
+          level: mission.level || 'beginner',
+          customerType: mission.customer_type || 'new'
+        }));
+
+        setMissions(progressiveMissions);
+        console.log(`🎯 Loaded ${progressiveMissions.length} progressive missions for ${data.customer_type} customer (${data.customer_level})`);
+        return;
+      }
+    } catch (error) {
+      console.error('Mission progression system not available, using fallback:', error);
+    }
+
+    // Fallback to dynamic missions if progression system fails
+    try {
+      const customerData = { customer_id: customerId };
+      const dynamicMissions = generateDynamicMissions(customerData);
+      setMissions(dynamicMissions);
+      console.log(`🔄 Using fallback dynamic missions: ${dynamicMissions.length} missions`);
+    } catch (error) {
+      console.error('Error loading missions:', error);
+    }
+  };
+
+  // Helper function to map API category to component category type
+  const mapCategoryToType = (apiCategory: string): 'aviation' | 'finance' | 'shopping' | 'travel' | 'combo' => {
+    const mapping: Record<string, 'aviation' | 'finance' | 'shopping' | 'travel' | 'combo'> = {
+      'onboarding': 'finance',
+      'profile': 'finance', 
+      'financial': 'finance',
+      'travel': 'aviation',
+      'lifestyle': 'shopping',
+      'social': 'combo',
+      'investment': 'finance',
+      'loyalty': 'combo'
+    };
+    return mapping[apiCategory] || 'finance';
+  };
+
+  // Function to generate dynamic missions based on customer data
+  const generateDynamicMissions = (customerData: any): Mission[] => {
+    const missions: Mission[] = [];
+    const today = new Date();
+    const deadline = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // 🎯 PROFILE COMPLETION MISSIONS
+    const profileComplete = customerData.basic_info?.name && customerData.basic_info?.age && customerData.basic_info?.city;
+    if (!profileComplete) {
+      missions.push({
+        id: 'M_PROFILE',
+        title: 'Hoàn Thiện Hồ Sơ',
+        description: 'Cập nhật đầy đủ thông tin cá nhân để nhận 500 SVT',
+        requirements: ['Điền họ tên', 'Điền tuổi', 'Điền thành phố'],
+        reward: 500,
+        badge: '👤',
+        progress: 0,
+        maxProgress: 1,
+        isCompleted: false,
+        deadline,
+        category: 'combo'
+      });
+    }
+
+    // ✅ DAILY CHECK-IN MISSIONS
+    missions.push({
+      id: 'M_CHECKIN',
+      title: 'Điểm Danh Hàng Ngày',
+      description: 'Đăng nhập mỗi ngày để nhận 100 SVT',
+      requirements: ['Đăng nhập vào app'],
+      reward: 100,
+      badge: '📅',
       progress: 1,
-      maxProgress: 2,
-      isCompleted: false,
-      deadline: '2025-08-31',
+      maxProgress: 1,
+      isCompleted: true,
+      deadline,
       category: 'combo'
-    },
-    {
-      id: 'M002',
-      title: 'Khách hàng Platinum',
-      description: 'Duy trì số dư trung bình 50 triệu trong 3 tháng',
-      requirements: ['Số dư TB ≥ 50,000,000 VND trong 90 ngày'],
-      reward: 5000,
-      badge: '💎',
-      progress: 2,
+    });
+
+    // 💰 FIRST TRANSACTION MISSION
+    missions.push({
+      id: 'M_FIRST_TRANSACTION',
+      title: 'Giao Dịch Đầu Tiên',
+      description: 'Thực hiện giao dịch đầu tiên để nhận 300 SVT',
+      requirements: ['Mua sắm hoặc chuyển tiền qua Sovico'],
+      reward: 300,
+      badge: '💳',
+      progress: 0,
+      maxProgress: 1,
+      isCompleted: false,
+      deadline,
+      category: 'finance'
+    });
+
+    // ✈️ FLIGHT MISSIONS
+    const flights = customerData.vietjet_summary?.total_flights_last_year || 0;
+    if (flights < 10) {
+      missions.push({
+        id: 'M_FLIGHT',
+        title: 'Phi Công Mới',
+        description: 'Thực hiện 3 chuyến bay để nâng cấp tài khoản',
+        requirements: ['Đặt và hoàn thành 3 chuyến bay Vietjet'],
+        reward: 1500,
+        badge: '✈️',
+        progress: flights % 3,
+        maxProgress: 3,
+        isCompleted: false,
+        deadline,
+        category: 'aviation'
+      });
+    }
+
+    // 💰 BANKING MISSIONS
+    const balance = customerData.hdbank_summary?.average_balance || 0;
+    if (balance < 50000000) {
+      missions.push({
+        id: 'M_BANK',
+        title: 'Nhà Đầu Tư Thông Minh',
+        description: 'Duy trì số dư trung bình 50 triệu trong tháng',
+        requirements: ['Gửi tiết kiệm tối thiểu 50,000,000 VND'],
+        reward: 2000,
+        badge: '💰',
+        progress: Math.min(balance / 50000000, 1),
+        maxProgress: 1,
+        isCompleted: balance >= 50000000,
+        deadline,
+        category: 'finance'
+      });
+    }
+
+    // 🏝️ RESORT MISSIONS
+    const nights = customerData.resort_summary?.total_nights_stayed || 0;
+    if (nights < 5) {
+      missions.push({
+        id: 'M_RESORT',
+        title: 'Người Nghỉ Dưỡng',
+        description: 'Trải nghiệm 2 đêm tại resort Sovico',
+        requirements: ['Đặt và nghỉ 2 đêm tại resort'],
+        reward: 1000,
+        badge: '🏝️',
+        progress: nights % 2,
+        maxProgress: 2,
+        isCompleted: false,
+        deadline,
+        category: 'travel'
+      });
+    }
+
+    // 🛒 MARKETPLACE MISSIONS
+    missions.push({
+      id: 'M_MARKETPLACE',
+      title: 'Mua Sắm Thông Minh',
+      description: 'Mua 3 sản phẩm từ SVT Marketplace',
+      requirements: ['Mua 3 items bất kỳ với SVT'],
+      reward: 800,
+      badge: '🛒',
+      progress: 0,
       maxProgress: 3,
       isCompleted: false,
-      deadline: '2025-09-15',
-      category: 'finance'
-    },
-    {
-      id: 'M003',
-      title: 'Sky Explorer',
-      description: 'Bay 5 tuyến khác nhau trong quý này',
-      requirements: ['Hoàn thành 5 chuyến bay đến các điểm đến khác nhau'],
-      reward: 3500,
-      badge: '🌏✈️',
-      progress: 3,
-      maxProgress: 5,
-      isCompleted: false,
-      deadline: '2025-09-30',
-      category: 'aviation'
-    },
-    {
-      id: 'M004',
-      title: 'Tín đồ Mua sắm',
-      description: 'Chi tiêu 5 triệu qua HDSaison trong tháng',
-      requirements: ['Tổng chi tiêu ≥ 5,000,000 VND qua HDSaison'],
-      reward: 1500,
-      badge: '🛍️💳',
-      progress: 4,
-      maxProgress: 5,
-      isCompleted: false,
-      deadline: '2025-08-31',
+      deadline,
       category: 'shopping'
-    }
-  ]);
+    });
 
-  const [achievements, setAchievements] = useState<Achievement[]>([
-    {
-      id: 'A001',
-      name: 'First Flight',
-      description: 'Hoàn thành chuyến bay đầu tiên',
-      icon: '🛫',
-      earnedDate: '2025-07-15',
-      nftTokenId: 'NFT_FF_001'
-    },
-    {
-      id: 'A002',
-      name: 'Savings Champion',
-      description: 'Đạt mốc 50 triệu tiết kiệm',
-      icon: '🏆💰',
-      earnedDate: '2025-07-28',
-    },
-    {
-      id: 'A003',
-      name: 'Loyalty Star',
-      description: 'Tham gia hệ sinh thái Sovico 6 tháng',
-      icon: '⭐',
-      earnedDate: '2025-08-01',
-    }
-  ]);
+    // 🤖 AI ASSISTANT MISSIONS
+    missions.push({
+      id: 'M_AI',
+      title: 'Tương Tác AI',
+      description: 'Hỏi 5 câu hỏi với AI Financial Advisor',
+      requirements: ['Chat với AI Advisor về tài chính'],
+      reward: 400,
+      badge: '🤖',
+      progress: 0,
+      maxProgress: 5,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
 
-  const [transactions, setTransactions] = useState<SVTTransaction[]>([
-    {
-      id: 'T001',
-      type: 'earn',
-      amount: 2000,
-      description: 'Hoàn thành nhiệm vụ "First Flight"',
-      date: '2025-08-18',
-      source: 'Mission Reward',
-      balance: 15750
-    },
-    {
-      id: 'T002',
-      type: 'spend',
-      amount: -500,
-      description: 'Mua voucher ăn uống 100K',
-      date: '2025-08-17',
-      source: 'SVT Marketplace',
-      balance: 13750
-    },
-    {
-      id: 'T003',
-      type: 'earn',
-      amount: 1200,
-      description: 'Giao dịch HDBank (Bonus 12%)',
-      date: '2025-08-16',
-      source: 'HDBank Transaction',
-      balance: 14250
-    },
-    {
-      id: 'T004',
-      type: 'earn',
-      amount: 800,
-      description: 'Check-in Vietjet flight VJ150',
-      date: '2025-08-15',
-      source: 'Vietjet Reward',
-      balance: 13050
-    }
-  ]);
+    // 📱 MOBILE APP MISSIONS
+    missions.push({
+      id: 'M_MOBILE',
+      title: 'Mobile Super User',
+      description: 'Cài đặt và sử dụng Sovico Mobile App',
+      requirements: ['Download app', 'Đăng nhập mobile'],
+      reward: 600,
+      badge: '📱',
+      progress: 0,
+      maxProgress: 1,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
 
-  const completeMission = (missionId: string) => {
-    setMissions(prev => prev.map(mission => {
-      if (mission.id === missionId && mission.progress >= mission.maxProgress) {
-        setSvtBalance(current => current + mission.reward);
-        return { ...mission, isCompleted: true };
+    // 🎁 REFERRAL MISSIONS
+    missions.push({
+      id: 'M_REFERRAL',
+      title: 'Giới Thiệu Bạn Bè',
+      description: 'Mời 3 bạn bè tham gia Sovico ecosystem',
+      requirements: ['Gửi mã giới thiệu', '3 bạn đăng ký thành công'],
+      reward: 2500,
+      badge: '🎁',
+      progress: 0,
+      maxProgress: 3,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
+
+    // 🏆 ACHIEVEMENT HUNTER
+    missions.push({
+      id: 'M_ACHIEVEMENT',
+      title: 'Thợ Săn Thành Tựu',
+      description: 'Mở khóa 10 achievements để trở thành VIP',
+      requirements: ['Đạt 10 achievements bất kỳ'],
+      reward: 3000,
+      badge: '🏆',
+      progress: 0,
+      maxProgress: 10,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
+
+    return missions;
+  };
+
+  const handleCompleteMission = async (mission: Mission) => {
+    try {
+      // Simulate completing the mission
+      setMissions(prev => prev.map(m => {
+        if (m.id === mission.id) {
+          return { 
+            ...m, 
+            isCompleted: true, 
+            progress: m.maxProgress,
+            claimed: false 
+          };
+        }
+        return m;
+      }));
+
+      // Call API to update SVT balance (optional - for real implementation)
+      // await fetch(`http://127.0.0.1:5000/api/missions/${mission.id}/complete`, { method: 'POST' });
+      
+      alert(`🎉 Hoàn thành nhiệm vụ "${mission.title}"! Nhấn "Nhận thưởng" để claim ${mission.reward} SVT.`);
+    } catch (error) {
+      console.error('Error completing mission:', error);
+      alert('❌ Có lỗi xảy ra khi hoàn thành nhiệm vụ!');
+    }
+  };
+
+  const claimMissionReward = async (missionId: string) => {
+    try {
+      console.log(`🏆 Claiming reward for mission: ${missionId}`);
+
+      // Try to complete mission through progression system first
+      try {
+        const completeResponse = await fetch(`http://127.0.0.1:5000/api/missions/${customerId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            mission_id: missionId,
+            log_blockchain: true 
+          })
+        });
+
+        const completeData = await completeResponse.json();
+
+        if (completeData.success) {
+          // Mission completed successfully through progression system
+          alert(`🎉 ${completeData.message}\n💰 Nhận được: ${completeData.svt_reward} SVT\n🔗 TX Hash: ${completeData.tx_hash || 'N/A'}`);
+          
+          // Reload missions to get new available ones
+          await loadMissions();
+          
+          // Reload SVT balance
+          const balanceResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`);
+          if (balanceResponse.ok) {
+            const balanceData = await balanceResponse.json();
+            setSvtBalance(balanceData.total_svt || 0);
+          }
+
+          console.log(`✅ Mission completed! New missions unlocked: ${completeData.newly_unlocked_missions}`);
+          
+          if (completeData.next_recommendations?.length > 0) {
+            console.log('🎯 Next recommended missions:', completeData.next_recommendations.map((m: any) => m.title));
+          }
+          
+          return;
+        } else if (completeResponse.status === 400) {
+          console.log('⚠️ Mission not ready for completion through progression system, using fallback');
+        }
+      } catch (progressionError) {
+        console.log('Mission progression system not available, using fallback:', progressionError);
       }
-      return mission;
-    }));
-  };
 
-  const formatVND = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+      // Fallback to old mission system
+      const mission = missions.find(m => m.id === missionId);
+      if (!mission || !mission.isCompleted || mission.claimed) return;
 
-  const formatSVT = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN').format(amount);
-  };
+      // Call API to add SVT tokens to database AND log blockchain transaction
+      const response = await fetch(`http://127.0.0.1:5000/api/tokens/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          amount: mission.reward,
+          transaction_type: 'mission_reward',
+          description: `Hoàn thành nhiệm vụ: ${mission.title}`,
+          mission_id: mission.id,
+          log_blockchain: true  // Flag to enable blockchain logging
+        })
+      });
 
-  const getProgressPercentage = (progress: number, max: number) => {
-    return Math.min((progress / max) * 100, 100);
-  };
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update UI
+        setMissions(prev => prev.map(m => {
+          if (m.id === missionId) {
+            return { ...m, claimed: true };
+          }
+          return m;
+        }));
+        
+        setSvtBalance(current => current + mission.reward);
+        
+        // Show success with blockchain transaction hash
+        alert(`🎉 Nhận thành công ${mission.reward} SVT!\n\n🔗 Blockchain TX: ${result.tx_hash || 'Pending...'}\n⛽ Gas Used: ${result.gas_used || 'N/A'}`);
 
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'aviation': return 'bg-blue-500';
-      case 'finance': return 'bg-green-500';
-      case 'shopping': return 'bg-purple-500';
-      case 'travel': return 'bg-orange-500';
-      case 'combo': return 'bg-gradient-to-r from-blue-500 to-purple-500';
-      default: return 'bg-gray-500';
+        // Generate new missions after claiming
+        setTimeout(async () => {
+          await loadMissions();
+          console.log('🔄 Missions reloaded after reward claim');
+        }, 1000);
+      } else {
+        throw new Error('Failed to claim reward');
+      }
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+      alert('❌ Có lỗi xảy ra khi nhận thưởng!');
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div>Đang tải dữ liệu ví...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* SVT Balance Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
+    <div className="bg-[#0D1117] text-white p-6 rounded-lg max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          Ví Sovico Token (SVT)
+        </h1>
+        <p className="text-gray-400">Quản lý token, nhiệm vụ và thành tựu của bạn</p>
+      </div>
+
+      {/* Balance Card */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 mb-8">
+        <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Ví Sovico Token</h2>
-            <div className="text-3xl font-bold">{formatSVT(svtBalance)} SVT</div>
-            <div className="text-purple-200 mt-1">
-              Tổng cộng đã kiếm: {formatSVT(totalLifetimeEarned)} SVT
-            </div>
+            <p className="text-purple-200 text-sm">Số dư hiện tại</p>
+            <p className="text-4xl font-bold">{svtBalance.toLocaleString('vi-VN')} SVT</p>
+            <p className="text-purple-200 text-sm mt-1">
+              ≈ {(svtBalance * 1000).toLocaleString('vi-VN')} VND
+            </p>
           </div>
           <div className="text-6xl">🪙</div>
         </div>
-        
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-purple-400">
-          <div className="text-center">
-            <div className="text-2xl font-bold">{missions.filter(m => m.isCompleted).length}</div>
-            <div className="text-purple-200 text-sm">Nhiệm vụ hoàn thành</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold">{achievements.length}</div>
-            <div className="text-purple-200 text-sm">Thành tựu</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold">{achievements.filter(a => a.nftTokenId).length}</div>
-            <div className="text-purple-200 text-sm">NFT sở hữu</div>
+        <div className="mt-4 pt-4 border-t border-purple-400">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-purple-200 text-sm">Tổng tích lũy</p>
+              <p className="text-xl font-bold">{totalLifetimeEarned.toLocaleString('vi-VN')} SVT</p>
+            </div>
+            <div>
+              <p className="text-purple-200 text-sm">Thành tựu</p>
+              <p className="text-xl font-bold">{achievements.length} huy hiệu</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+      {/* Tabs */}
+      <div className="flex space-x-1 mb-6 bg-[#161B22] rounded-lg p-1">
         {[
-          { key: 'wallet', label: 'Ví Token', icon: '🪙' },
-          { key: 'missions', label: 'Nhiệm vụ', icon: '🎯' },
-          { key: 'achievements', label: 'Thành tựu', icon: '🏆' },
-          { key: 'history', label: 'Lịch sử', icon: '📊' }
+          { id: 'wallet', label: 'Tổng quan', icon: '💰' },
+          { id: 'missions', label: 'Nhiệm vụ', icon: '🎯' },
+          { id: 'achievements', label: 'Thành tựu', icon: '🏆' },
+          { id: 'history', label: 'Lịch sử', icon: '📊' }
         ].map(tab => (
           <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-md font-medium transition-all ${
-              activeTab === tab.key
-                ? 'bg-white shadow-sm text-purple-600'
-                : 'text-gray-600 hover:text-purple-600'
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex-1 py-3 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700'
             }`}
           >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
+            <span className="mr-2">{tab.icon}</span>
+            {tab.label}
           </button>
         ))}
       </div>
 
       {/* Tab Content */}
-      <div className="space-y-4">
-        {activeTab === 'wallet' && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">Thông tin Ví</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="card p-4">
-                <h4 className="font-semibold mb-3">Giá trị quy đổi</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>1 SVT =</span>
-                    <span className="font-medium">1,000 VND</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Tổng giá trị ví:</span>
-                    <span className="font-bold text-green-600">{formatVND(svtBalance * 1000)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="card p-4">
-                <h4 className="font-semibold mb-3">Cấp độ thành viên</h4>
-                <div className="flex items-center space-x-3">
-                  <div className="text-3xl">💎</div>
+      {activeTab === 'missions' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Nhiệm vụ hiện tại</h2>
+            <span className="text-gray-400">{missions.filter(m => !m.isCompleted).length} nhiệm vụ đang hoạt động</span>
+          </div>
+          
+          {missions.map(mission => (
+            <div key={mission.id} className="bg-[#161B22] border border-gray-700 rounded-lg p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center">
+                  <span className="text-3xl mr-4">{mission.badge}</span>
                   <div>
-                    <div className="font-bold text-purple-600">Platinum</div>
-                    <div className="text-sm text-gray-600">15,750 / 20,000 SVT để lên Diamond</div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                      <div className="bg-purple-600 h-2 rounded-full" style={{width: '78.75%'}}></div>
-                    </div>
+                    <h3 className="text-lg font-bold text-white">{mission.title}</h3>
+                    <p className="text-gray-400 text-sm">{mission.description}</p>
                   </div>
+                </div>
+                <div className="text-right">
+                  <div className="bg-yellow-600 text-yellow-100 px-3 py-1 rounded-full text-sm font-bold">
+                    +{mission.reward} SVT
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Đến {mission.deadline}</p>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-400">Tiến độ</span>
+                  <span className="text-white">{mission.progress}/{mission.maxProgress}</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full" 
+                    style={{ width: `${(mission.progress / mission.maxProgress) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-400 mb-2">Yêu cầu:</p>
+                <ul className="space-y-1">
+                  {mission.requirements.map((req, index) => (
+                    <li key={index} className="text-sm text-gray-300 flex items-center">
+                      <span className="text-blue-400 mr-2">•</span>
+                      {req}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              {mission.isCompleted ? (
+                <button
+                  onClick={() => claimMissionReward(mission.id)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium"
+                >
+                  ✅ Nhận thưởng
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleCompleteMission(mission)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium"
+                >
+                  🎯 Hoàn thành nhiệm vụ
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'achievements' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Thành tựu đã đạt được</h2>
+            <span className="text-gray-400">{achievements.length} huy hiệu</span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {achievements.map(achievement => (
+              <div key={achievement.id} className="bg-[#161B22] border border-gray-700 rounded-lg p-4 text-center">
+                <div className="text-4xl mb-3">{achievement.icon}</div>
+                <h3 className="font-bold text-white mb-2">{achievement.name}</h3>
+                <p className="text-gray-400 text-sm mb-3">{achievement.description}</p>
+                <p className="text-xs text-gray-500">Đạt được: {achievement.earnedDate}</p>
+              </div>
+            ))}
+          </div>
+          
+          {achievements.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🏆</div>
+              <h3 className="text-xl font-bold text-gray-400 mb-2">Chưa có thành tựu</h3>
+              <p className="text-gray-500">Hoàn thành nhiệm vụ để nhận được huy hiệu đầu tiên!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold">Lịch sử giao dịch</h2>
+            <span className="text-gray-400">{transactions.length} giao dịch</span>
+          </div>
+          
+          <div className="space-y-3">
+            {transactions.map(tx => (
+              <div key={tx.id} className="bg-[#161B22] border border-gray-700 rounded-lg p-4 flex justify-between items-center">
+                <div className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+                    tx.type === 'earn' ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'
+                  }`}>
+                    {tx.type === 'earn' ? '+' : '-'}
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">{tx.description}</p>
+                    <p className="text-sm text-gray-400">{tx.date} • {tx.source}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`font-bold ${
+                    tx.type === 'earn' ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {tx.type === 'earn' ? '+' : '-'}{tx.amount.toLocaleString('vi-VN')} SVT
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {transactions.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">📊</div>
+              <h3 className="text-xl font-bold text-gray-400 mb-2">Chưa có giao dịch</h3>
+              <p className="text-gray-500">Bắt đầu sử dụng dịch vụ để tích lũy SVT!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'wallet' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Quick Stats */}
+            <div className="bg-[#161B22] border border-gray-700 rounded-lg p-6">
+              <h3 className="text-lg font-bold mb-4">Thống kê nhanh</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Nhiệm vụ hoàn thành</span>
+                  <span className="text-white font-bold">{missions.filter(m => m.isCompleted).length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Thành tựu đạt được</span>
+                  <span className="text-white font-bold">{achievements.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Giao dịch thực hiện</span>
+                  <span className="text-white font-bold">{transactions.length}</span>
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {activeTab === 'missions' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold">Nhiệm vụ hiện tại</h3>
-              <span className="text-sm text-gray-600">
-                {missions.filter(m => !m.isCompleted).length} nhiệm vụ đang thực hiện
-              </span>
-            </div>
-            
-            <div className="space-y-4">
-              {missions.map(mission => (
-                <div key={mission.id} className={`card p-4 border-l-4 ${getCategoryColor(mission.category)}`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <span className="text-2xl">{mission.badge}</span>
-                        <h4 className="font-bold text-lg">{mission.title}</h4>
-                        {mission.isCompleted && <span className="badge bg-green-500 text-white">✓ Hoàn thành</span>}
-                      </div>
-                      
-                      <p className="text-gray-600 mb-3">{mission.description}</p>
-                      
-                      <div className="space-y-2 mb-4">
-                        <h5 className="font-medium">Yêu cầu:</h5>
-                        <ul className="space-y-1">
-                          {mission.requirements.map((req, index) => (
-                            <li key={index} className="flex items-center space-x-2 text-sm">
-                              <span className={index < mission.progress ? "text-green-500" : "text-gray-400"}>
-                                {index < mission.progress ? "✅" : "⭕"}
-                              </span>
-                              <span className={index < mission.progress ? "line-through text-gray-500" : ""}>
-                                {req}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="mb-3">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>Tiến độ: {mission.progress}/{mission.maxProgress}</span>
-                          <span>Phần thưởng: {formatSVT(mission.reward)} SVT</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${getCategoryColor(mission.category)}`}
-                            style={{width: `${getProgressPercentage(mission.progress, mission.maxProgress)}%`}}
-                          ></div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">
-                          Hạn: {new Date(mission.deadline).toLocaleDateString('vi-VN')}
-                        </span>
-                        {mission.progress >= mission.maxProgress && !mission.isCompleted && (
-                          <button
-                            onClick={() => completeMission(mission.id)}
-                            className="btn btn-primary text-sm"
-                          >
-                            Nhận thưởng
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'achievements' && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">Thành tựu & NFT</h3>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {achievements.map(achievement => (
-                <div key={achievement.id} className="card p-4 text-center">
-                  <div className="text-4xl mb-3">{achievement.icon}</div>
-                  <h4 className="font-bold mb-2">{achievement.name}</h4>
-                  <p className="text-sm text-gray-600 mb-3">{achievement.description}</p>
-                  <div className="text-xs text-gray-500 mb-2">
-                    Đạt được: {new Date(achievement.earnedDate).toLocaleDateString('vi-VN')}
-                  </div>
-                  {achievement.nftTokenId && (
-                    <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg p-2 text-xs">
-                      <div className="flex items-center justify-center space-x-1">
-                        <span>🎨</span>
-                        <span>NFT</span>
-                      </div>
-                      <div className="mt-1 font-mono text-xs opacity-80">
-                        {achievement.nftTokenId}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'history' && (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">Lịch sử giao dịch SVT</h3>
-            <div className="space-y-3">
-              {transactions.map(transaction => (
-                <div key={transaction.id} className="card p-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                      transaction.type === 'earn' ? 'bg-green-500' : 
-                      transaction.type === 'spend' ? 'bg-red-500' : 'bg-blue-500'
-                    }`}>
-                      {transaction.type === 'earn' ? '+' : transaction.type === 'spend' ? '-' : '↔'}
-                    </div>
+            {/* Recent Activity */}
+            <div className="bg-[#161B22] border border-gray-700 rounded-lg p-6">
+              <h3 className="text-lg font-bold mb-4">Hoạt động gần đây</h3>
+              <div className="space-y-3">
+                {transactions.slice(0, 3).map(tx => (
+                  <div key={tx.id} className="flex justify-between items-center">
                     <div>
-                      <div className="font-medium">{transaction.description}</div>
-                      <div className="text-sm text-gray-600">
-                        {transaction.source} • {new Date(transaction.date).toLocaleDateString('vi-VN')}
-                      </div>
+                      <p className="text-sm text-white truncate">{tx.description}</p>
+                      <p className="text-xs text-gray-500">{tx.date}</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={`font-bold ${
-                      transaction.type === 'earn' ? 'text-green-600' : 
-                      transaction.type === 'spend' ? 'text-red-600' : 'text-blue-600'
+                    <p className={`text-sm font-bold ${
+                      tx.type === 'earn' ? 'text-green-400' : 'text-red-400'
                     }`}>
-                      {transaction.type === 'earn' ? '+' : ''}{formatSVT(transaction.amount)} SVT
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Số dư: {formatSVT(transaction.balance)} SVT
-                    </div>
+                      {tx.type === 'earn' ? '+' : '-'}{tx.amount}
+                    </p>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

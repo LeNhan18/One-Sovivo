@@ -1,56 +1,104 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-interface ChatMessage {
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+interface Message {
   id: string;
-  type: 'user' | 'assistant';
+  type: 'user' | 'ai';
   content: string;
   timestamp: Date;
-  suggestions?: string[];
+
 }
 
 interface UserProfile {
   name: string;
   age: number;
-  income: number;
-  savings: number;
-  riskTolerance: 'low' | 'medium' | 'high';
-  goals: string[];
-  currentInvestments: any[];
+  customer_id: number;
+  riskTolerance: 'conservative' | 'moderate' | 'aggressive';
+  sovicoTokens: number;
+  totalTransactions: number;
+  monthlyIncome?: number;
+  investmentGoals?: string[];
 }
 
+// Initialize Gemini AI with multiple model fallbacks
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDxF5rCqGT8v-7hP8j2mN9kL3nQ1rS6wE4';
+const genAI = new GoogleGenerativeAI(apiKey);
+
+// Try different models in order of preference
+const getModel = () => {
+  const modelNames = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro", 
+    "gemini-pro",
+    "gemini-1.0-pro"
+  ];
+  
+  // For now, use the most stable one
+  return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+};
+
+const model = getModel();
+
 const AIFinancialAssistant: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      type: 'assistant',
-      content: 'Xin chào! Tôi là AI Financial Advisor của Sovico. Tôi sẽ giúp bạn đưa ra các lời khuyên tài chính dựa trên profile 360° của bạn. Hãy hỏi tôi bất cứ điều gì về đầu tư, tiết kiệm, hoặc quản lý tài chính!',
-      timestamp: new Date(),
-      suggestions: [
-        'Tôi có 50 triệu, nên làm gì để tiền sinh lời?',
-        'Phân tích chi tiêu của tôi trong 3 tháng qua',
-        'Tư vấn đầu tư phù hợp với độ tuổi của tôi',
-        'Lập kế hoạch tài chính cho việc mua nhà'
-      ]
+      type: 'ai',
+      content: '👋 Chào bạn! Tôi là AI Financial Advisor của Sovico được hỗ trợ bởi Google Gemini.\n\n🎯 **Khả năng của tôi:**\n• 📊 Phân tích tài chính cá nhân 360°\n• 💎 Tư vấn tối ưu hóa SVT và NFT\n• � Đề xuất sản phẩm HDBank phù hợp\n• ✈️ Chiến lược tích điểm Vietjet\n• �️ Lập kế hoạch nghỉ dưỡng thông minh\n• � Dự báo và phân tích thị trường\n\n💡 Tôi sẽ phân tích profile của bạn để đưa ra lời khuyên cá nhân hóa. Hãy hỏi tôi bất cứ điều gì!',
+      timestamp: new Date()
     }
   ]);
-  
   const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [useGemini, setUseGemini] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const userProfile: UserProfile = {
-    name: 'Nguyễn Văn A',
-    age: 28,
-    income: 25000000, // 25 triệu/tháng
-    savings: 150000000, // 150 triệu
-    riskTolerance: 'medium',
-    goals: ['Mua nhà', 'Đầu tư dài hạn', 'Du lịch'],
-    currentInvestments: [
-      { type: 'Tiết kiệm HDBank', amount: 80000000, rate: 6.5 },
-      { type: 'Cổ phiếu', amount: 30000000, return: 12 },
-      { type: 'Vàng', amount: 40000000, return: 8 }
-    ]
-  };
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) return;
+
+        const response = await fetch('http://127.0.0.1:5000/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          
+          // Get SVT balance from correct endpoint
+          const svtResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${userData.customer_id}`);
+          let svtBalance = 0;
+          let transactionCount = 0;
+          
+          if (svtResponse.ok) {
+            const svtData = await svtResponse.json();
+            svtBalance = svtData.total_svt || 0;
+            transactionCount = svtData.transactions?.length || 0;
+          }
+
+          setUserProfile({
+            name: userData.name || 'Khách hàng',
+            age: 30, // Default, could be enhanced
+            customer_id: userData.customer_id,
+            riskTolerance: 'moderate', // Default, could be from survey
+            sovicoTokens: svtBalance,
+            totalTransactions: transactionCount,
+            monthlyIncome: 20000000, // Default 20M VND
+            investmentGoals: ['Tiết kiệm', 'Đầu tư an toàn']
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,159 +108,243 @@ const AIFinancialAssistant: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const formatVND = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+  const predefinedQuestions = [
+    "Phân tích profile tài chính và đề xuất chiến lược cho tôi",
+    "Làm thế nào để nâng cấp lên cấp bậc Diamond với SVT?",
+    "Tôi nên đầu tư vào đâu với profile hiện tại?",
+    "Tối ưu hóa việc sử dụng hệ sinh thái Sovico như thế nào?",
+    "Lập kế hoạch tài chính 5 năm dựa trên thu nhập của tôi"
+  ];
 
-  const getAIResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
+  // Enhanced AI response using Gemini with model fallback
+  const generateGeminiResponse = async (userMessage: string): Promise<string> => {
+    const modelNames = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
     
-    if (input.includes('50 triệu') || input.includes('50tr') || input.includes('tiền sinh lời')) {
-      return `Dựa trên profile của bạn, với 50 triệu VND, tôi khuyên bạn nên:
+    for (const modelName of modelNames) {
+      try {
+        console.log(`🤖 Trying Gemini model: ${modelName}`);
+        
+        // Try each model
+        const currentModel = genAI.getGenerativeModel({ model: modelName });
+        
+        // Professional System Prompt
+        const systemPrompt = `Bạn là một Trợ lý Tài chính AI chuyên nghiệp của Tập đoàn Sovico.
+Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên dữ liệu 360° của khách hàng.
 
-📊 **Phân bố đầu tư được đề xuất:**
-• 30% (15tr) - Tiết kiệm có kỳ hạn HDBank (6.5%/năm) - An toàn, thanh khoản cao
-• 40% (20tr) - Quỹ đầu tư cân bằng - Tăng trưởng ổn định 8-10%/năm
-• 20% (10tr) - Cổ phiếu blue-chip - Tiềm năng tăng trưởng 12-15%/năm
-• 10% (5tr) - Dự phòng khẩn cấp - Gửi tiết kiệm không kỳ hạn
+**KIẾN THỨC NỀN TẢNG VỀ HỆ SINH THÁI SOVICO:**
 
-💡 **Lý do lựa chọn:**
-- Tuổi 28, thời gian đầu tư dài hạn (30+ năm)
-- Thu nhập ổn định 25tr/tháng
-- Mức độ rủi ro trung bình phù hợp
+🏢 **Tập đoàn Sovico** - Hệ sinh thái tài chính toàn diện:
+- **HDBank**: Ngân hàng số 1 về dịch vụ khách hàng, cung cấp thẻ tín dụng, tiết kiệm, đầu tư
+- **Vietjet Air**: Hãng hàng không giá rẻ hàng đầu Đông Nam Á
+- **Sovico Resort**: Chuỗi resort cao cấp 5 sao tại các điểm đến hấp dẫn
+- **Sovico Real Estate**: Phát triển bất động sản cao cấp
 
-🎯 **Dự kiến lợi nhuận:** 8-12%/năm trung bình
-**Giá trị sau 5 năm:** ~75-85 triệu VND
+💎 **Sovico Token (SVT)** - Token tiện ích blockchain:
+- Kiếm SVT qua: Giao dịch HDBank (0.1% giá trị), bay Vietjet (100 SVT/chuyến), booking resort (500 SVT/đêm), hoàn thành nhiệm vụ (50-1000 SVT)
+- Sử dụng SVT: Đổi voucher ăn uống (ROI 120%), upgrade hạng bay (ROI 150%), giảm giá resort (10-30%), mua NFT achievements, P2P trading
+- Hệ thống cấp bậc: Bronze (<10K SVT), Silver (10K-50K), Gold (50K-200K), Diamond (>200K)
 
-Bạn có muốn tôi hướng dẫn cụ thể cách thực hiện không?`;
+🎖️ **Hộ chiếu NFT** - Tài sản số độc nhất:
+- Ghi lại cấp bậc, thành tựu, lịch sử giao dịch
+- Tự động "tiến hóa" khi đạt cột mốc mới
+- Có thể trade trên marketplace nội bộ
+- Mang lại quyền lợi đặc biệt (ưu đãi, ưu tiên dịch vụ)
+
+💳 **Sản phẩm HDBank chính:**
+- Thẻ Visa Signature: Phòng chờ sân bay, bảo hiểm du lịch
+- Thẻ Vietjet Platinum: Tích miles x2, miễn phí hành lý
+- Gói tiết kiệm HD EARN: 7-8%/năm + bảo hiểm
+- HD Invest: Ủy thác đầu tư từ 10 triệu VND
+
+**QUY TẮC TRẢ LỜI:**
+1. Luôn phân tích HỒ SƠ KHÁCH HÀNG trước khi tư vấn
+2. Cá nhân hóa 100% dựa trên tuổi, thu nhập, khẩu vị rủi ro
+3. Đề xuất cụ thể các sản phẩm Sovico phù hợp
+4. Luôn bao gồm chiến lược tích lũy SVT
+5. Sử dụng format Markdown với emoji để dễ đọc
+6. Đưa ra timeline và action steps cụ thể
+7. Tính toán ROI và lợi ích số liệu cụ thể`;
+
+        // Build complete prompt with user profile
+        const fullPrompt = `${systemPrompt}
+
+**HỒ SƠ KHÁCH HÀNG HIỆN TẠI:**
+- 👤 Tên: ${userProfile?.name || 'Khách hàng'}
+- 🎂 Tuổi: ${userProfile?.age || 'Chưa xác định'}
+- 🎯 Khẩu vị rủi ro: ${userProfile?.riskTolerance || 'moderate'}
+- 💎 Số dư SVT: ${userProfile?.sovicoTokens?.toLocaleString('vi-VN') || '0'} SVT
+- 📊 Tổng giao dịch: ${userProfile?.totalTransactions || 0} lần
+- 💰 Thu nhập ước tính: ${userProfile?.monthlyIncome?.toLocaleString('vi-VN') || 'Chưa xác định'} VND/tháng
+- 🏆 Cấp bậc hiện tại: ${userProfile?.sovicoTokens && userProfile.sovicoTokens >= 200000 ? 'Diamond 💎' : 
+                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 50000 ? 'Gold 🥇' :
+                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 10000 ? 'Silver 🥈' : 'Bronze 🥉'}
+
+**CÂU HỎI CỦA KHÁCH HÀNG:**
+"${userMessage}"
+
+Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chính cá nhân hóa, bao gồm chiến lược sử dụng hệ sinh thái Sovico một cách tối ưu.`;
+
+        const result = await currentModel.generateContent(fullPrompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        console.log(`✅ Success with ${modelName}! Response length:`, text.length);
+        return text;
+        
+      } catch (error: any) {
+        console.warn(`⚠️ Model ${modelName} failed:`, error.message);
+        
+        // If this is the last model, throw the error
+        if (modelName === modelNames[modelNames.length - 1]) {
+          throw error;
+        }
+        
+        // Otherwise continue to next model
+        continue;
+      }
     }
-
-    if (input.includes('chi tiêu') || input.includes('phân tích')) {
-      return `📊 **Phân tích chi tiêu 3 tháng qua của bạn:**
-
-**HDBank (Tài khoản chính):**
-• Tổng chi: 18.5 triệu VND
-• Chi tiêu trung bình: 6.17tr/tháng
-• Xu hướng: Giảm 8% so với quý trước ✅
-
-**HDSaison (Thẻ tín dụng):**
-• Tổng chi: 12.3 triệu VND  
-• Categories lớn nhất:
-  - Ăn uống & giải trí: 5.2tr (42%)
-  - Mua sắm: 3.8tr (31%)
-  - Di chuyển: 2.1tr (17%)
-  - Khác: 1.2tr (10%)
-
-**Vietjet (Du lịch):**
-• 3 chuyến bay - 8.5 triệu VND
-• Tăng 40% so với quý trước
-
-💰 **Đánh giá tài chính:**
-• Tỷ lệ tiết kiệm: 68% (Xuất sắc! 📈)
-• Chi tiêu/Thu nhập: 32% (Lý tưởng < 50%)
-• Dư nợ thẻ tín dụng: 0 VND ✅
-
-🎯 **Khuyến nghị:**
-1. Duy trì tỷ lệ tiết kiệm hiện tại
-2. Cân nhắc tăng đầu tư từ phần tiết kiệm dư thừa
-3. Có thể tăng chi tiêu giải trí 10-15% để cân bằng cuộc sống`;
-    }
-
-    if (input.includes('đầu tư') && input.includes('tuổi')) {
-      return `🎯 **Tư vấn đầu tư theo độ tuổi 28:**
-
-**Ưu thế của bạn:**
-• Thời gian đầu tư dài (37 năm đến nghỉ hưu)
-• Thu nhập ổn định và tăng trưởng
-• Khả năng chấp nhận rủi ro cao
-
-📈 **Danh mục đầu tư được đề xuất:**
-
-**Giai đoạn 28-35 tuổi (Hiện tại):**
-• 60% Cổ phiếu (VN30, ETF quốc tế)
-• 25% Trái phiếu & Tiết kiệm
-• 10% Bất động sản (REITs)
-• 5% Vàng/Crypto (phòng ngừa lạm phát)
-
-**Mục tiêu lợi nhuận:** 10-12%/năm
-
-**Giai đoạn 35-45 tuổi:**
-• Giảm dần tỷ trọng cổ phiếu xuống 45%
-• Tăng trái phiếu lên 35%
-
-**Sau 45 tuổi:**
-• Chuyển sang đầu tư bảo toàn: 70% trái phiếu, 30% cổ phiếu
-
-🚀 **Chiến lược DCA (Dollar Cost Averaging):**
-• Đầu tư đều đặn 8-10tr/tháng
-• Tự động hóa qua HDBank Auto-Invest
-• Tái đầu tư cổ tức
-
-💡 **Với 150 triệu hiện tại + 10tr/tháng:**
-**Sau 20 năm:** ~1.2 tỷ VND
-**Sau 30 năm:** ~2.8 tỷ VND`;
-    }
-
-    if (input.includes('mua nhà') || input.includes('bất động sản')) {
-      return `🏠 **Kế hoạch tài chính mua nhà:**
-
-**Phân tích khả năng tài chính:**
-• Thu nhập: 25tr/tháng
-• Tiết kiệm hiện tại: 150tr
-• Khả năng tiết kiệm: 17tr/tháng
-
-🎯 **Mục tiêu BĐS phù hợp:**
-• Giá trị: 2.5 - 3.5 tỷ VND
-• Vị trí: Quận 7, Thủ Đức, Bình Thạnh
-• Loại: Căn hộ 2-3PN
-
-💰 **Kế hoạch tài chính:**
-
-**Bước 1: Chuẩn bị vốn (12-18 tháng)**
-• Vốn tự có cần: 30% = 750tr - 1.05 tỷ
-• Hiện có: 150tr
-• Cần tiết kiệm thêm: 600-900tr
-• Thời gian: 15-18 tháng (với 17tr/tháng)
-
-**Bước 2: Vay ngân hàng**
-• Vay 70% = 1.75 - 2.45 tỷ
-• Lãi suất: 8-9%/năm
-• Thời hạn: 20-25 năm
-• Trả góp/tháng: 15-20tr (60-80% thu nhập)
-
-📊 **Timeline được đề xuất:**
-• **6 tháng tới:** Tích lũy 150tr + 100tr = 250tr
-• **12 tháng:** Đạt 400tr, bắt đầu tìm hiểu thị trường
-• **18 tháng:** Đạt 550-600tr, sẵn sàng mua
-
-💡 **Chiến lược tối ưu:**
-1. Gửi tiết kiệm có kỳ hạn để tích lũy nhanh
-2. Đăng ký tư vấn ưu đãi lãi suất tại HDBank (khách hàng VIP)
-3. Xem xét mua trong giai đoạn thị trường điều chỉnh
-
-⚠️ **Lưu ý:** Sau khi mua nhà, thu nhập khả dụng còn ~5-10tr/tháng. Cần điều chỉnh lối sống phù hợp.`;
-    }
-
-    // Default responses
-    const defaultResponses = [
-      `Dựa trên dữ liệu 360° của bạn, tôi thấy bạn có profile tài chính khá tốt. Bạn có thể cụ thể hơn về vấn đề muốn tư vấn không?`,
-      
-      `Với thu nhập 25 triệu/tháng và tiết kiệm 150 triệu hiện tại, bạn đang có nền tảng tài chính vững chắc. Hãy cho tôi biết mục tiêu cụ thể để tôi tư vấn phù hợp nhất.`,
-      
-      `Tôi có thể giúp bạn về: đầu tư, tiết kiệm, mua nhà, quản lý chi tiêu, hoặc lập kế hoạch tài chính. Bạn quan tâm lĩnh vực nào nhất?`
-    ];
-
-    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+    
+    // This should never be reached, but just in case
+    throw new Error('All Gemini models failed');
   };
 
-  const sendMessage = async () => {
+  const generateLocalResponse = (userMessage: string): string => {
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Đầu tư
+    if (lowerMessage.includes('đầu tư') || lowerMessage.includes('investment')) {
+      return `💡 **Phân tích đầu tư cho bạn:**
+
+Dựa trên profile và mức độ rủi ro:
+
+🏦 **Ngân hàng (30-40%)**
+• Tiền gửi có kỳ hạn HDBank: 7-8%/năm
+• Trái phiếu doanh nghiệp: 8-12%/năm
+
+📈 **Chứng khoán (20-30%)**
+• Cổ phiếu blue-chip VN30
+• ETF diversified
+
+🏠 **Bất động sản (20-30%)**
+• Resort/condotel qua Sovico
+• Căn hộ cho thuê khu vực trung tâm
+
+💎 **SVT Ecosystem (10-20%)**
+• Stake SVT để nhận rewards
+• Trading trên P2P marketplace
+
+**Lưu ý:** Chỉ đầu tư số tiền có thể chấp nhận rủi ro!`;
+    }
+    
+    // Chi tiêu
+    if (lowerMessage.includes('chi tiêu') || lowerMessage.includes('tiết kiệm')) {
+      return `💰 **Kế hoạch tối ưu chi tiêu:**
+
+📊 **Quy tắc 50/30/20:**
+• 50% nhu cầu thiết yếu (ăn, ở, đi lại)
+• 30% giải trí, mua sắm
+• 20% tiết kiệm và đầu tư
+
+🎯 **Mẹo tiết kiệm với Sovico:**
+• Dùng thẻ HDBank để tích điểm
+• Bay Vietjet thường xuyên → tích miles
+• Nghỉ dưỡng Sovico Resort → voucher
+• Mua sắm bằng SVT token → cashback
+
+📱 **Công cụ theo dõi:**
+• Sovico SuperApp tracking tự động
+• Báo cáo chi tiêu theo danh mục
+• Cảnh báo khi vượt ngân sách`;
+    }
+    
+    // SVT Token
+    if (lowerMessage.includes('svt') || lowerMessage.includes('token')) {
+      return `🪙 **Chiến lược SVT Token:**
+
+🎯 **Cách kiếm SVT:**
+• Hoàn thành nhiệm vụ hàng ngày: 50-100 SVT
+• Giao dịch HDBank: 0.1% số tiền → SVT
+• Bay Vietjet: 100 SVT/chuyến
+• Review resort: 200-500 SVT
+• Refer bạn bè: 1000 SVT/người
+
+💎 **Cách dùng SVT hiệu quả:**
+• Đổi voucher ăn uống (ROI 120%)
+• Upgrade hạng bay (ROI 150%)
+• Mua NFT achievements 
+• Trade trên P2P marketplace
+
+🏆 **Level up strategy:**
+• Tích 10,000 SVT → Silver
+• Tích 50,000 SVT → Gold  
+• Tích 200,000 SVT → Diamond`;
+    }
+    
+    // HDBank
+    if (lowerMessage.includes('hdbank') || lowerMessage.includes('ngân hàng')) {
+      return `🏦 **Sản phẩm HDBank phù hợp:**
+
+💳 **Thẻ tín dụng:**
+• HDBank Visa Signature: Phòng chờ sân bay
+• HDBank Vietjet Platinum: Tích miles x2
+• HDBank Live: Cashback 8% ăn uống
+
+💰 **Tiết kiệm & Đầu tư:**
+• Tiền gửi online: Lãi suất ưu đãi +0.5%
+• HD EARN: Combo tiết kiệm + bảo hiểm
+• HD Invest: Ủy thác đầu tư từ 10 triệu
+
+🎁 **Ưu đãi đặc biệt:**
+• Mở tài khoản qua Sovico: +500 SVT
+• Duy trì số dư 50 triệu: +200 SVT/tháng
+• Giao dịch 10 triệu/tháng: Free phí chuyển khoản`;
+    }
+    
+    // Kế hoạch tài chính
+    if (lowerMessage.includes('kế hoạch') || lowerMessage.includes('planning')) {
+      return `📋 **Kế hoạch tài chính 2025:**
+
+🎯 **Mục tiêu SMART:**
+• Tiết kiệm 100 triệu (8.3 triệu/tháng)
+• Đầu tư 50 triệu vào portfolio cân bằng
+• Tích lũy 50,000 SVT tokens
+• Đạt hạng Gold trong hệ sinh thái Sovico
+
+📅 **Timeline thực hiện:**
+**Q1:** Tối ưu chi tiêu, mở tài khoản đầu tư
+**Q2:** Đầu tư batch 1, bắt đầu DCA stocks
+**Q3:** Review & rebalance portfolio
+**Q4:** Harvest profits, plan cho năm sau
+
+💡 **Action items:**
+• Setup auto-transfer 8.3tr/tháng
+• Cài đặt alerts trên Sovico app
+• Monthly review với AI advisor`;
+    }
+    
+    // Default response
+    return `🤖 Cảm ơn bạn đã hỏi! Tôi đang phân tích câu hỏi của bạn...
+
+Dựa trên thông tin hiện tại, tôi đề xuất:
+
+💼 **Phân tích ngắn hạn:**
+• Review lại spending pattern của bạn
+• Tối ưu hóa cash flow với các sản phẩm HDBank
+• Tích cực tham gia Sovico ecosystem để kiếm SVT
+
+📈 **Chiến lược dài hạn:**
+• Đa dạng hóa portfolio (stocks, bonds, real estate)
+• Xây dựng emergency fund 6-12 tháng
+• Đầu tư vào education và personal development
+
+💬 Bạn có thể hỏi cụ thể hơn về đầu tư, tiết kiệm, hoặc các sản phẩm tài chính nhé!`;
+  };
+
+  const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
-    // Add user message
-    const userMessage: ChatMessage = {
+    const userMessage: Message = {
+
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage,
@@ -220,171 +352,229 @@ Bạn có muốn tôi hướng dẫn cụ thể cách thực hiện không?`;
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setIsTyping(true);
 
-    // Simulate AI thinking time
-    setTimeout(() => {
-      const aiResponse: ChatMessage = {
+    const currentInput = inputMessage;
+    setInputMessage('');
+    setIsLoading(true);
+
+    try {
+      let aiResponseContent;
+      if (useGemini) {
+        aiResponseContent = await generateGeminiResponse(currentInput);
+      } else {
+        aiResponseContent = generateLocalResponse(currentInput);
+      }
+
+      const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: getAIResponse(inputMessage),
-        timestamp: new Date(),
-        suggestions: [
-          'Tôi muốn biết thêm chi tiết',
-          'Có lựa chọn nào khác không?',
-          'Rủi ro của phương án này?',
-          'Tư vấn khác'
-        ]
+        type: 'ai',
+        content: aiResponseContent,
+        timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 1500 + Math.random() * 1000);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInputMessage(suggestion);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+    } catch (error: any) {
+      console.error('❌ Error generating response:', error);
+      
+      let errorMessage = '❌ **Xin lỗi, AI gặp sự cố**\n\n';
+      
+      if (error.message && error.message.includes('GoogleGenerativeAI')) {
+        errorMessage += '🔧 **Vấn đề Gemini AI:**\n';
+        errorMessage += '• API có thể bị giới hạn hoặc model không khả dụng\n';
+        errorMessage += '• Đang chuyển sang chế độ tư vấn cơ bản\n\n';
+        errorMessage += generateLocalResponse(currentInput);
+      } else if (error.message && error.message.includes('fetch')) {
+        errorMessage += '🌐 **Vấn đề kết nối mạng:**\n';
+        errorMessage += '• Kiểm tra kết nối internet\n';
+        errorMessage += '• Thử lại sau vài giây\n';
+      } else {
+        errorMessage += '⚠️ **Lỗi không xác định:**\n';
+        errorMessage += '• Vui lòng thử lại hoặc liên hệ support\n';
+        errorMessage += '• Hotline: 1900-1234\n';
+      }
+      
+      errorMessage += '\n---\n💡 *Tip: Bạn có thể toggle sang "Local AI" để sử dụng tư vấn offline*';
+      
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: errorMessage,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleQuestionClick = (question: string) => {
+    setInputMessage(question);
+  };
+
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="flex flex-col h-full bg-[#0D1117] text-white">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-t-xl">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-            🤖
+      <div className="bg-[#161B22] border-b border-gray-700 p-4">
+        <div className="flex items-center">
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-3">
+            <span className="text-lg">🤖</span>
           </div>
-          <div>
-            <h3 className="font-bold text-lg">AI Financial Advisor</h3>
-            <p className="text-blue-100 text-sm">Tư vấn tài chính thông minh 24/7</p>
+          <div className="flex-1">
+            <h2 className="font-bold text-lg">AI Financial Advisor</h2>
+            <p className="text-sm text-gray-400">
+              {useGemini ? 'Powered by Google Gemini AI' : 'Powered by Sovico Intelligence'}
+              {userProfile && (
+                <span className="ml-2 text-blue-400">
+                  • {userProfile.name} • {userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT
+                </span>
+              )}
+            </p>
           </div>
-          <div className="ml-auto">
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setUseGemini(!useGemini)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                useGemini 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-600 text-gray-300'
+              }`}
+            >
+              {useGemini ? '🧠 Gemini AI' : '🔧 Local AI'}
+            </button>
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-900 text-green-300">
+              <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+              Online
+            </span>
+
           </div>
         </div>
       </div>
 
-      {/* User Profile Summary */}
-      <div className="bg-white border-b p-4">
-        <div className="grid grid-cols-4 gap-4 text-center">
-          <div>
-            <div className="text-lg font-bold text-green-600">{formatVND(userProfile.income)}</div>
-            <div className="text-xs text-gray-600">Thu nhập/tháng</div>
-          </div>
-          <div>
-            <div className="text-lg font-bold text-blue-600">{formatVND(userProfile.savings)}</div>
-            <div className="text-xs text-gray-600">Tổng tiết kiệm</div>
-          </div>
-          <div>
-            <div className="text-lg font-bold text-purple-600">{userProfile.age} tuổi</div>
-            <div className="text-xs text-gray-600">Độ tuổi</div>
-          </div>
-          <div>
-            <div className="text-lg font-bold text-orange-600">
-              {userProfile.riskTolerance === 'low' ? 'Thấp' : 
-               userProfile.riskTolerance === 'medium' ? 'Trung bình' : 'Cao'}
+      {/* User Profile Indicator */}
+      {userProfile && (
+        <div className="bg-[#161B22] border-b border-gray-700 p-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-400">📊 Profile:</span>
+              <span className="text-blue-400">{userProfile.name}</span>
+              <span className="text-gray-500">|</span>
+              <span className="text-purple-400">{userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT</span>
+              <span className="text-gray-500">|</span>
+              <span className={`font-medium ${
+                userProfile.sovicoTokens >= 200000 ? 'text-purple-400' :
+                userProfile.sovicoTokens >= 50000 ? 'text-yellow-400' :
+                userProfile.sovicoTokens >= 10000 ? 'text-gray-300' : 'text-orange-400'
+              }`}>
+                {userProfile.sovicoTokens >= 200000 ? '💎 Diamond' :
+                 userProfile.sovicoTokens >= 50000 ? '🥇 Gold' :
+                 userProfile.sovicoTokens >= 10000 ? '🥈 Silver' : '🥉 Bronze'}
+              </span>
             </div>
-            <div className="text-xs text-gray-600">Khẩu vị rủi ro</div>
+            <div className="text-gray-500 text-xs">
+              {userProfile.totalTransactions} giao dịch
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map(message => (
-          <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] ${
-              message.type === 'user' 
-                ? 'bg-blue-500 text-white rounded-l-2xl rounded-tr-2xl' 
-                : 'bg-white text-gray-800 rounded-r-2xl rounded-tl-2xl shadow-sm border'
-            } p-4`}>
-              <div className="whitespace-pre-wrap">{message.content}</div>
-              <div className={`text-xs mt-2 ${
-                message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
-              }`}>
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg p-4 ${
+                message.type === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-[#161B22] border border-gray-700'
+              }`}
+            >
+              <div className="whitespace-pre-line text-sm">
+                {message.content}
+              </div>
+              <div className="text-xs opacity-70 mt-2">
                 {message.timestamp.toLocaleTimeString('vi-VN', { 
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })}
               </div>
-              
-              {message.suggestions && (
-                <div className="mt-3 space-y-2">
-                  <div className="text-sm font-medium text-gray-600">Gợi ý câu hỏi:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {message.suggestions.map((suggestion, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="text-xs bg-gray-100 hover:bg-blue-100 text-gray-700 px-3 py-1 rounded-full transition-all"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
           </div>
         ))}
-        
-        {isTyping && (
+      
+        {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white rounded-r-2xl rounded-tl-2xl shadow-sm border p-4">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
+              <div className="flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+                <span className="text-sm text-gray-400">AI đang suy nghĩ...</span>
+
               </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
+      {/* Quick Questions */}
+      {messages.length <= 1 && (
+        <div className="p-4 border-t border-gray-700">
+          <p className="text-sm text-gray-400 mb-3">💡 Câu hỏi gợi ý:</p>
+          <div className="grid grid-cols-1 gap-2">
+            {predefinedQuestions.map((question, index) => (
+              <button
+                key={index}
+                onClick={() => handleQuestionClick(question)}
+                className="text-left p-3 bg-[#161B22] hover:bg-[#1F2937] rounded-lg text-sm border border-gray-700 hover:border-blue-500 transition-colors"
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
-      <div className="bg-white border-t p-4">
+      <div className="bg-[#161B22] border-t border-gray-700 p-4">
         <div className="flex space-x-3">
-          <textarea
+          <input
+            type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Hỏi tôi về đầu tư, tiết kiệm, hoặc quản lý tài chính..."
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            rows={2}
-            disabled={isTyping}
+            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            placeholder="Hỏi AI về tài chính, đầu tư, tiết kiệm..."
+            className="flex-1 bg-[#0D1117] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            disabled={isLoading}
           />
           <button
-            onClick={sendMessage}
-            disabled={!inputMessage.trim() || isTyping}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              inputMessage.trim() && !isTyping
-                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            onClick={handleSendMessage}
+            disabled={!inputMessage.trim() || isLoading}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium transition-colors"
           >
-            Gửi
+            {isLoading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              '📤'
+            )}
           </button>
         </div>
         
-        <div className="flex space-x-2 mt-2">
-          {['💰 Đầu tư', '🏠 Mua nhà', '📊 Phân tích', '🎯 Mục tiêu'].map(quickAction => (
-            <button
-              key={quickAction}
-              onClick={() => handleSuggestionClick(quickAction.split(' ')[1])}
-              className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full transition-all"
-            >
-              {quickAction}
-            </button>
-          ))}
+        <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
+          <span>🔒 Cuộc trò chuyện được mã hóa end-to-end</span>
+          <div className="flex items-center space-x-4">
+            <span>💰 Miễn phí cho khách hàng Sovico</span>
+            {useGemini && (
+              <span className="bg-purple-900 text-purple-300 px-2 py-1 rounded">
+                ⚡ Gemini AI Active
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

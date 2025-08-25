@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
 
-// Type definitions for NFT metadata
-interface NFTAttribute {
-  trait_type: string;
-  value: string | number;
-}
 
 interface NFTMetadata {
   name: string;
   description: string;
   image: string;
-  attributes: NFTAttribute[];
+  attributes: Array<{
+    trait_type: string;
+    value: string | number;
+  }>;
+}
+
+interface Achievement {
+  id: number;
+  name: string;
+  description: string;
+  badge_image_url?: string;
+  unlocked_at: string;
+
 }
 
 interface NFTPassportProps {
@@ -20,47 +27,71 @@ interface NFTPassportProps {
 
 const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }) => {
   const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch NFT data from backend API
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [svtBalance, setSvtBalance] = useState(0);
+
+  useEffect(() => {
+    fetchNFTData();
+  }, [tokenId, refreshTrigger]);
+
+
   const fetchNFTData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/nft/${tokenId}`);
-      const data = await response.json();
+
+      // Fetch NFT metadata
+      const nftResponse = await fetch(`http://127.0.0.1:5000/api/nft/${tokenId}`);
+      const nftData = await nftResponse.json();
       
-      if (data.success) {
-        setMetadata(data.metadata);
+      if (nftData.success) {
+        setMetadata(nftData.metadata);
       } else {
-        setError(data.error || 'Failed to load NFT data');
-        // Set fallback data
-        setMetadata(data.metadata || {
+        // Fallback metadata if blockchain is offline
+        setMetadata({
           name: `Sovico Passport #${tokenId}`,
-          description: 'Digital identity passport (offline mode)',
-          image: 'https://via.placeholder.com/300x400/6B7280/white?text=Offline+Mode',
+          description: "Digital identity passport for Sovico ecosystem",
+          image: "https://via.placeholder.com/300x400/6366F1/white?text=Sovico+NFT",
           attributes: [
-            { trait_type: 'Status', value: 'Offline' },
-            { trait_type: 'Level', value: 'Bronze' },
-            { trait_type: 'SVT Points', value: 0 }
+            { trait_type: "Status", value: "Active" },
+            { trait_type: "Level", value: "Bronze" },
+            { trait_type: "SVT Points", value: 0 }
           ]
         });
       }
+
+      // Fetch achievements
+      const achievementsResponse = await fetch(`http://127.0.0.1:5000/api/nft/${tokenId}/achievements`);
+      if (achievementsResponse.ok) {
+        const achievementsData = await achievementsResponse.json();
+        setAchievements(achievementsData.achievements || []);
+      }
+
+      // Fetch SVT balance
+      const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${tokenId}`);
+      if (tokensResponse.ok) {
+        const tokensData = await tokensResponse.json();
+        setSvtBalance(tokensData.total_svt || 0);
+      }
+
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch NFT data';
-      setError(errorMessage);
+      console.error('Error fetching NFT data:', err);
+      setError('Không thể kết nối đến blockchain. Hiển thị dữ liệu offline.');
       
-      // Set fallback data for offline mode
+      // Fallback data
       setMetadata({
         name: `Sovico Passport #${tokenId}`,
-        description: 'Digital identity passport (offline mode)', 
-        image: 'https://via.placeholder.com/300x400/6B7280/white?text=Offline+Mode',
+        description: "Digital identity passport (offline mode)",
+        image: "https://via.placeholder.com/300x400/6B7280/white?text=Offline+Mode",
         attributes: [
-          { trait_type: 'Status', value: 'Offline' },
-          { trait_type: 'Level', value: 'Bronze' },
-          { trait_type: 'SVT Points', value: 0 }
+          { trait_type: "Status", value: "Offline" },
+          { trait_type: "Level", value: "Bronze" },
+          { trait_type: "SVT Points", value: 0 }
+
         ]
       });
     } finally {
@@ -68,167 +99,192 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
     }
   };
 
-  // Effect to fetch data on component mount and when refreshTrigger changes
-  useEffect(() => {
-    fetchNFTData();
-  }, [tokenId, refreshTrigger]);
 
-  // Helper function to get level color
-  const getLevelColor = (level: string | number): string => {
-    const levelStr = String(level).toLowerCase();
-    switch (levelStr) {
-      case 'diamond':
-        return 'text-purple-400 bg-purple-100';
-      case 'platinum':
-        return 'text-gray-600 bg-gray-100';
-      case 'gold':
-        return 'text-yellow-500 bg-yellow-100';
-      case 'silver':
-        return 'text-gray-500 bg-gray-100';
-      case 'bronze':
-      default:
-        return 'text-orange-500 bg-orange-100';
+  const getAchievementIcon = (achievementName: string): string => {
+    const name = achievementName.toLowerCase();
+    if (name.includes('frequent') || name.includes('bay') || name.includes('phi')) return '✈️';
+    if (name.includes('high') || name.includes('roller') || name.includes('cao')) return '💎';
+    if (name.includes('business') || name.includes('elite') || name.includes('doanh')) return '👔';
+    if (name.includes('stay') || name.includes('guest') || name.includes('nghỉ')) return '🏖️';
+    if (name.includes('resort') || name.includes('lover')) return '🌴';
+    if (name.includes('loyalty') || name.includes('member') || name.includes('thành')) return '🏆';
+    if (name.includes('first') || name.includes('đầu')) return '🥇';
+    return '🎖️';
+  };
+
+  const getRankColor = (rank: string): string => {
+    switch (rank?.toLowerCase()) {
+      case 'diamond': return 'from-cyan-400 to-blue-600';
+      case 'platinum': return 'from-gray-300 to-gray-500';
+      case 'gold': return 'from-yellow-400 to-yellow-600';
+      case 'silver': return 'from-gray-400 to-gray-600';
+      default: return 'from-orange-400 to-orange-600'; // Bronze
     }
   };
 
-  // Helper function to get badge emoji
-  const getBadgeEmoji = (traitType: string): string => {
-    switch (traitType.toLowerCase()) {
-      case 'level':
-        return '🏆';
-      case 'svt points':
-        return '💎';
-      case 'achievements':
-        return '🏅';
-      case 'member since':
-        return '📅';
-      case 'status':
-        return '⚡';
-      case 'rank':
-        return '👑';
-      default:
-        return '🔖';
-    }
+  const getCurrentRank = (): string => {
+    // Calculate rank based on actual SVT balance instead of hardcoded metadata
+    if (svtBalance >= 200000) return 'Diamond';
+    if (svtBalance >= 50000) return 'Gold';
+    if (svtBalance >= 10000) return 'Silver';
+    return 'Bronze';
   };
 
-  // Manual refresh function
-  const handleRefresh = () => {
-    fetchNFTData();
+  const getCurrentRankBadge = (): string => {
+    const rank = getCurrentRank();
+    switch (rank.toLowerCase()) {
+      case 'diamond': return '💎 Diamond';
+      case 'gold': return '🥇 Gold';
+      case 'silver': return '🥈 Silver';
+      default: return '🥉 Bronze';
+    }
+
   };
 
   if (loading) {
     return (
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="p-6">
-          <div className="animate-pulse">
-            <div className="h-48 bg-gray-300 rounded mb-4"></div>
-            <div className="h-4 bg-gray-300 rounded mb-2"></div>
-            <div className="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
-            <div className="space-y-2">
-              <div className="h-3 bg-gray-300 rounded"></div>
-              <div className="h-3 bg-gray-300 rounded"></div>
-              <div className="h-3 bg-gray-300 rounded"></div>
+
+      <div className="bg-[#161B22] border border-gray-700 rounded-xl p-6 text-white">
+        <div className="animate-pulse">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-32 h-40 bg-gray-700 rounded-lg"></div>
+          </div>
+          <div className="space-y-3">
+            <div className="h-4 bg-gray-700 rounded w-3/4 mx-auto"></div>
+            <div className="h-3 bg-gray-700 rounded w-1/2 mx-auto"></div>
+
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+
+  return (
+    <div className="bg-[#161B22] border border-gray-700 rounded-xl overflow-hidden text-white">
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-yellow-900/50 border-b border-yellow-700 p-3">
+          <div className="flex items-center text-yellow-300 text-sm">
+            <span className="mr-2">⚠️</span>
+            {error}
+          </div>
+        </div>
+      )}
+
+      {/* NFT Card Header */}
+      <div className="relative bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h3 className="text-xl font-bold mb-2">{metadata?.name}</h3>
+            <p className="text-purple-200 text-sm mb-4 max-w-md">{metadata?.description}</p>
+            
+            {/* Rank Badge */}
+            <div className={`inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r ${getRankColor(getCurrentRank())} text-white font-bold text-sm`}>
+              <span className="mr-2">{getCurrentRankBadge()}</span>
+              {getCurrentRank()} Member
+            </div>
+          </div>
+          
+          {/* NFT Image */}
+          <div className="ml-4">
+            <div className="w-32 h-40 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center text-4xl border-2 border-white/20">
+              🎫
             </div>
           </div>
         </div>
       </div>
-    );
-  }
 
-  if (!metadata) {
-    return (
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden">
-        <div className="p-6 text-center">
-          <div className="text-red-500 mb-4">❌</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            NFT Passport Not Found
-          </h3>
-          <p className="text-gray-600 mb-4">
-            {error || `No passport found for token ID ${tokenId}`}
-          </p>
-          <button
-            onClick={handleRefresh}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            🔄 Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-      {/* Header with refresh button */}
-      <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-        <h2 className="text-lg font-bold">🆔 Sovico Passport</h2>
-        <button
-          onClick={handleRefresh}
-          className="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full p-2 transition-all duration-200"
-          title="Refresh NFT data"
-        >
-          🔄
-        </button>
-      </div>
-
-      {/* Error message if any */}
-      {error && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 m-4 rounded">
-          <p className="text-sm">⚠️ {error}</p>
-        </div>
-      )}
-
-      {/* NFT Image */}
+      {/* Stats Grid */}
       <div className="p-6">
-        <div className="relative">
-          <img
-            src={metadata.image}
-            alt={metadata.name}
-            className="w-full h-48 object-cover rounded-lg mb-4"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x400/4F46E5/white?text=Sovico+Passport';
-            }}
-          />
-          {/* Overlay badge for token ID */}
-          <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
-            #{tokenId}
-          </div>
-        </div>
-
-        {/* NFT Name and Description */}
-        <div className="mb-4">
-          <h3 className="text-xl font-bold text-gray-900 mb-2">{metadata.name}</h3>
-          <p className="text-gray-600 text-sm">{metadata.description}</p>
-        </div>
-
-        {/* Attributes Grid */}
-        <div className="space-y-3">
-          <h4 className="text-lg font-semibold text-gray-800 mb-3">📊 Passport Details</h4>
-          {metadata.attributes.map((attr, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">{getBadgeEmoji(attr.trait_type)}</span>
-                <span className="font-medium text-gray-700">{attr.trait_type}</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {metadata?.attributes?.map((attr, index) => (
+            <div key={index} className="bg-[#0D1117] border border-gray-600 rounded-lg p-3 text-center">
+              <div className="text-gray-400 text-xs uppercase tracking-wide mb-1">
+                {attr.trait_type}
               </div>
-              <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                attr.trait_type.toLowerCase() === 'level' 
-                  ? getLevelColor(attr.value)
-                  : 'text-blue-600 bg-blue-100'
-              }`}>
-                {attr.value}
+              <div className="text-white font-bold">
+                {attr.trait_type === 'SVT Points' ? svtBalance.toLocaleString('vi-VN') : 
+                 attr.trait_type === 'Level' ? getCurrentRank() : attr.value}
+
               </div>
             </div>
           ))}
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-          <p className="text-xs text-gray-500">
-            🚀 Powered by Sovico Blockchain Technology
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Last updated: {new Date().toLocaleString()}
-          </p>
+
+        {/* Achievements Section */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-lg font-semibold flex items-center">
+              <span className="mr-2">🏆</span>
+              Thành tựu ({achievements.length})
+            </h4>
+            <button
+              onClick={fetchNFTData}
+              className="text-blue-400 hover:text-blue-300 text-sm flex items-center"
+            >
+              <span className="mr-1">🔄</span>
+              Refresh
+            </button>
+          </div>
+
+          {achievements.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {achievements.map((achievement) => (
+                <div
+                  key={achievement.id}
+                  className="bg-gradient-to-r from-[#0D1117] to-green-900/30 border border-green-700 rounded-lg p-4 flex items-center"
+                >
+                  <div className="text-2xl mr-3">
+                    {getAchievementIcon(achievement.name)}
+                  </div>
+                  <div className="flex-1">
+                    <h5 className="font-semibold text-green-300 text-sm">
+                      {achievement.name}
+                    </h5>
+                    <p className="text-gray-400 text-xs mt-1">
+                      {achievement.description}
+                    </p>
+                    <p className="text-green-500 text-xs mt-1">
+                      Mở khóa: {new Date(achievement.unlocked_at).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">🎯</div>
+              <p className="text-gray-400 text-sm">
+                Chưa có thành tựu nào. <br />
+                Hãy sử dụng các dịch vụ Sovico để mở khóa!
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-6 pt-6 border-t border-gray-700">
+          <div className="flex flex-wrap gap-2">
+            <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              📤 Share NFT
+            </button>
+            <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              🎨 Customize
+            </button>
+            <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              🔗 View on Blockchain
+            </button>
+          </div>
+        </div>
+
+        {/* Metadata Footer */}
+        <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
+          <div className="flex justify-between items-center">
+            <span>Token ID: #{tokenId}</span>
+            <span>Network: Sovico Chain</span>
+          </div>
         </div>
       </div>
     </div>
