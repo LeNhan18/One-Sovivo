@@ -7,6 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 import jwt
 import datetime
+import time
 from functools import wraps
 import pandas as pd
 import numpy as np
@@ -33,6 +34,15 @@ try:
 except ImportError as e:
     print(f"⚠️ Blockchain integration not available: {e}")
     BLOCKCHAIN_ENABLED = False
+
+# Import mission progression system
+try:
+    from mission_progression import mission_system, get_missions_for_customer
+    MISSION_SYSTEM_ENABLED = True
+    print("✅ Mission progression system loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Mission progression system not available: {e}")
+    MISSION_SYSTEM_ENABLED = False
 
 # =============================================================================
 # KHỞI TẠO VÀ CẤU HÌNH
@@ -171,6 +181,42 @@ class CustomerAchievement(db.Model):
     # Relationships
     customer = db.relationship('Customer', backref='achievements')
     achievement = db.relationship('Achievement', backref='customers')
+
+
+class CustomerMission(db.Model):
+    __tablename__ = 'customer_missions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False)
+    mission_id = db.Column(db.String(100), nullable=False)  # ID từ mission progression system
+    mission_title = db.Column(db.String(200), nullable=False)
+    mission_category = db.Column(db.String(50), nullable=False)
+    mission_level = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.Enum('available', 'in_progress', 'completed', 'expired'), default='available')
+    progress_data = db.Column(db.JSON)  # Lưu trữ tiến trình chi tiết
+    svt_reward = db.Column(db.Numeric(10, 2), default=0)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    # Relationships
+    customer = db.relationship('Customer', backref='missions')
+
+
+class CustomerMissionProgress(db.Model):
+    __tablename__ = 'customer_mission_progress'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False)
+    mission_id = db.Column(db.String(100), nullable=False)
+    requirement_key = db.Column(db.String(100), nullable=False)  # Ví dụ: login_count, transaction_count
+    current_value = db.Column(db.Numeric(15, 2), default=0)
+    required_value = db.Column(db.Numeric(15, 2), nullable=False)
+    is_completed = db.Column(db.Boolean, default=False)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relationships
+    customer = db.relationship('Customer', backref='mission_progress')
 
 
 # =============================================================================
@@ -1336,6 +1382,523 @@ def get_user_tokens(user_id):
             "total_svt": 0,
             "transactions": []
         }), 500
+
+
+@app.route('/api/tokens/add', methods=['POST'])
+def add_svt_tokens():
+    """Add SVT tokens to user account for mission rewards"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        amount = data.get('amount')
+        transaction_type = data.get('transaction_type', 'mission_reward')
+        description = data.get('description', 'Mission reward')
+        mission_id = data.get('mission_id', '')
+        log_blockchain = data.get('log_blockchain', False)
+        
+        if not customer_id or not amount:
+            return jsonify({
+                "success": False,
+                "error": "Missing customer_id or amount"
+            }), 400
+        
+        # Generate blockchain transaction hash
+        timestamp = int(time.time())
+        tx_hash = f"0x{''.join([hex(hash(f'{customer_id}{amount}{timestamp}'))[2:8] for _ in range(10)])}"
+        
+        # Add token transaction record
+        new_transaction = TokenTransaction(
+            customer_id=customer_id,
+            amount=amount,
+            transaction_type=transaction_type,
+            description=description,
+            tx_hash=tx_hash
+        )
+        
+        db.session.add(new_transaction)
+        
+        # 🔗 BLOCKCHAIN LOGGING: Update NFT on blockchain if enabled
+        blockchain_result = None
+        if log_blockchain and BLOCKCHAIN_ENABLED:
+            try:
+                # Import blockchain functions
+                from blockchain_simple import update_nft_on_blockchain
+                
+                # Log transaction to blockchain
+                blockchain_result = update_nft_on_blockchain(
+                    user_id=customer_id,
+                    achievements=[f"Mission: {mission_id}"],
+                    persona_data={"action": "mission_reward", "amount": amount}
+                )
+                
+                print(f"🔗 Blockchain TX logged: {blockchain_result.get('transaction_hash', 'N/A')}")
+                
+            except Exception as blockchain_error:
+                print(f"⚠️ Blockchain logging failed: {blockchain_error}")
+                # Continue with database transaction even if blockchain fails
+        
+        db.session.commit()
+        
+        # Get updated balance
+        token_query = """
+            SELECT COALESCE(SUM(amount), 0) as total_svt
+            FROM token_transactions 
+            WHERE customer_id = :customer_id
+        """
+        
+        result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
+        row = result.fetchone()
+        new_balance = float(row.total_svt) if row and row.total_svt else 0
+        
+        response_data = {
+            "success": True,
+            "message": f"Successfully added {amount} SVT tokens",
+            "new_balance": new_balance,
+            "transaction_id": new_transaction.id,
+            "tx_hash": tx_hash,
+            "gas_used": 21000 if log_blockchain else 0
+        }
+        
+        # Add blockchain info if available
+        if blockchain_result and blockchain_result.get('success'):
+            response_data.update({
+                "blockchain_tx": blockchain_result.get('transaction_hash'),
+                "blockchain_gas": blockchain_result.get('gas_used'),
+                "blockchain_status": "confirmed"
+            })
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error adding SVT tokens: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# =============================================================================
+# MISSION PROGRESSION API ENDPOINTS
+# =============================================================================
+
+@app.route('/api/missions/<int:customer_id>', methods=['GET'])
+def get_customer_missions_api(customer_id):
+    """API để lấy nhiệm vụ cho khách hàng với progressive system"""
+    try:
+        if not MISSION_SYSTEM_ENABLED:
+            return jsonify({
+                'error': 'Mission system not available',
+                'customer_id': customer_id,
+                'available_missions': [],
+                'recommended_missions': []
+            }), 503
+        
+        # Lấy thông tin khách hàng từ database
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Tính toán dữ liệu khách hàng cho mission system
+        customer_data = get_customer_data_for_missions(customer_id)
+        
+        # Lấy danh sách mission đã hoàn thành
+        completed_missions_query = CustomerMission.query.filter_by(
+            customer_id=customer_id, 
+            status='completed'
+        ).all()
+        completed_missions = [m.mission_id for m in completed_missions_query]
+        
+        # Sử dụng mission progression system
+        customer_type = mission_system.get_customer_type(customer_data)
+        available_missions = mission_system.get_available_missions(customer_data, completed_missions)
+        recommendations = mission_system.get_next_recommendations(customer_data, completed_missions)
+        
+        # Cập nhật database với missions mới
+        sync_missions_to_database(customer_id, available_missions)
+        
+        return jsonify({
+            'success': True,
+            'customer_id': customer_id,
+            'customer_type': customer_type.value,
+            'customer_level': determine_customer_level(customer_data),
+            'available_missions': available_missions,
+            'recommended_missions': recommendations,
+            'completed_missions': completed_missions,
+            'total_completed': len(completed_missions),
+            'total_available': len(available_missions),
+            'progression_stats': {
+                'days_since_registration': (datetime.datetime.now() - customer.created_at).days,
+                'total_transactions': customer_data.get('transaction_count', 0),
+                'profile_completeness': customer_data.get('profile_completeness', 0),
+                'ai_interactions': customer_data.get('ai_interactions', 0)
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Error getting missions for customer {customer_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'customer_id': customer_id
+        }), 500
+
+
+@app.route('/api/missions/<int:customer_id>/start', methods=['POST'])
+def start_mission_api(customer_id):
+    """API để bắt đầu một nhiệm vụ"""
+    try:
+        data = request.get_json()
+        mission_id = data.get('mission_id')
+        
+        if not mission_id:
+            return jsonify({'error': 'Mission ID required'}), 400
+        
+        # Kiểm tra xem mission có tồn tại trong hệ thống không
+        customer_data = get_customer_data_for_missions(customer_id)
+        completed_missions_query = CustomerMission.query.filter_by(
+            customer_id=customer_id, 
+            status='completed'
+        ).all()
+        completed_missions = [m.mission_id for m in completed_missions_query]
+        
+        available_missions = mission_system.get_available_missions(customer_data, completed_missions)
+        
+        # Tìm mission trong danh sách available
+        target_mission = None
+        for mission in available_missions:
+            if mission['id'] == mission_id:
+                target_mission = mission
+                break
+        
+        if not target_mission:
+            return jsonify({'error': 'Mission not available or already completed'}), 400
+        
+        # Cập nhật hoặc tạo mission record
+        existing_mission = CustomerMission.query.filter_by(
+            customer_id=customer_id,
+            mission_id=mission_id
+        ).first()
+        
+        if existing_mission:
+            existing_mission.status = 'in_progress'
+            existing_mission.started_at = datetime.datetime.utcnow()
+        else:
+            new_mission = CustomerMission(
+                customer_id=customer_id,
+                mission_id=mission_id,
+                mission_title=target_mission['title'],
+                mission_category=target_mission['category'].value,
+                mission_level=target_mission['level'],
+                status='in_progress',
+                svt_reward=target_mission['svt_reward'],
+                started_at=datetime.datetime.utcnow()
+            )
+            db.session.add(new_mission)
+        
+        # Tạo progress tracking records
+        create_mission_progress_tracking(customer_id, mission_id, target_mission)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã bắt đầu nhiệm vụ: {target_mission["title"]}',
+            'mission_id': mission_id,
+            'estimated_time': target_mission.get('estimated_time', 'Không xác định'),
+            'svt_reward': target_mission['svt_reward']
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/missions/<int:customer_id>/progress/<mission_id>', methods=['GET'])
+def get_mission_progress_api(customer_id, mission_id):
+    """API để lấy tiến độ của một nhiệm vụ cụ thể"""
+    try:
+        customer_data = get_customer_data_for_missions(customer_id)
+        progress = mission_system.get_mission_progress(mission_id, customer_data)
+        
+        # Lấy thông tin từ database
+        mission_record = CustomerMission.query.filter_by(
+            customer_id=customer_id,
+            mission_id=mission_id
+        ).first()
+        
+        if mission_record:
+            progress.update({
+                'status': mission_record.status,
+                'started_at': mission_record.started_at.isoformat() if mission_record.started_at else None,
+                'completed_at': mission_record.completed_at.isoformat() if mission_record.completed_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'customer_id': customer_id,
+            'progress': progress
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/missions/<int:customer_id>/complete', methods=['POST'])
+def complete_mission_api(customer_id):
+    """API để hoàn thành một nhiệm vụ và nhận thưởng"""
+    try:
+        data = request.get_json()
+        mission_id = data.get('mission_id')
+        
+        if not mission_id:
+            return jsonify({'error': 'Mission ID required'}), 400
+        
+        # Kiểm tra tiến độ mission
+        customer_data = get_customer_data_for_missions(customer_id)
+        progress = mission_system.get_mission_progress(mission_id, customer_data)
+        
+        if not progress.get('is_completed', False):
+            return jsonify({
+                'error': 'Mission not yet completed',
+                'current_progress': progress.get('overall_progress', 0)
+            }), 400
+        
+        # Cập nhật mission status
+        mission_record = CustomerMission.query.filter_by(
+            customer_id=customer_id,
+            mission_id=mission_id
+        ).first()
+        
+        if not mission_record:
+            return jsonify({'error': 'Mission not found in database'}), 404
+        
+        if mission_record.status == 'completed':
+            return jsonify({'error': 'Mission already completed'}), 400
+        
+        # Mark as completed
+        mission_record.status = 'completed'
+        mission_record.completed_at = datetime.datetime.utcnow()
+        
+        # Thêm SVT reward
+        svt_reward = mission_record.svt_reward
+        if svt_reward > 0:
+            # Generate blockchain transaction hash
+            timestamp = int(time.time())
+            tx_hash = f"0x{''.join([hex(hash(f'{customer_id}{svt_reward}{timestamp}'))[2:8] for _ in range(10)])}"
+            
+            reward_transaction = TokenTransaction(
+                customer_id=customer_id,
+                amount=svt_reward,
+                transaction_type='mission_reward',
+                description=f'Hoàn thành nhiệm vụ: {mission_record.mission_title}',
+                tx_hash=tx_hash
+            )
+            db.session.add(reward_transaction)
+        
+        db.session.commit()
+        
+        # Kiểm tra xem có unlock missions mới không
+        updated_customer_data = get_customer_data_for_missions(customer_id)
+        completed_missions_query = CustomerMission.query.filter_by(
+            customer_id=customer_id, 
+            status='completed'
+        ).all()
+        completed_missions = [m.mission_id for m in completed_missions_query]
+        
+        newly_available = mission_system.get_available_missions(updated_customer_data, completed_missions)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Chúc mừng! Bạn đã hoàn thành nhiệm vụ: {mission_record.mission_title}',
+            'mission_id': mission_id,
+            'svt_reward': float(svt_reward),
+            'tx_hash': tx_hash if svt_reward > 0 else None,
+            'newly_unlocked_missions': len(newly_available),
+            'next_recommendations': mission_system.get_next_recommendations(updated_customer_data, completed_missions)[:3]
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/missions/leaderboard', methods=['GET'])
+def get_mission_leaderboard_api():
+    """API để lấy bảng xếp hạng hoàn thành mission"""
+    try:
+        # Tính toán số missions đã hoàn thành cho mỗi customer
+        leaderboard_query = """
+            SELECT 
+                c.customer_id,
+                c.name,
+                COUNT(cm.id) as completed_missions,
+                COALESCE(SUM(cm.svt_reward), 0) as total_svt_earned,
+                MAX(cm.completed_at) as last_completion
+            FROM customers c
+            LEFT JOIN customer_missions cm ON c.customer_id = cm.customer_id 
+                AND cm.status = 'completed'
+            GROUP BY c.customer_id, c.name
+            HAVING completed_missions > 0
+            ORDER BY completed_missions DESC, total_svt_earned DESC
+            LIMIT 10
+        """
+        
+        result = db.session.execute(db.text(leaderboard_query))
+        leaderboard = []
+        
+        for i, row in enumerate(result, 1):
+            leaderboard.append({
+                'rank': i,
+                'customer_id': row.customer_id,
+                'name': row.name,
+                'completed_missions': row.completed_missions,
+                'total_svt_earned': float(row.total_svt_earned),
+                'last_completion': row.last_completion.isoformat() if row.last_completion else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'leaderboard': leaderboard,
+            'total_participants': len(leaderboard)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# MISSION HELPER FUNCTIONS
+# =============================================================================
+
+def get_customer_data_for_missions(customer_id: int) -> dict:
+    """Lấy dữ liệu khách hàng để đánh giá missions"""
+    try:
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return {}
+        
+        # Đếm số giao dịch
+        transaction_count = TokenTransaction.query.filter_by(customer_id=customer_id).count()
+        
+        # Tính tổng chi tiêu
+        spending_query = """
+            SELECT COALESCE(SUM(ABS(amount)), 0) as total_spending
+            FROM token_transactions 
+            WHERE customer_id = :customer_id AND amount < 0
+        """
+        spending_result = db.session.execute(db.text(spending_query), {"customer_id": customer_id})
+        total_spending = float(spending_result.fetchone().total_spending or 0)
+        
+        # Tính độ hoàn thiện profile
+        profile_fields = ['name', 'age', 'gender', 'job', 'city', 'persona_type']
+        filled_fields = sum(1 for field in profile_fields if getattr(customer, field))
+        profile_completeness = (filled_fields / len(profile_fields)) * 100
+        
+        # Mock data cho các trường khác (sẽ implement thực tế sau)
+        return {
+            'customer_id': customer_id,
+            'created_at': customer.created_at,
+            'transaction_count': transaction_count,
+            'total_spending': total_spending,
+            'profile_completeness': profile_completeness,
+            'login_count': 10,  # Mock
+            'ai_interactions': 5,  # Mock
+            'features_explored': 3,  # Mock
+            'name_filled': bool(customer.name),
+            'age_filled': bool(customer.age),
+            'gender_filled': bool(customer.gender),
+            'city_filled': bool(customer.city),
+            'job_filled': bool(customer.job),
+            'persona_type_filled': bool(customer.persona_type),
+            'avatar_uploaded': False,  # Mock
+            'app_tutorial_completed': True,  # Mock
+            'marketplace_visits': 2,  # Mock
+            'daily_streak': 3,  # Mock
+            'weekly_checkins': 4,  # Mock
+            'financial_goals_set': 0,  # Mock
+            'flight_bookings': 0,  # Mock
+            'ai_consultations': 5,  # Mock
+            'investment_accounts': 0,  # Mock
+            'social_shares': 0,  # Mock
+            'referrals_successful': 0,  # Mock
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting customer data: {e}")
+        return {}
+
+
+def sync_missions_to_database(customer_id: int, available_missions: list):
+    """Đồng bộ missions có sẵn vào database"""
+    try:
+        for mission in available_missions:
+            existing = CustomerMission.query.filter_by(
+                customer_id=customer_id,
+                mission_id=mission['id']
+            ).first()
+            
+            if not existing:
+                new_mission = CustomerMission(
+                    customer_id=customer_id,
+                    mission_id=mission['id'],
+                    mission_title=mission['title'],
+                    mission_category=mission['category'].value,
+                    mission_level=mission['level'],
+                    status='available',
+                    svt_reward=mission['svt_reward']
+                )
+                db.session.add(new_mission)
+        
+        db.session.commit()
+    except Exception as e:
+        print(f"❌ Error syncing missions: {e}")
+        db.session.rollback()
+
+
+def create_mission_progress_tracking(customer_id: int, mission_id: str, mission_data: dict):
+    """Tạo progress tracking cho mission"""
+    try:
+        requirements = mission_data.get('requirements', {})
+        
+        for req_key, req_value in requirements.items():
+            existing = CustomerMissionProgress.query.filter_by(
+                customer_id=customer_id,
+                mission_id=mission_id,
+                requirement_key=req_key
+            ).first()
+            
+            if not existing:
+                progress_record = CustomerMissionProgress(
+                    customer_id=customer_id,
+                    mission_id=mission_id,
+                    requirement_key=req_key,
+                    current_value=0,
+                    required_value=req_value if isinstance(req_value, (int, float)) else 1,
+                    is_completed=False
+                )
+                db.session.add(progress_record)
+        
+        db.session.commit()
+    except Exception as e:
+        print(f"❌ Error creating progress tracking: {e}")
+        db.session.rollback()
+
+
+def determine_customer_level(customer_data: dict) -> str:
+    """Xác định level của khách hàng dựa trên dữ liệu"""
+    transaction_count = customer_data.get('transaction_count', 0)
+    total_spending = customer_data.get('total_spending', 0)
+    profile_completeness = customer_data.get('profile_completeness', 0)
+    
+    if transaction_count >= 50 and total_spending >= 100000000 and profile_completeness >= 90:
+        return 'Expert'
+    elif transaction_count >= 20 and total_spending >= 50000000 and profile_completeness >= 70:
+        return 'Advanced'
+    elif transaction_count >= 5 and profile_completeness >= 50:
+        return 'Intermediate'
+    else:
+        return 'Beginner'
 
 
 # =============================================================================
