@@ -123,20 +123,33 @@ const SVTWallet: React.FC = () => {
 
       } catch (error) {
         console.error('Error fetching wallet data:', error);
-        // Keep some fallback missions for demo
+        // Fallback missions với business logic thực tế
         setMissions([
           {
             id: 'M001',
-            title: 'Kết nối dịch vụ',
-            description: 'Kết nối với backend để lấy dữ liệu thực',
-            requirements: ['Kiểm tra kết nối API'],
+            title: 'Khám Phá Sovico',
+            description: 'Đăng nhập và khám phá các dịch vụ Sovico để nhận thưởng',
+            requirements: ['Đăng nhập hệ thống', 'Xem profile NFT'],
             reward: 100,
-            badge: '🔗',
+            badge: '🎯',
+            progress: 1,
+            maxProgress: 1,
+            isCompleted: true,
+            deadline: '2025-12-31',
+            category: 'combo'
+          },
+          {
+            id: 'M002', 
+            title: 'Nhà Đầu Tư Mới',
+            description: 'Bắt đầu hành trình đầu tư với gói cơ bản',
+            requirements: ['Nạp tối thiểu 1,000,000 VND'],
+            reward: 500,
+            badge: '�',
             progress: 0,
             maxProgress: 1,
             isCompleted: false,
             deadline: '2025-12-31',
-            category: 'combo'
+            category: 'finance'
           }
         ]);
       } finally {
@@ -153,12 +166,60 @@ const SVTWallet: React.FC = () => {
     const today = new Date();
     const deadline = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    // Flight-based mission
+    // 🎯 PROFILE COMPLETION MISSIONS
+    const profileComplete = customerData.basic_info?.name && customerData.basic_info?.age && customerData.basic_info?.city;
+    if (!profileComplete) {
+      missions.push({
+        id: 'M_PROFILE',
+        title: 'Hoàn Thiện Hồ Sơ',
+        description: 'Cập nhật đầy đủ thông tin cá nhân để nhận 500 SVT',
+        requirements: ['Điền họ tên', 'Điền tuổi', 'Điền thành phố'],
+        reward: 500,
+        badge: '👤',
+        progress: 0,
+        maxProgress: 1,
+        isCompleted: false,
+        deadline,
+        category: 'combo'
+      });
+    }
+
+    // ✅ DAILY CHECK-IN MISSIONS
+    missions.push({
+      id: 'M_CHECKIN',
+      title: 'Điểm Danh Hàng Ngày',
+      description: 'Đăng nhập mỗi ngày để nhận 100 SVT',
+      requirements: ['Đăng nhập vào app'],
+      reward: 100,
+      badge: '📅',
+      progress: 1,
+      maxProgress: 1,
+      isCompleted: true,
+      deadline,
+      category: 'combo'
+    });
+
+    // 💰 FIRST TRANSACTION MISSION
+    missions.push({
+      id: 'M_FIRST_TRANSACTION',
+      title: 'Giao Dịch Đầu Tiên',
+      description: 'Thực hiện giao dịch đầu tiên để nhận 300 SVT',
+      requirements: ['Mua sắm hoặc chuyển tiền qua Sovico'],
+      reward: 300,
+      badge: '💳',
+      progress: 0,
+      maxProgress: 1,
+      isCompleted: false,
+      deadline,
+      category: 'finance'
+    });
+
+    // ✈️ FLIGHT MISSIONS
     const flights = customerData.vietjet_summary?.total_flights_last_year || 0;
     if (flights < 10) {
       missions.push({
         id: 'M_FLIGHT',
-        title: 'Phi công Mới',
+        title: 'Phi Công Mới',
         description: 'Thực hiện 3 chuyến bay để nâng cấp tài khoản',
         requirements: ['Đặt và hoàn thành 3 chuyến bay Vietjet'],
         reward: 1500,
@@ -171,7 +232,7 @@ const SVTWallet: React.FC = () => {
       });
     }
 
-    // Banking mission
+    // 💰 BANKING MISSIONS
     const balance = customerData.hdbank_summary?.average_balance || 0;
     if (balance < 50000000) {
       missions.push({
@@ -189,7 +250,7 @@ const SVTWallet: React.FC = () => {
       });
     }
 
-    // Resort mission
+    // 🏝️ RESORT MISSIONS
     const nights = customerData.resort_summary?.total_nights_stayed || 0;
     if (nights < 5) {
       missions.push({
@@ -198,7 +259,7 @@ const SVTWallet: React.FC = () => {
         description: 'Trải nghiệm 2 đêm tại resort Sovico',
         requirements: ['Đặt và nghỉ 2 đêm tại resort'],
         reward: 1000,
-        badge: '🏖️',
+        badge: '🏝️',
         progress: nights % 2,
         maxProgress: 2,
         isCompleted: false,
@@ -207,17 +268,146 @@ const SVTWallet: React.FC = () => {
       });
     }
 
+    // 🛒 MARKETPLACE MISSIONS
+    missions.push({
+      id: 'M_MARKETPLACE',
+      title: 'Mua Sắm Thông Minh',
+      description: 'Mua 3 sản phẩm từ SVT Marketplace',
+      requirements: ['Mua 3 items bất kỳ với SVT'],
+      reward: 800,
+      badge: '🛒',
+      progress: 0,
+      maxProgress: 3,
+      isCompleted: false,
+      deadline,
+      category: 'shopping'
+    });
+
+    // 🤖 AI ASSISTANT MISSIONS
+    missions.push({
+      id: 'M_AI',
+      title: 'Tương Tác AI',
+      description: 'Hỏi 5 câu hỏi với AI Financial Advisor',
+      requirements: ['Chat với AI Advisor về tài chính'],
+      reward: 400,
+      badge: '🤖',
+      progress: 0,
+      maxProgress: 5,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
+
+    // 📱 MOBILE APP MISSIONS
+    missions.push({
+      id: 'M_MOBILE',
+      title: 'Mobile Super User',
+      description: 'Cài đặt và sử dụng Sovico Mobile App',
+      requirements: ['Download app', 'Đăng nhập mobile'],
+      reward: 600,
+      badge: '📱',
+      progress: 0,
+      maxProgress: 1,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
+
+    // 🎁 REFERRAL MISSIONS
+    missions.push({
+      id: 'M_REFERRAL',
+      title: 'Giới Thiệu Bạn Bè',
+      description: 'Mời 3 bạn bè tham gia Sovico ecosystem',
+      requirements: ['Gửi mã giới thiệu', '3 bạn đăng ký thành công'],
+      reward: 2500,
+      badge: '🎁',
+      progress: 0,
+      maxProgress: 3,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
+
+    // 🏆 ACHIEVEMENT HUNTER
+    missions.push({
+      id: 'M_ACHIEVEMENT',
+      title: 'Thợ Săn Thành Tựu',
+      description: 'Mở khóa 10 achievements để trở thành VIP',
+      requirements: ['Đạt 10 achievements bất kỳ'],
+      reward: 3000,
+      badge: '🏆',
+      progress: 0,
+      maxProgress: 10,
+      isCompleted: false,
+      deadline,
+      category: 'combo'
+    });
+
     return missions;
   };
 
-  const claimMissionReward = (missionId: string) => {
-    setMissions(prev => prev.map(mission => {
-      if (mission.id === missionId && mission.isCompleted && !mission.claimed) {
+  const handleCompleteMission = async (mission: Mission) => {
+    try {
+      // Simulate completing the mission
+      setMissions(prev => prev.map(m => {
+        if (m.id === mission.id) {
+          return { 
+            ...m, 
+            isCompleted: true, 
+            progress: m.maxProgress,
+            claimed: false 
+          };
+        }
+        return m;
+      }));
+
+      // Call API to update SVT balance (optional - for real implementation)
+      // await fetch(`http://127.0.0.1:5000/api/missions/${mission.id}/complete`, { method: 'POST' });
+      
+      alert(`🎉 Hoàn thành nhiệm vụ "${mission.title}"! Nhấn "Nhận thưởng" để claim ${mission.reward} SVT.`);
+    } catch (error) {
+      console.error('Error completing mission:', error);
+      alert('❌ Có lỗi xảy ra khi hoàn thành nhiệm vụ!');
+    }
+  };
+
+  const claimMissionReward = async (missionId: string) => {
+    try {
+      const mission = missions.find(m => m.id === missionId);
+      if (!mission || !mission.isCompleted || mission.claimed) return;
+
+      // Call API to add SVT tokens to database
+      const response = await fetch(`http://127.0.0.1:5000/api/tokens/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          amount: mission.reward,
+          transaction_type: 'mission_reward',
+          description: `Hoàn thành nhiệm vụ: ${mission.title}`
+        })
+      });
+
+      if (response.ok) {
+        // Update UI
+        setMissions(prev => prev.map(m => {
+          if (m.id === missionId) {
+            return { ...m, claimed: true };
+          }
+          return m;
+        }));
+        
         setSvtBalance(current => current + mission.reward);
-        return { ...mission, claimed: true };
+        alert(`🎉 Nhận thành công ${mission.reward} SVT!`);
+      } else {
+        throw new Error('Failed to claim reward');
       }
-      return mission;
-    }));
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+      alert('❌ Có lỗi xảy ra khi nhận thưởng!');
+    }
   };
 
   if (loading) {
@@ -349,9 +539,12 @@ const SVTWallet: React.FC = () => {
                   ✅ Nhận thưởng
                 </button>
               ) : (
-                <div className="w-full bg-gray-700 text-gray-400 py-2 px-4 rounded-lg text-center">
-                  Đang thực hiện...
-                </div>
+                <button
+                  onClick={() => handleCompleteMission(mission)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium"
+                >
+                  🎯 Hoàn thành nhiệm vụ
+                </button>
               )}
             </div>
           ))}
