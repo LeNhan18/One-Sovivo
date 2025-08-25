@@ -53,6 +53,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [achievementsCount, setAchievementsCount] = useState(0)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,10 +74,18 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`)
           const tokensInfo = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0 }
           
+          // Tính tier dựa trên SVT balance thực tế
+          const calculateTier = (svtBalance: number) => {
+            if (svtBalance >= 200000) return 'Diamond';
+            if (svtBalance >= 50000) return 'Gold';
+            if (svtBalance >= 10000) return 'Silver';
+            return 'Bronze';
+          };
+
           const realUserData = {
             customerId: customerData.basic_info?.customer_id || customerId,
             name: customerData.basic_info?.name || user.name,
-            memberTier: tokenData?.metadata?.attributes?.find(attr => attr.trait_type === 'Level')?.value || "Bronze",
+            memberTier: calculateTier(tokensInfo.total_svt || 0),
             walletAddress: "0x" + customerId.toString().padStart(40, '0'),
             sovicoTokens: tokensInfo.total_svt || 0, // SVT thực từ DB
             services: {
@@ -102,6 +111,13 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
             }
           }
           setUserData(realUserData)
+          
+          // Lấy achievements count
+          const achievementsResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}/achievements`)
+          if (achievementsResponse.ok) {
+            const achievementsData = await achievementsResponse.json()
+            setAchievementsCount(achievementsData.total_achievements || 0)
+          }
           
           // Lấy recommendations từ AI
           const aiResponse = await fetch(`http://127.0.0.1:5000/customer/${customerId}/insights`)
@@ -367,15 +383,15 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           
           <div className="grid grid-cols-3 gap-4 mb-4 pt-4 border-t border-purple-400">
             <div className="text-center">
-              <div className="text-xl font-bold">3</div>
+              <div className="text-xl font-bold">{achievementsCount}</div>
               <div className="text-purple-200 text-xs">Nhiệm vụ hoàn thành</div>
             </div>
             <div className="text-center">
-              <div className="text-xl font-bold">4</div>
+              <div className="text-xl font-bold">{1 + achievementsCount}</div>
               <div className="text-purple-200 text-xs">NFT sở hữu</div>
             </div>
             <div className="text-center">
-              <div className="text-xl font-bold">Platinum</div>
+              <div className="text-xl font-bold">{userData?.memberTier}</div>
               <div className="text-purple-200 text-xs">Cấp độ</div>
             </div>
           </div>
