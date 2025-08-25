@@ -54,7 +54,6 @@ pip install -r requirements.txt
 python setup_database.py
 
 # Chạy backend
-python app_new.py
 ```
 
 ### Bước 3: Thiết lập Frontend
