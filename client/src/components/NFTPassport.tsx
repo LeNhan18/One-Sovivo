@@ -116,8 +116,21 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
   };
 
   const getCurrentRank = (): string => {
-    const levelAttr = metadata?.attributes?.find(attr => attr.trait_type === 'Level');
-    return levelAttr?.value as string || 'Bronze';
+    // Calculate rank based on actual SVT balance instead of hardcoded metadata
+    if (svtBalance >= 200000) return 'Diamond';
+    if (svtBalance >= 50000) return 'Gold';
+    if (svtBalance >= 10000) return 'Silver';
+    return 'Bronze';
+  };
+
+  const getCurrentRankBadge = (): string => {
+    const rank = getCurrentRank();
+    switch (rank.toLowerCase()) {
+      case 'diamond': return '💎 Diamond';
+      case 'gold': return '🥇 Gold';
+      case 'silver': return '🥈 Silver';
+      default: return '🥉 Bronze';
+    }
   };
 
   if (loading) {
@@ -157,7 +170,7 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
             
             {/* Rank Badge */}
             <div className={`inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r ${getRankColor(getCurrentRank())} text-white font-bold text-sm`}>
-              <span className="mr-2">👑</span>
+              <span className="mr-2">{getCurrentRankBadge()}</span>
               {getCurrentRank()} Member
             </div>
           </div>
@@ -180,7 +193,8 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
                 {attr.trait_type}
               </div>
               <div className="text-white font-bold">
-                {attr.trait_type === 'SVT Points' ? svtBalance.toLocaleString('vi-VN') : attr.value}
+                {attr.trait_type === 'SVT Points' ? svtBalance.toLocaleString('vi-VN') : 
+                 attr.trait_type === 'Level' ? getCurrentRank() : attr.value}
               </div>
             </div>
           ))}
