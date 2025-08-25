@@ -35,7 +35,7 @@ interface SVTTransaction {
 }
 
 const SVTWallet: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'wallet' | 'missions' | 'achievements' | 'history'>('wallet');
+  const [activeTab, setActiveTab] = useState<'wallet' | 'missions' | 'achievements' | 'history' | 'leaderboard'>('wallet');
   const [svtBalance, setSvtBalance] = useState(0);
   const [totalLifetimeEarned, setTotalLifetimeEarned] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -43,6 +43,10 @@ const SVTWallet: React.FC = () => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [transactions, setTransactions] = useState<SVTTransaction[]>([]);
+  const [customerLevel, setCustomerLevel] = useState<string>('Beginner');
+  const [customerType, setCustomerType] = useState<string>('new');
+  const [progressionStats, setProgressionStats] = useState<any>({});
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   // Get customer ID from auth
   useEffect(() => {
@@ -159,6 +163,56 @@ const SVTWallet: React.FC = () => {
 
     fetchData();
   }, [customerId]);
+
+  // Load missions with progression system
+  const loadProgressiveMissions = async () => {
+    if (!customerId) return [];
+
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/missions/${customerId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setCustomerLevel(data.customer_level || 'Beginner');
+        setCustomerType(data.customer_type || 'new');
+        setProgressionStats(data.progression_stats || {});
+
+        // Convert API missions to component format
+        return data.recommended_missions.map((mission: any) => ({
+          id: mission.id,
+          title: mission.title,
+          description: mission.description,
+          reward: mission.svt_reward,
+          progress: 0,
+          maxProgress: 100,
+          isCompleted: false,
+          deadline: mission.estimated_time || 'Không giới hạn',
+          category: mapCategoryToType(mission.category),
+          icon: mission.icon || '🎯',
+          level: mission.level || 'beginner',
+          customerType: mission.customer_type || 'new'
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading progressive missions:', error);
+    }
+    return [];
+  };
+
+  // Helper function to map API category to component category type
+  const mapCategoryToType = (apiCategory: string): 'aviation' | 'finance' | 'shopping' | 'travel' | 'combo' => {
+    const mapping: Record<string, 'aviation' | 'finance' | 'shopping' | 'travel' | 'combo'> = {
+      'onboarding': 'finance',
+      'profile': 'finance', 
+      'financial': 'finance',
+      'travel': 'aviation',
+      'lifestyle': 'shopping',
+      'social': 'combo',
+      'investment': 'finance',
+      'loyalty': 'combo'
+    };
+    return mapping[apiCategory] || 'finance';
+  };
 
   // Function to generate dynamic missions based on customer data
   const generateDynamicMissions = (customerData: any): Mission[] => {
@@ -376,7 +430,7 @@ const SVTWallet: React.FC = () => {
       const mission = missions.find(m => m.id === missionId);
       if (!mission || !mission.isCompleted || mission.claimed) return;
 
-      // Call API to add SVT tokens to database
+      // Call API to add SVT tokens to database AND log blockchain transaction
       const response = await fetch(`http://127.0.0.1:5000/api/tokens/add`, {
         method: 'POST',
         headers: {
@@ -386,11 +440,15 @@ const SVTWallet: React.FC = () => {
           customer_id: customerId,
           amount: mission.reward,
           transaction_type: 'mission_reward',
-          description: `Hoàn thành nhiệm vụ: ${mission.title}`
+          description: `Hoàn thành nhiệm vụ: ${mission.title}`,
+          mission_id: mission.id,
+          log_blockchain: true  // Flag to enable blockchain logging
         })
       });
 
       if (response.ok) {
+        const result = await response.json();
+        
         // Update UI
         setMissions(prev => prev.map(m => {
           if (m.id === missionId) {
@@ -400,7 +458,9 @@ const SVTWallet: React.FC = () => {
         }));
         
         setSvtBalance(current => current + mission.reward);
-        alert(`🎉 Nhận thành công ${mission.reward} SVT!`);
+        
+        // Show success with blockchain transaction hash
+        alert(`🎉 Nhận thành công ${mission.reward} SVT!\n\n🔗 Blockchain TX: ${result.tx_hash || 'Pending...'}\n⛽ Gas Used: ${result.gas_used || 'N/A'}`);
       } else {
         throw new Error('Failed to claim reward');
       }
