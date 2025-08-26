@@ -1711,36 +1711,6 @@ def start_mission_api(customer_id):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/missions/<int:customer_id>/progress/<mission_id>', methods=['GET'])
-def get_mission_progress_api(customer_id, mission_id):
-    """API để lấy tiến độ của một nhiệm vụ cụ thể"""
-    try:
-        customer_data = get_customer_data_for_missions(customer_id)
-        progress = mission_system.get_mission_progress(mission_id, customer_data)
-        
-        # Lấy thông tin từ database
-        mission_record = CustomerMission.query.filter_by(
-            customer_id=customer_id,
-            mission_id=mission_id
-        ).first()
-        
-        if mission_record:
-            progress.update({
-                'status': mission_record.status,
-                'started_at': mission_record.started_at.isoformat() if mission_record.started_at else None,
-                'completed_at': mission_record.completed_at.isoformat() if mission_record.completed_at else None
-            })
-        
-        return jsonify({
-            'success': True,
-            'customer_id': customer_id,
-            'progress': progress
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/api/missions/<int:customer_id>/complete', methods=['POST'])
 def complete_mission_api(customer_id):
     """API để hoàn thành một nhiệm vụ và nhận thưởng SVT"""
@@ -1893,28 +1863,53 @@ def complete_mission_api(customer_id):
 
 @app.route('/api/missions/<int:customer_id>/progress/<mission_id>', methods=['GET'])
 def get_mission_progress_api(customer_id, mission_id):
-        updated_customer_data = get_customer_data_for_missions(customer_id)
-        completed_missions_query = CustomerMission.query.filter_by(
-            customer_id=customer_id, 
-            status='completed'
-        ).all()
-        completed_missions = [m.mission_id for m in completed_missions_query]
+    """API để lấy tiến độ của một nhiệm vụ cụ thể"""
+    try:
+        # Lấy mission record từ database
+        mission_record = CustomerMission.query.filter_by(
+            customer_id=customer_id,
+            mission_id=mission_id
+        ).first()
         
-        newly_available = mission_system.get_available_missions(updated_customer_data, completed_missions)
+        if not mission_record:
+            return jsonify({'error': 'Mission not found'}), 404
+        
+        # Lấy thông tin mission template
+        mission_template = detailed_mission_system.get_mission_by_id(mission_id)
+        if not mission_template:
+            return jsonify({'error': 'Mission template not found'}), 404
+        
+        # Tính toán progress
+        progress_data = mission_record.progress_data or {}
+        target_value = mission_template.get('target_value', 1)
+        current_value = progress_data.get('current_value', 0)
+        
+        # Tính phần trăm hoàn thành
+        progress_percentage = min(100, (current_value / target_value) * 100) if target_value > 0 else 0
+        is_completed = mission_record.status == 'completed'
         
         return jsonify({
             'success': True,
-            'message': f'Chúc mừng! Bạn đã hoàn thành nhiệm vụ: {mission_record.mission_title}',
             'mission_id': mission_id,
-            'svt_reward': float(svt_reward),
-            'tx_hash': tx_hash if svt_reward > 0 else None,
-            'newly_unlocked_missions': len(newly_available),
-            'next_recommendations': mission_system.get_next_recommendations(updated_customer_data, completed_missions)[:3]
+            'mission_title': mission_record.mission_title,
+            'status': mission_record.status,
+            'current_value': current_value,
+            'target_value': target_value,
+            'progress_percentage': progress_percentage,
+            'is_completed': is_completed,
+            'started_at': mission_record.started_at.isoformat() if mission_record.started_at else None,
+            'completed_at': mission_record.completed_at.isoformat() if mission_record.completed_at else None,
+            'reward_amount': float(mission_record.svt_reward) if mission_record.svt_reward else 0,
+            'instructions': mission_template.get('instructions', []),
+            'estimated_time': mission_template.get('estimated_time', '5 phút')
         })
         
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Error getting mission progress: {e}")
+        return jsonify({
+            'error': 'Failed to get mission progress',
+            'details': str(e)
+        }), 500
 
 
 @app.route('/api/missions/leaderboard', methods=['GET'])
