@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Message {
@@ -6,6 +7,7 @@ interface Message {
   type: 'user' | 'ai';
   content: string;
   timestamp: Date;
+
 }
 
 interface UserProfile {
@@ -96,6 +98,7 @@ const AIFinancialAssistant: React.FC = () => {
 
     fetchUserProfile();
   }, []);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -341,6 +344,7 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
     if (!inputMessage.trim()) return;
 
     const userMessage: Message = {
+
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage,
@@ -348,6 +352,7 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
     };
 
     setMessages(prev => [...prev, userMessage]);
+
     const currentInput = inputMessage;
     setInputMessage('');
     setIsLoading(true);
@@ -440,6 +445,7 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
               <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
               Online
             </span>
+
           </div>
         </div>
       </div>
@@ -494,10 +500,11 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
                   minute: '2-digit' 
                 })}
               </div>
+
             </div>
           </div>
         ))}
-        
+      
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
@@ -508,13 +515,13 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
                 <span className="text-sm text-gray-400">AI đang suy nghĩ...</span>
+
               </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
-
       {/* Quick Questions */}
       {messages.length <= 1 && (
         <div className="p-4 border-t border-gray-700">
