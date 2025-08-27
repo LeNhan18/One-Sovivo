@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
+
 interface NFTMetadata {
   name: string;
   description: string;
@@ -16,6 +17,7 @@ interface Achievement {
   description: string;
   badge_image_url?: string;
   unlocked_at: string;
+
 }
 
 interface NFTPassportProps {
@@ -25,6 +27,7 @@ interface NFTPassportProps {
 
 const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }) => {
   const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
+
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,11 +37,13 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
     fetchNFTData();
   }, [tokenId, refreshTrigger]);
 
+
   const fetchNFTData = async () => {
     setLoading(true);
     setError(null);
     
     try {
+
       // Fetch NFT metadata
       const nftResponse = await fetch(`http://127.0.0.1:5000/api/nft/${tokenId}`);
       const nftData = await nftResponse.json();
@@ -86,12 +91,14 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
           { trait_type: "Status", value: "Offline" },
           { trait_type: "Level", value: "Bronze" },
           { trait_type: "SVT Points", value: 0 }
+
         ]
       });
     } finally {
       setLoading(false);
     }
   };
+
 
   const getAchievementIcon = (achievementName: string): string => {
     const name = achievementName.toLowerCase();
@@ -131,10 +138,12 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
       case 'silver': return '🥈 Silver';
       default: return '🥉 Bronze';
     }
+
   };
 
   if (loading) {
     return (
+
       <div className="bg-[#161B22] border border-gray-700 rounded-xl p-6 text-white">
         <div className="animate-pulse">
           <div className="flex items-center justify-center mb-4">
@@ -143,11 +152,13 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
           <div className="space-y-3">
             <div className="h-4 bg-gray-700 rounded w-3/4 mx-auto"></div>
             <div className="h-3 bg-gray-700 rounded w-1/2 mx-auto"></div>
+
           </div>
         </div>
       </div>
     );
   }
+
 
   return (
     <div className="bg-[#161B22] border border-gray-700 rounded-xl overflow-hidden text-white">
@@ -195,10 +206,12 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
               <div className="text-white font-bold">
                 {attr.trait_type === 'SVT Points' ? svtBalance.toLocaleString('vi-VN') : 
                  attr.trait_type === 'Level' ? getCurrentRank() : attr.value}
+
               </div>
             </div>
           ))}
         </div>
+
 
         {/* Achievements Section */}
         <div>
