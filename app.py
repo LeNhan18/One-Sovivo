@@ -575,8 +575,11 @@ def purchase_marketplace_item_api():
         
         # Lấy customer_id từ user đăng nhập
         user = request.current_user
-        if not user.customer_id:
+        if not user.customer_id or not user.customer:
             return jsonify({'error': 'Người dùng chưa có thông tin khách hàng'}), 400
+        
+        # Get actual business customer_id
+        actual_customer_id = user.customer.customer_id
         
         # Kiểm tra vật phẩm
         item = MarketplaceItem.query.get(item_id)
@@ -595,7 +598,7 @@ def purchase_marketplace_item_api():
             WHERE customer_id = :customer_id
         """
         
-        result = db.session.execute(db.text(token_query), {"customer_id": user.customer_id})
+        result = db.session.execute(db.text(token_query), {"customer_id": actual_customer_id})
         row = result.fetchone()
         current_balance = float(row.total_svt) if row and row.total_svt else 0
         if current_balance < total_cost:
@@ -605,7 +608,7 @@ def purchase_marketplace_item_api():
         # 1. Trừ SVT
         debit_transaction = TokenTransaction(
             tx_hash=f"purchase_{item_id}_{datetime.datetime.utcnow().timestamp()}",
-            customer_id=user.customer_id,
+            customer_id=actual_customer_id,
             transaction_type='marketplace_purchase',
             amount=-total_cost,
             description=f"Mua {quantity}x {item.name}"
@@ -1489,6 +1492,66 @@ def add_svt_tokens():
 
 
 # =============================================================================
+# TEST ENDPOINTS FOR DEVELOPMENT
+# =============================================================================
+
+@app.route('/api/test/add-svt/<int:customer_id>', methods=['POST'])
+def test_add_svt_tokens(customer_id):
+    """Test endpoint to add SVT tokens for testing marketplace"""
+    try:
+        data = request.get_json() or {}
+        amount = data.get('amount', 1000)  # Default 1000 SVT
+        
+        # Generate unique transaction hash
+        import time
+        import uuid
+        import random
+        
+        timestamp = int(time.time() * 1000000)
+        unique_id = str(uuid.uuid4()).replace('-', '')[:16]
+        random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
+        tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
+        
+        # Add test transaction
+        test_transaction = TokenTransaction(
+            customer_id=customer_id,
+            amount=amount,
+            transaction_type='test_reward',
+            description=f'Test tokens for marketplace testing',
+            tx_hash=tx_hash
+        )
+        
+        db.session.add(test_transaction)
+        db.session.commit()
+        
+        # Get updated balance
+        token_query = """
+            SELECT COALESCE(SUM(amount), 0) as total_svt
+            FROM token_transactions 
+            WHERE customer_id = :customer_id
+        """
+        
+        result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
+        row = result.fetchone()
+        new_balance = float(row.total_svt) if row and row.total_svt else 0
+        
+        return jsonify({
+            "success": True,
+            "message": f"Added {amount} test SVT tokens",
+            "new_balance": new_balance,
+            "transaction_id": test_transaction.id,
+            "tx_hash": tx_hash
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# =============================================================================
 # MISSION PROGRESSION API ENDPOINTS
 # =============================================================================
 
@@ -2292,6 +2355,107 @@ def get_recommendations(predicted_persona, input_data):
         })
 
     return recommendations
+
+
+# =============================================================================
+# TEST ENDPOINTS - For development only
+# =============================================================================
+
+@app.route('/api/test/add-svt', methods=['POST'])
+def test_add_svt():
+    """Test endpoint to add SVT tokens for development"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id', 2015)  # Default to 2015
+        amount = data.get('amount', 10000)  # Default to 10000 SVT
+        
+        # Generate unique transaction hash
+        import time
+        import uuid
+        import random
+        timestamp = int(time.time() * 1000000)
+        unique_id = str(uuid.uuid4()).replace('-', '')[:16]
+        random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(8)])
+        tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
+        
+        # Add test transaction
+        test_transaction = TokenTransaction(
+            customer_id=customer_id,
+            amount=amount,
+            transaction_type='test_reward',
+            description=f'Test reward - {amount} SVT tokens',
+            tx_hash=tx_hash
+        )
+        
+        db.session.add(test_transaction)
+        db.session.commit()
+        
+        # Get updated balance
+        token_query = """
+            SELECT COALESCE(SUM(amount), 0) as total_svt
+            FROM token_transactions 
+            WHERE customer_id = :customer_id
+        """
+        
+        result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
+        row = result.fetchone()
+        new_balance = float(row.total_svt) if row and row.total_svt else 0
+        
+        return jsonify({
+            "success": True,
+            "message": f"Added {amount} SVT tokens to customer {customer_id}",
+            "new_balance": new_balance,
+            "transaction_id": test_transaction.id,
+            "tx_hash": tx_hash
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/api/token-transactions/<int:customer_id>', methods=['GET'])
+def get_token_transactions(customer_id):
+    """Get token transactions directly from database"""
+    try:
+        # Get all transactions for this customer
+        transactions = TokenTransaction.query.filter_by(customer_id=customer_id).order_by(TokenTransaction.created_at.desc()).all()
+        
+        # Calculate total balance
+        total_balance = db.session.execute(
+            db.text("SELECT COALESCE(SUM(amount), 0) as total FROM token_transactions WHERE customer_id = :customer_id"),
+            {"customer_id": customer_id}
+        ).fetchone().total or 0
+        
+        # Format transactions
+        transaction_list = []
+        for tx in transactions:
+            transaction_list.append({
+                "id": tx.id,
+                "tx_hash": tx.tx_hash,
+                "transaction_type": tx.transaction_type,
+                "amount": float(tx.amount),
+                "description": tx.description,
+                "created_at": tx.created_at.strftime('%Y-%m-%d %H:%M:%S') if tx.created_at else None,
+                "block_number": tx.block_number
+            })
+        
+        return jsonify({
+            "success": True,
+            "customer_id": customer_id,
+            "total_balance": float(total_balance),
+            "transaction_count": len(transaction_list),
+            "transactions": transaction_list
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 # =============================================================================

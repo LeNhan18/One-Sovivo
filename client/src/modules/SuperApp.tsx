@@ -5,7 +5,7 @@ import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
-import ServiceModal from '../components/ServiceModal'
+import { ServiceModal } from '../components/ServiceModal'
 
 type Props = {
   user: AuthUser
@@ -531,6 +531,14 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           </div>
         </div>
       </main>
+
+      {/* Service Modal */}
+      <ServiceModal
+        isOpen={isServiceModalOpen}
+        onClose={closeServiceModal}
+        serviceType={currentService!}
+        userData={userData}
+      />
     </div>
   )
 }
