@@ -2459,6 +2459,375 @@ def get_token_transactions(customer_id):
 
 
 # =============================================================================
+# SERVICE INTEGRATION APIs - Real Database Operations
+# =============================================================================
+
+@app.route('/api/service/vietjet/book-flight', methods=['POST'])
+def vietjet_book_flight():
+    """Đặt vé máy bay Vietjet và lưu vào database"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        flight_type = data.get('flight_type', 'domestic')  # domestic/international
+        
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "message": "customer_id is required"
+            }), 400
+        
+        # Sinh flight_id và thông tin chuyến bay
+        flight_id = f"VJ{int(time.time())}"
+        if flight_type == "domestic":
+            origin = "HAN"
+            destination = "SGN"
+            ticket_class = "economy"
+            booking_value = 2500000
+        else:
+            origin = "HAN"
+            destination = "NRT"
+            ticket_class = "business"
+            booking_value = 8500000
+
+        flight_date = datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30))
+
+        new_flight = VietjetFlight(
+            flight_id=flight_id,
+            customer_id=customer_id,
+            flight_date=flight_date,
+            origin=origin,
+            destination=destination,
+            ticket_class=ticket_class,
+            booking_value=booking_value
+        )
+        db.session.add(new_flight)
+        
+        # Tính SVT reward dựa trên loại vé
+        svt_reward = 500 if flight_type == "domestic" else 1200
+
+        # Thêm SVT token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="service_reward",
+            amount=svt_reward,
+            description=f"Vietjet flight booking: {origin}-{destination}",
+            transaction_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000),
+            timestamp=datetime.datetime.now()
+        )
+        db.session.add(token_tx)
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": f"Đặt vé {origin}-{destination} thành công!",
+            "flight_id": flight_id,
+            "svt_reward": svt_reward,
+            "flight_details": {
+                "origin": origin,
+                "destination": destination,
+                "ticket_class": ticket_class,
+                "booking_value": booking_value,
+                "flight_date": flight_date.strftime('%Y-%m-%d')
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi đặt vé: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/hdbank/transfer', methods=['POST'])
+def hdbank_transfer():
+    """Thực hiện chuyển khoản HDBank và lưu vào database"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        amount = data.get('amount', 5000000)  # Default 5 triệu VND
+        transfer_type = data.get('transfer_type', 'internal')
+        
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "message": "customer_id is required"
+            }), 400
+        
+        # Tạo transaction ID
+        transaction_id = f"HD{int(time.time())}"
+        
+        # Thêm bank transaction vào database
+        bank_tx = HDBankTransaction(
+            customer_id=customer_id,
+            transaction_id=transaction_id,
+            transaction_type="transfer",
+            amount=amount,
+            description=f"Transfer to beneficiary - {transfer_type}",
+            transaction_date=datetime.datetime.now(),
+            status="completed"
+        )
+        db.session.add(bank_tx)
+        
+        # Tính SVT reward dựa trên số tiền
+        svt_reward = max(100, int(amount / 50000))  # 100 SVT minimum, 1 SVT per 50k VND
+        
+        # Thêm SVT token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="service_reward",
+            amount=svt_reward,
+            description=f"HDBank transfer reward: {amount:,} VND",
+            transaction_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000),
+            timestamp=datetime.datetime.now()
+        )
+        db.session.add(token_tx)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Chuyển khoản {amount:,} VND thành công!",
+            "transaction_id": transaction_id,
+            "svt_reward": svt_reward,
+            "transfer_details": {
+                "amount": amount,
+                "type": transfer_type
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi chuyển khoản: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/hdbank/loan', methods=['POST'])
+def hdbank_loan():
+    """Đăng ký khoản vay HDBank và lưu vào database"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        loan_amount = data.get('loan_amount', 500000000)  # Default 500 triệu VND
+        loan_type = data.get('loan_type', 'personal')
+        
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "message": "customer_id is required"
+            }), 400
+        
+        # Tạo loan transaction ID
+        loan_id = f"LOAN{int(time.time())}"
+        
+        # Thêm loan transaction vào database
+        loan_tx = HDBankTransaction(
+            customer_id=customer_id,
+            transaction_id=loan_id,
+            transaction_type="loan_disbursement",
+            amount=loan_amount,
+            description=f"Personal loan approved - {loan_type}",
+            transaction_date=datetime.datetime.now(),
+            status="approved"
+        )
+        db.session.add(loan_tx)
+        
+        # SVT reward cho khoản vay lớn
+        svt_reward = max(1000, int(loan_amount / 500000))  # 1000 SVT minimum, 1 SVT per 500k VND
+        
+        # Thêm SVT token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="service_reward",
+            amount=svt_reward,
+            description=f"HDBank loan approval reward: {loan_amount:,} VND",
+            transaction_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000),
+            timestamp=datetime.datetime.now()
+        )
+        db.session.add(token_tx)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Khoản vay {loan_amount:,} VND đã được phê duyệt!",
+            "loan_id": loan_id,
+            "svt_reward": svt_reward,
+            "loan_details": {
+                "amount": loan_amount,
+                "type": loan_type,
+                "interest_rate": "8.5%/năm"
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi đăng ký vay: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/resort/book-room', methods=['POST'])
+def resort_book_room():
+    """Đặt phòng Resort và lưu vào database"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        nights = data.get('nights', 2)
+        room_type = data.get('room_type', 'deluxe')
+        
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "message": "customer_id is required"
+            }), 400
+        
+        # Tạo booking ID
+        booking_id = f"RST{int(time.time())}"
+        
+        # Tính giá phòng
+        room_prices = {
+            'standard': 2000000,
+            'deluxe': 3500000,
+            'suite': 6000000
+        }
+        total_price = room_prices.get(room_type, 3500000) * nights
+        
+        # Thêm resort booking vào database
+        resort_booking = ResortBooking(
+            customer_id=customer_id,
+            booking_id=booking_id,
+            resort_name="Sovico Premium Resort",
+            room_type=room_type,
+            check_in_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30)),
+            check_out_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30) + nights),
+            nights_stayed=nights,
+            total_amount=total_price,
+            status="confirmed"
+        )
+        db.session.add(resort_booking)
+        
+        # Tính SVT reward
+        svt_reward = nights * 400  # 400 SVT per night
+        
+        # Thêm SVT token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="service_reward",
+            amount=svt_reward,
+            description=f"Resort booking reward: {nights} nights {room_type}",
+            transaction_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000),
+            timestamp=datetime.datetime.now()
+        )
+        db.session.add(token_tx)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Đặt phòng {room_type} {nights} đêm thành công!",
+            "booking_id": booking_id,
+            "svt_reward": svt_reward,
+            "booking_details": {
+                "room_type": room_type,
+                "nights": nights,
+                "total_price": total_price
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi đặt phòng: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/resort/book-spa', methods=['POST'])
+def resort_book_spa():
+    """Đặt dịch vụ Spa và lưu vào database"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        spa_type = data.get('spa_type', 'massage')
+        
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "message": "customer_id is required"
+            }), 400
+        
+        # Tạo spa booking ID
+        spa_booking_id = f"SPA{int(time.time())}"
+        
+        # Tính giá spa
+        spa_prices = {
+            'massage': 1500000,
+            'facial': 1200000,
+            'body_treatment': 2000000,
+            'premium_package': 3500000
+        }
+        spa_price = spa_prices.get(spa_type, 1500000)
+        
+        # Thêm spa booking như một resort booking
+        spa_booking = ResortBooking(
+            customer_id=customer_id,
+            booking_id=spa_booking_id,
+            resort_name="Sovico Premium Spa",
+            room_type=f"spa_{spa_type}",
+            check_in_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(1, 7)),
+            check_out_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(1, 7)),
+            nights_stayed=0,  # Spa service, not overnight
+            total_amount=spa_price,
+            status="confirmed"
+        )
+        db.session.add(spa_booking)
+        
+        # SVT reward cho spa
+        svt_reward = int(spa_price / 5000)  # 1 SVT per 5k VND
+        
+        # Thêm SVT token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="service_reward",
+            amount=svt_reward,
+            description=f"Spa service reward: {spa_type}",
+            transaction_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000),
+            timestamp=datetime.datetime.now()
+        )
+        db.session.add(token_tx)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Đặt dịch vụ {spa_type} thành công!",
+            "booking_id": spa_booking_id,
+            "svt_reward": svt_reward,
+            "spa_details": {
+                "service": spa_type,
+                "price": spa_price
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi đặt spa: {str(e)}"
+        }), 500
+
+
+# =============================================================================
 # INITIALIZATION
 # =============================================================================
 def init_app():
