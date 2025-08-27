@@ -62,9 +62,13 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
       try {
         // Lấy dữ liệu thực từ backend sử dụng customer_id của user
         const customerId = user.customer_id || 1001; // Sử dụng customer_id từ user, fallback 1001
+        console.log('🔍 SuperApp Debug - User:', user);
+        console.log('🔍 SuperApp Debug - Customer ID:', customerId);
+        
         const response = await fetch(`http://127.0.0.1:5000/customer/${customerId}`)
         if (response.ok) {
           const customerData = await response.json()
+          console.log('🔍 SuperApp Debug - Customer Data:', customerData);
           
           // Lấy dữ liệu token từ blockchain/database  
           const tokenResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}`)
@@ -73,6 +77,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           // Tính tổng SVT tokens thực từ token_transactions
           const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`)
           const tokensInfo = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0 }
+          console.log('🔍 SuperApp Debug - Tokens Info:', tokensInfo);
           
           // Tính tier dựa trên SVT balance thực tế
           const calculateTier = (svtBalance: number) => {
@@ -112,11 +117,17 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           }
           setUserData(realUserData)
           
-          // Lấy achievements count
-          const achievementsResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}/achievements`)
-          if (achievementsResponse.ok) {
-            const achievementsData = await achievementsResponse.json()
-            setAchievementsCount(achievementsData.total_achievements || 0)
+          // Lấy mission count từ token transactions thay vì achievements
+          const missionResponse = await fetch(`http://127.0.0.1:5000/api/token-transactions/${customerId}`)
+          if (missionResponse.ok) {
+            const missionData = await missionResponse.json()
+            if (missionData.success) {
+              // Đếm số mission_reward transactions (missions hoàn thành)
+              const missionCount = missionData.transactions.filter((tx: any) => 
+                tx.transaction_type === 'mission_reward'
+              ).length
+              setAchievementsCount(missionCount)
+            }
           }
           
           // Lấy recommendations từ AI
