@@ -2511,9 +2511,8 @@ def vietjet_book_flight():
             transaction_type="service_reward",
             amount=svt_reward,
             description=f"Vietjet flight booking: {origin}-{destination}",
-            transaction_hash=f"0x{uuid.uuid4().hex}",
-            block_number=random.randint(1000000, 2000000),
-            timestamp=datetime.datetime.now()
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
 
@@ -2580,9 +2579,8 @@ def hdbank_transfer():
             transaction_type="service_reward",
             amount=svt_reward,
             description=f"HDBank transfer reward: {amount:,} VND",
-            transaction_hash=f"0x{uuid.uuid4().hex}",
-            block_number=random.randint(1000000, 2000000),
-            timestamp=datetime.datetime.now()
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
         
@@ -2646,9 +2644,8 @@ def hdbank_loan():
             transaction_type="service_reward",
             amount=svt_reward,
             description=f"HDBank loan approval reward: {loan_amount:,} VND",
-            transaction_hash=f"0x{uuid.uuid4().hex}",
-            block_number=random.randint(1000000, 2000000),
-            timestamp=datetime.datetime.now()
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
         
@@ -2723,9 +2720,8 @@ def resort_book_room():
             transaction_type="service_reward",
             amount=svt_reward,
             description=f"Resort booking reward: {nights} nights {room_type}",
-            transaction_hash=f"0x{uuid.uuid4().hex}",
-            block_number=random.randint(1000000, 2000000),
-            timestamp=datetime.datetime.now()
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
         
@@ -2800,9 +2796,8 @@ def resort_book_spa():
             transaction_type="service_reward",
             amount=svt_reward,
             description=f"Spa service reward: {spa_type}",
-            transaction_hash=f"0x{uuid.uuid4().hex}",
-            block_number=random.randint(1000000, 2000000),
-            timestamp=datetime.datetime.now()
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
         
