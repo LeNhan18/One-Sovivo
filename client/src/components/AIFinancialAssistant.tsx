@@ -79,7 +79,7 @@ const AIFinancialAssistant: React.FC = () => {
           }
 
           setUserProfile({
-            name: userData.name || 'Khách hàng',
+            name: userData.customer_name || 'Khách hàng',
             age: 30, // Default, could be enhanced
             customer_id: userData.customer_id,
             riskTolerance: 'moderate', // Default, could be from survey
