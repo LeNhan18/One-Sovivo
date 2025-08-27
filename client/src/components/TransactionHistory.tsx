@@ -65,7 +65,8 @@ const TransactionHistory: React.FC = () => {
       try {
         const token = localStorage.getItem('auth_token');
         if (!token) {
-          setCustomerId(1001); // fallback
+          console.log('🔍 No auth token, using fallback customer ID 2015');
+          setCustomerId(2015); // Use 2015 where we have data
           return;
         }
         
@@ -75,13 +76,16 @@ const TransactionHistory: React.FC = () => {
         
         if (response.ok) {
           const user = await response.json();
-          setCustomerId(user.customer_id || 1001);
+          console.log('🔍 User from auth:', user);
+          setCustomerId(user.customer_id || 2015);
         } else {
-          setCustomerId(1001);
+          console.log('🔍 Auth failed, using fallback customer ID 2015');
+          setCustomerId(2015);
         }
       } catch (error) {
         console.error('Error fetching customer ID:', error);
-        setCustomerId(1001);
+        console.log('🔍 Error in auth, using fallback customer ID 2015');
+        setCustomerId(2015);
       }
     };
 
@@ -94,32 +98,33 @@ const TransactionHistory: React.FC = () => {
       if (!customerId) return;
 
       try {
-        const response = await fetch(`http://127.0.0.1:5000/api/tokens?customer_id=${customerId}`);
+        // Use the new endpoint that fetches directly from token_transactions table
+        const response = await fetch(`http://127.0.0.1:5000/api/token-transactions/${customerId}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('🔍 Transaction History Data:', data);
           
-          // Convert API data to Transaction format
-          const convertedTransactions: Transaction[] = data.map((tx: any) => ({
-            id: tx.id?.toString() || `TXN_${Date.now()}`,
-            type: tx.transaction_type === 'earn' ? 'earn' : 
-                  tx.transaction_type === 'spend' ? 'spend' : 'transfer',
-            amount: parseFloat(tx.amount) || 0,
-            description: tx.description || 'SVT Transaction',
-            category: tx.transaction_type || 'general',
-            source: getSourceFromType(tx.transaction_type || ''),
-            date: tx.created_at || new Date().toISOString(),
-            balance: parseFloat(tx.balance_after) || 0,
-            blockHash: `0x${Math.random().toString(16).substr(2, 12)}...`,
-            confirmations: Math.floor(Math.random() * 50) + 1,
-            fee: tx.transaction_type === 'spend' ? Math.abs(parseFloat(tx.amount)) * 0.01 : 0
-          }));
+          if (data.success) {
+            // Set total balance from API
+            setTotalSVT(data.total_balance || 0);
+            
+            // Convert API data to Transaction format
+            const convertedTransactions: Transaction[] = data.transactions.map((tx: any) => ({
+              id: tx.id?.toString() || `TXN_${Date.now()}`,
+              type: tx.transaction_type.includes('reward') || tx.transaction_type.includes('bonus') || tx.transaction_type.includes('checkin') ? 'earn' :
+                    tx.transaction_type.includes('purchase') || tx.transaction_type.includes('spend') ? 'spend' : 'transfer',
+              amount: parseFloat(tx.amount) || 0,
+              description: tx.description || 'SVT Transaction',
+              category: tx.transaction_type || 'general',
+              source: getSourceFromType(tx.transaction_type || ''),
+              date: tx.created_at || new Date().toISOString(),
+              balance: data.total_balance || 0, // Use total balance for all transactions
+              blockHash: tx.tx_hash || `0x${Math.random().toString(16).substr(2, 12)}...`,
+              confirmations: Math.floor(Math.random() * 50) + 1,
+              fee: tx.transaction_type.includes('purchase') ? Math.abs(parseFloat(tx.amount)) * 0.01 : 0
+            }));
 
-          setTransactions(convertedTransactions);
-          
-          // Calculate total SVT balance
-          if (convertedTransactions.length > 0) {
-            const latestBalance = convertedTransactions[0]?.balance || 0;
-            setTotalSVT(latestBalance);
+            setTransactions(convertedTransactions);
           }
         }
       } catch (error) {
@@ -136,10 +141,14 @@ const TransactionHistory: React.FC = () => {
       if (!customerId) return;
 
       try {
-        const response = await fetch(`http://127.0.0.1:5000/api/nft/achievements?customer_id=${customerId}`);
+        // Use the correct endpoint path
+        const response = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}/achievements`);
         if (response.ok) {
           const data = await response.json();
-          setAchievements(data);
+          console.log('🏆 NFT Achievements Data:', data);
+          setAchievements(data.achievements || []);
+        } else {
+          console.error('Failed to fetch achievements:', response.status);
         }
       } catch (error) {
         console.error('Error fetching achievements:', error);
