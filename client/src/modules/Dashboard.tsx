@@ -6,6 +6,7 @@ import { AIInsights } from '../parts/AIInsights'
 import { ActionsPanel } from '../parts/ActionsPanel'
 import { ModelMetrics } from '../parts/ModelMetrics'
 import BlockchainDashboard from '../components/BlockchainDashboard'
+import TransactionHistory from '../components/TransactionHistory'
 
 export type CustomerBasic = {
   customer_id: number
@@ -139,7 +140,7 @@ export const Dashboard: React.FC = () => {
         {showMetrics ? (
           <ModelMetrics onClose={() => setShowMetrics(false)} />
         ) : activeTab === 'blockchain' ? (
-          <BlockchainDashboard customerId={selectedId || 1} />
+          <TransactionHistory />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Column 1: Search & Suggestions */}
