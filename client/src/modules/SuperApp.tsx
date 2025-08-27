@@ -5,6 +5,7 @@ import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
+import ServiceModal from '../components/ServiceModal'
 
 type Props = {
   user: AuthUser
@@ -54,6 +55,10 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [achievementsCount, setAchievementsCount] = useState(0)
+  
+  // Modal states
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
+  const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -242,6 +247,17 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
     { id: 'ai-assistant', label: 'AI Advisor', icon: '🤖', description: 'Tư vấn tài chính thông minh' },
     { id: 'history', label: 'Blockchain', icon: '⛓️', description: 'Lịch sử & NFT' }
   ]
+
+  // Service modal handlers
+  const openServiceModal = (serviceType: 'vietjet' | 'hdbank' | 'resort') => {
+    setCurrentService(serviceType)
+    setIsServiceModalOpen(true)
+  }
+
+  const closeServiceModal = () => {
+    setIsServiceModalOpen(false)
+    setCurrentService(null)
+  }
 
   if (loading) {
     return (
@@ -453,6 +469,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
               value={userData?.services?.vietjet?.flights} 
               unit="chuyến bay"
               color="text-red-400"
+              onClick={() => openServiceModal('vietjet')}
             />
             <ServiceCard 
               icon={<BankIcon />} 
@@ -461,6 +478,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
               unit="đ" 
               isCurrency 
               color="text-blue-400"
+              onClick={() => openServiceModal('hdbank')}
             />
             <ServiceCard 
               icon={<BuildingIcon />} 
@@ -468,6 +486,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
               value={userData?.services?.resorts?.nights_stayed} 
               unit="đêm nghỉ"
               color="text-green-400"
+              onClick={() => openServiceModal('resort')}
             />
           </div>
         </div>
@@ -524,10 +543,14 @@ type ServiceCardProps = {
   unit: string
   isCurrency?: boolean
   color?: string
+  onClick?: () => void
 }
 
-const ServiceCard: React.FC<ServiceCardProps> = ({ icon, title, value, unit, isCurrency = false, color = "text-gray-400" }) => (
-  <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4 flex items-center">
+const ServiceCard: React.FC<ServiceCardProps> = ({ icon, title, value, unit, isCurrency = false, color = "text-gray-400", onClick }) => (
+  <div 
+    className="bg-[#161B22] border border-gray-700 rounded-lg p-4 flex items-center cursor-pointer hover:border-blue-500 hover:bg-blue-900/20 transition-all"
+    onClick={onClick}
+  >
     <div className={color}>{icon}</div>
     <div className="ml-4">
       <p className="text-gray-400 text-sm">{title}</p>
