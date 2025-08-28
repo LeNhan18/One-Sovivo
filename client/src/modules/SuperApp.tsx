@@ -6,6 +6,7 @@ import AIFinancialAssistant from '../components/AIFinancialAssistant'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
 import { ServiceModal } from '../components/ServiceModal'
+import { AIAgent } from '../components/AIAgent'
 
 type Props = {
   user: AuthUser
@@ -56,9 +57,12 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [achievementsCount, setAchievementsCount] = useState(0)
   
-  // Modal states
+  // Modal states - Tự thao tác (Buffet style)
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
   const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
+  
+  // AI Agent states - Được phục vụ (Waiter style)
+  const [showAIAgent, setShowAIAgent] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -459,9 +463,21 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
           </div>
         </div>
 
-        {/* Services Overview */}
+        {/* Services Overview - Hybrid Interaction */}
         <div>
-          <h2 className="text-xl font-bold mb-4 text-white">💎 Dịch vụ của bạn</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-white">💎 Dịch vụ của bạn</h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowAIAgent(true)}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center space-x-2"
+              >
+                <span>🤖</span>
+                <span>Nói với AI</span>
+              </button>
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ServiceCard 
               icon={<PlaneIcon />} 
@@ -470,6 +486,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
               unit="chuyến bay"
               color="text-red-400"
               onClick={() => openServiceModal('vietjet')}
+              subtitle="👨‍🍳 Tự thao tác"
             />
             <ServiceCard 
               icon={<BankIcon />} 
@@ -479,6 +496,7 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
               isCurrency 
               color="text-blue-400"
               onClick={() => openServiceModal('hdbank')}
+              subtitle="👨‍🍳 Tự thao tác"
             />
             <ServiceCard 
               icon={<BuildingIcon />} 
@@ -487,7 +505,23 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
               unit="đêm nghỉ"
               color="text-green-400"
               onClick={() => openServiceModal('resort')}
+              subtitle="👨‍🍳 Tự thao tác"
             />
+          </div>
+          
+          <div className="mt-4 p-4 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-700 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-medium">🤵 Được AI phục vụ tự động</h3>
+                <p className="text-gray-300 text-sm">Chỉ cần nói: "Tôi muốn đặt vé máy bay và vay tiền" - AI sẽ làm tất cả!</p>
+              </div>
+              <button
+                onClick={() => setShowAIAgent(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Bắt đầu
+              </button>
+            </div>
           </div>
         </div>
         
@@ -532,13 +566,71 @@ export const SuperApp: React.FC<Props> = ({ user }) => {
         </div>
       </main>
 
-      {/* Service Modal */}
+      {/* Service Modal - Tự thao tác (Buffet style) */}
       <ServiceModal
         isOpen={isServiceModalOpen}
         onClose={closeServiceModal}
         serviceType={currentService!}
         userData={userData}
       />
+
+      {/* AI Agent Modal - Được phục vụ (Waiter style) */}
+      {showAIAgent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-4xl h-[90vh] flex flex-col">
+            {/* AI Agent Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-700 bg-gradient-to-r from-purple-600 to-blue-600">
+              <h2 className="text-xl font-bold text-white flex items-center space-x-2">
+                <span>🤵</span>
+                <span>AI Agent - Trợ lý cá nhân</span>
+              </h2>
+              <button
+                onClick={() => setShowAIAgent(false)}
+                className="text-white hover:text-gray-300 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* AI Agent Content */}
+            <div className="flex-1 overflow-hidden">
+              <AIAgent 
+                userData={userData}
+                onServiceAction={async (service, action, params) => {
+                  // Handle service actions through API
+                  const apiUrls = {
+                    vietjet: {
+                      book_flight: 'http://127.0.0.1:5000/api/service/vietjet/book-flight'
+                    },
+                    hdbank: {
+                      transfer: 'http://127.0.0.1:5000/api/service/hdbank/transfer',
+                      loan: 'http://127.0.0.1:5000/api/service/hdbank/loan'
+                    },
+                    resort: {
+                      book_room: 'http://127.0.0.1:5000/api/service/resort/book-room',
+                      spa_booking: 'http://127.0.0.1:5000/api/service/resort/book-spa'
+                    }
+                  }
+
+                  const apiUrl = apiUrls[service]?.[action]
+                  if (!apiUrl) throw new Error('API không hỗ trợ')
+
+                  const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                  })
+
+                  const result = await response.json()
+                  if (!result.success) throw new Error(result.message)
+                  
+                  return result
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -552,16 +644,24 @@ type ServiceCardProps = {
   isCurrency?: boolean
   color?: string
   onClick?: () => void
+  subtitle?: string
 }
 
-const ServiceCard: React.FC<ServiceCardProps> = ({ icon, title, value, unit, isCurrency = false, color = "text-gray-400", onClick }) => (
+const ServiceCard: React.FC<ServiceCardProps> = ({ icon, title, value, unit, isCurrency = false, color = "text-gray-400", onClick, subtitle }) => (
   <div 
-    className="bg-[#161B22] border border-gray-700 rounded-lg p-4 flex items-center cursor-pointer hover:border-blue-500 hover:bg-blue-900/20 transition-all"
+    className="bg-[#161B22] border border-gray-700 rounded-lg p-4 flex items-center cursor-pointer hover:border-blue-500 hover:bg-blue-900/20 transition-all relative"
     onClick={onClick}
   >
     <div className={color}>{icon}</div>
-    <div className="ml-4">
-      <p className="text-gray-400 text-sm">{title}</p>
+    <div className="ml-4 flex-1">
+      <div className="flex items-center justify-between">
+        <p className="text-gray-400 text-sm">{title}</p>
+        {subtitle && (
+          <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+            {subtitle}
+          </span>
+        )}
+      </div>
       <p className="text-lg font-bold text-white">
         {isCurrency ? Math.round(value / 1_000_000).toLocaleString('vi-VN') : value}
         <span className="text-sm font-normal text-gray-400 ml-1">{isCurrency ? "triệu" : unit}</span>
