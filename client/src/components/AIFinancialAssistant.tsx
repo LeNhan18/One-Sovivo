@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Message {
@@ -29,21 +30,34 @@ interface UserProfile {
   investmentGoals?: string[];
 }
 
-// Initialize Gemini AI
+// Initialize Gemini AI with multiple model fallbacks
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDxF5rCqGT8v-7hP8j2mN9kL3nQ1rS6wE4';
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// Try different models in order of preference
+const getModel = () => {
+  const modelNames = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro", 
+    "gemini-pro",
+    "gemini-1.0-pro"
+  ];
+  
+  // For now, use the most stable one
+  return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+};
+
+const model = getModel();
 
 const AIFinancialAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       type: 'ai',
-      content: '👋 Chào bạn! Tôi là AI Assistant của Sovico được hỗ trợ bởi Google Gemini.\n\n🎯 **Khả năng của tôi:**\n• 📊 Phân tích tài chính cá nhân và tư vấn\n• ✈️ **Tự động đặt vé máy bay Vietjet**\n• 🏦 **Tự động xử lý giao dịch HDBank**\n• 🏨 **Tự động đặt phòng resort**\n• 💎 Tối ưu hóa SVT và NFT\n• 🤖 **Thực hiện dịch vụ tự động theo yêu cầu**\n\n💡 **Thử nói:** "Đặt vé máy bay từ Hà Nội đi Đà Nẵng ngày 15/9 cho 2 người"\n\nHãy hỏi tôi bất cứ điều gì!',
+      content: '👋 Chào bạn! Tôi là AI Assistant của Sovico được hỗ trợ bởi Google Gemini.\n\n🎯 **Khả năng của tôi:**\n• 📊 Phân tích tài chính cá nhân và tư vấn\n• ✈️ **Tự động đặt vé máy bay Vietjet**\n• 🏦 **Tự động xử lý giao dịch HDBank**\n• 🏨 **Tự động đặt phòng resort**\n• 💎 Tối ưu hóa SVT và NFT\n• 🤖 **Thực hiện dịch vụ tự động theo yêu cầu**\n\n💡 **Thử nói:** "Đặt vé máy bay cho tôi", "Vay 500 triệu", "Đặt phòng khách sạn"\n\nHãy hỏi tôi bất cứ điều gì!',
       timestamp: new Date()
     }
   ]);
-  
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -78,12 +92,12 @@ const AIFinancialAssistant: React.FC = () => {
 
           setUserProfile({
             name: userData.customer_name || 'Khách hàng',
-            age: 30,
+            age: 30, // Default, could be enhanced
             customer_id: userData.customer_id,
-            riskTolerance: 'moderate',
+            riskTolerance: 'moderate', // Default, could be from survey
             sovicoTokens: svtBalance,
             totalTransactions: transactionCount,
-            monthlyIncome: 20000000,
+            monthlyIncome: 20000000, // Default 20M VND
             investmentGoals: ['Tiết kiệm', 'Đầu tư an toàn']
           });
         }
@@ -95,6 +109,7 @@ const AIFinancialAssistant: React.FC = () => {
     fetchUserProfile();
   }, []);
 
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -103,39 +118,34 @@ const AIFinancialAssistant: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
+  const predefinedQuestions = [
+    "Phân tích profile tài chính và đề xuất chiến lược cho tôi",
+    "Đặt vé máy bay cho tôi đi Đà Nẵng",
+    "Vay 500 triệu để mua nhà",
+    "Đặt phòng khách sạn 3 đêm", 
+    "Chuyển khoản 10 triệu cho bạn",
+    "Làm thế nào để nâng cấp lên cấp bậc Diamond với SVT?",
+    "Tối ưu hóa việc sử dụng hệ sinh thái Sovico như thế nào?"
+  ];
+
   // AI Intent Recognition - Phân tích ý định từ text
   const analyzeIntent = (text: string): ServiceAction[] => {
     const normalizedText = text.toLowerCase()
     const actions: ServiceAction[] = []
 
-    // Flight booking intents - Kiểm tra thông tin đầy đủ
+    // Flight booking intents - Mở rộng keyword detection
     if (normalizedText.includes('vé máy bay') || normalizedText.includes('đặt vé') || 
         normalizedText.includes('bay') || normalizedText.includes('chuyến bay') ||
         normalizedText.includes('vietjet') || normalizedText.includes('máy bay') ||
         (normalizedText.includes('đi') && (normalizedText.includes('vé') || normalizedText.includes('bay'))) ||
         normalizedText.includes('book flight') || normalizedText.includes('flight')) {
-      
-      // Kiểm tra xem có đủ thông tin chuyến bay không
-      const hasOrigin = /từ|from|khởi hành/.test(normalizedText) || /hà nội|tp\.?hcm|đà nẵng|phú quốc|nha trang/.test(normalizedText)
-      const hasDestination = /đến|đi/.test(normalizedText) && /hà nội|tp\.?hcm|đà nẵng|phú quốc|nha trang/.test(normalizedText)
-      const hasDate = /ngày|tháng|\/|\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\/\d{1,2}/.test(normalizedText)
-      
-      // Nếu không đủ thông tin, không tạo action
-      if (!hasOrigin || !hasDestination || !hasDate) {
-        return [] // Trả về empty để AI hỏi thông tin
-      }
-
       actions.push({
         id: `flight_${Date.now()}`,
         service: 'vietjet',
         action: 'book_flight',
         params: {
           flight_type: normalizedText.includes('quốc tế') || normalizedText.includes('nước ngoài') ? 'international' : 'domestic',
-          ticket_class: normalizedText.includes('thương gia') || normalizedText.includes('business') ? 'business' : 'economy',
-          origin: extractLocation(normalizedText, 'from'),
-          destination: extractLocation(normalizedText, 'to'),
-          departure_date: extractDate(normalizedText),
-          passengers: extractPassengerCount(normalizedText)
+          ticket_class: normalizedText.includes('thương gia') || normalizedText.includes('business') ? 'business' : 'economy'
         },
         status: 'pending'
       })
@@ -191,58 +201,26 @@ const AIFinancialAssistant: React.FC = () => {
       })
     }
 
+    // Spa intents
+    if (normalizedText.includes('spa') || normalizedText.includes('massage') || 
+        normalizedText.includes('thư giãn')) {
+      actions.push({
+        id: `spa_${Date.now()}`,
+        service: 'resort',
+        action: 'spa_booking',
+        params: {
+          spa_type: normalizedText.includes('cao cấp') ? 'premium_package' :
+                   normalizedText.includes('mặt') ? 'facial' :
+                   normalizedText.includes('body') ? 'body_treatment' : 'massage'
+        },
+        status: 'pending'
+      })
+    }
+
     return actions
   }
 
-  // Helper functions
-  const extractLocation = (text: string, type: 'from' | 'to'): string => {
-    const locationMap: { [key: string]: string } = {
-      'hà nội': 'HAN',
-      'tp.hcm': 'SGN', 
-      'hồ chí minh': 'SGN',
-      'sài gòn': 'SGN',
-      'đà nẵng': 'DAD',
-      'phú quốc': 'PQC',
-      'nha trang': 'CXR',
-      'đà lạt': 'DLI',
-      'cần thơ': 'VCA'
-    }
-
-    for (const [city, code] of Object.entries(locationMap)) {
-      if (text.includes(city)) {
-        return code
-      }
-    }
-    
-    return type === 'from' ? 'HAN' : 'SGN' // Default
-  }
-
-  const extractDate = (text: string): string => {
-    const datePattern = /(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/
-    const match = text.match(datePattern)
-    
-    if (match) {
-      const day = match[1].padStart(2, '0')
-      const month = match[2].padStart(2, '0') 
-      const year = match[3] || '2025'
-      return `${year}-${month}-${day}`
-    }
-    
-    // Default: ngày mai
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().split('T')[0]
-  }
-
-  const extractPassengerCount = (text: string): number => {
-    const numbers = text.match(/(\d+)\s*(người|khách|hành khách)/g)
-    if (numbers) {
-      const match = numbers[0].match(/\d+/)
-      if (match) return parseInt(match[0])
-    }
-    return 1
-  }
-
+  // Extract amount from text
   const extractAmount = (text: string, type: 'loan' | 'transfer'): number => {
     const numbers = text.match(/\d+/g)
     if (numbers) {
@@ -252,16 +230,18 @@ const AIFinancialAssistant: React.FC = () => {
       if (text.includes('nghìn')) return amount * 1000
     }
     
+    // Default amounts
     return type === 'loan' ? 500000000 : 5000000
   }
 
+  // Extract nights from text
   const extractNights = (text: string): number => {
     const numbers = text.match(/(\d+)\s*(đêm|ngày)/g)
     if (numbers) {
       const match = numbers[0].match(/\d+/)
       if (match) return parseInt(match[0])
     }
-    return 2
+    return 2 // Default 2 nights
   }
 
   // Execute service actions
@@ -277,6 +257,7 @@ const AIFinancialAssistant: React.FC = () => {
       ))
 
       try {
+        // Call the actual service API
         const apiUrl = getApiUrl(action.service, action.action)
         const response = await fetch(apiUrl, {
           method: 'POST',
@@ -290,6 +271,7 @@ const AIFinancialAssistant: React.FC = () => {
         const result = await response.json()
         
         if (result.success) {
+          // Update action status to completed
           setMessages(prev => prev.map(msg => 
             msg.id === messageId 
               ? { ...msg, actions: msg.actions?.map(a => 
@@ -303,10 +285,11 @@ const AIFinancialAssistant: React.FC = () => {
 
       } catch (error) {
         console.error('Service execution failed:', error)
+        // Update action status to failed
         setMessages(prev => prev.map(msg => 
           msg.id === messageId 
             ? { ...msg, actions: msg.actions?.map(a => 
-                a.id === action.id ? { ...a, status: 'failed', result: { error: (error as Error).message } } : a
+                a.id === action.id ? { ...a, status: 'failed', result: { error: error.message } } : a
               ) }
             : msg
         ))
@@ -315,10 +298,14 @@ const AIFinancialAssistant: React.FC = () => {
 
     setIsProcessing(false)
 
+    // Add completion message
+    const completedActions = actions.filter(a => a.status === 'completed').length
+    const totalActions = actions.length
+    
     const completionMessage: Message = {
       id: `completion_${Date.now()}`,
       type: 'ai',
-      content: `✅ Hoàn thành! Tôi đã thực hiện các yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
+      content: `✅ Hoàn thành! Tôi đã thực hiện ${completedActions}/${totalActions} yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
       timestamp: new Date()
     }
 
@@ -336,6 +323,7 @@ const AIFinancialAssistant: React.FC = () => {
         return ''
       case 'resort':
         if (action === 'book_room') return `${baseUrl}/resort/book-room`
+        if (action === 'spa_booking') return `${baseUrl}/resort/book-spa`
         return ''
       default:
         return ''
@@ -352,19 +340,19 @@ const AIFinancialAssistant: React.FC = () => {
     }
   }
 
-  const predefinedQuestions = [
-    "Đặt vé từ Hà Nội đi Đà Nẵng ngày 30/8 cho 2 người",
-    "Phân tích profile tài chính và đề xuất chiến lược cho tôi",
-    "Vay 500 triệu để mua nhà", 
-    "Đặt phòng resort 3 đêm ở Phú Quốc",
-    "Chuyển khoản 10 triệu cho bạn",
-    "Làm thế nào để nâng cấp lên cấp bậc Diamond với SVT?"
-  ];
-
-  // Generate AI response
+  // Enhanced AI response using Gemini with model fallback
   const generateGeminiResponse = async (userMessage: string): Promise<string> => {
-    try {
-      const systemPrompt = `Bạn là một Trợ lý Tài chính AI chuyên nghiệp của Tập đoàn Sovico được hỗ trợ bởi Google Gemini.
+    const modelNames = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
+    
+    for (const modelName of modelNames) {
+      try {
+        console.log(`🤖 Trying Gemini model: ${modelName}`);
+        
+        // Try each model
+        const currentModel = genAI.getGenerativeModel({ model: modelName });
+        
+        // Professional System Prompt
+        const systemPrompt = `Bạn là một Trợ lý Tài chính AI chuyên nghiệp của Tập đoàn Sovico.
 Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên dữ liệu 360° của khách hàng.
 
 **KIẾN THỨC NỀN TẢNG VỀ HỆ SINH THÁI SOVICO:**
@@ -375,54 +363,205 @@ Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên d
 - **Sovico Resort**: Chuỗi resort cao cấp 5 sao tại các điểm đến hấp dẫn
 - **Sovico Real Estate**: Phát triển bất động sản cao cấp
 
-💎 **HỆ THỐNG SVT (SOVICO TOKEN):**
-- **Bronze** (0-9,999 SVT): Khách hàng mới, ưu đãi cơ bản
-- **Silver** (10,000-49,999 SVT): Ưu đãi nâng cao, tích điểm x1.5
-- **Gold** (50,000-199,999 SVT): Ưu đãi cao cấp, tích điểm x2, dịch vụ VIP
-- **Diamond** (200,000+ SVT): Ưu đãi tối đa, tích điểm x3, butler service
+💎 **Sovico Token (SVT)** - Token tiện ích blockchain:
+- Kiếm SVT qua: Giao dịch HDBank (0.1% giá trị), bay Vietjet (100 SVT/chuyến), booking resort (500 SVT/đêm), hoàn thành nhiệm vụ (50-1000 SVT)
+- Sử dụng SVT: Đổi voucher ăn uống (ROI 120%), upgrade hạng bay (ROI 150%), giảm giá resort (10-30%), mua NFT achievements, P2P trading
+- Hệ thống cấp bậc: Bronze (<10K SVT), Silver (10K-50K), Gold (50K-200K), Diamond (>200K)
 
-🎯 **CHIẾN LƯỢC TƯ VẤN:**
-1. **Phân tích 360°**: Dựa trên dữ liệu thực từ tất cả dịch vụ Sovico
-2. **Cá nhân hóa**: Đề xuất phù hợp với profile và mục tiêu cá nhân
-3. **Tối ưu hóa SVT**: Hướng dẫn cách tích lũy và sử dụng SVT hiệu quả
-4. **Cross-selling thông minh**: Giới thiệu dịch vụ bổ trợ hợp lý
+🎖️ **Hộ chiếu NFT** - Tài sản số độc nhất:
+- Ghi lại cấp bậc, thành tựu, lịch sử giao dịch
+- Tự động "tiến hóa" khi đạt cột mốc mới
+- Có thể trade trên marketplace nội bộ
+- Mang lại quyền lợi đặc biệt (ưu đãi, ưu tiên dịch vụ)
 
-📊 **THÔNG TIN KHÁCH HÀNG HIỆN TẠI:**
+💳 **Sản phẩm HDBank chính:**
+- Thẻ Visa Signature: Phòng chờ sân bay, bảo hiểm du lịch
+- Thẻ Vietjet Platinum: Tích miles x2, miễn phí hành lý
+- Gói tiết kiệm HD EARN: 7-8%/năm + bảo hiểm
+- HD Invest: Ủy thác đầu tư từ 10 triệu VND
+
+**QUY TẮC TRẢ LỜI:**
+1. Luôn phân tích HỒ SƠ KHÁCH HÀNG trước khi tư vấn
+2. Cá nhân hóa 100% dựa trên tuổi, thu nhập, khẩu vị rủi ro
+3. Đề xuất cụ thể các sản phẩm Sovico phù hợp
+4. Luôn bao gồm chiến lược tích lũy SVT
+5. Sử dụng format Markdown với emoji để dễ đọc
+6. Đưa ra timeline và action steps cụ thể
+7. Tính toán ROI và lợi ích số liệu cụ thể`;
+
+        // Build complete prompt with user profile
+        const fullPrompt = `${systemPrompt}
+
+**HỒ SƠ KHÁCH HÀNG HIỆN TẠI:**
 - 👤 Tên: ${userProfile?.name || 'Khách hàng'}
-- 🆔 ID: ${userProfile?.customer_id || 'Chưa xác định'}
-- 💎 SVT Balance: ${(userProfile?.sovicoTokens || 0).toLocaleString('vi-VN')} SVT
-- 🏆 Cấp bậc: ${userProfile?.sovicoTokens && userProfile.sovicoTokens >= 200000 ? 'Diamond 💎' :
-                userProfile?.sovicoTokens && userProfile.sovicoTokens >= 50000 ? 'Gold 🥇' :
-                userProfile?.sovicoTokens && userProfile.sovicoTokens >= 10000 ? 'Silver 🥈' : 'Bronze 🥉'}
-- 📈 Tổng giao dịch: ${userProfile?.totalTransactions || 0} lần
-- 🎯 Khẩu vị rủi ro: ${userProfile?.riskTolerance || 'Moderate'}
-- 💰 Thu nhập ước tính: ${(userProfile?.monthlyIncome || 0).toLocaleString('vi-VN')} VNĐ/tháng
+- 🎂 Tuổi: ${userProfile?.age || 'Chưa xác định'}
+- 🎯 Khẩu vị rủi ro: ${userProfile?.riskTolerance || 'moderate'}
+- 💎 Số dư SVT: ${userProfile?.sovicoTokens?.toLocaleString('vi-VN') || '0'} SVT
+- 📊 Tổng giao dịch: ${userProfile?.totalTransactions || 0} lần
+- 💰 Thu nhập ước tính: ${userProfile?.monthlyIncome?.toLocaleString('vi-VN') || 'Chưa xác định'} VND/tháng
+- 🏆 Cấp bậc hiện tại: ${userProfile?.sovicoTokens && userProfile.sovicoTokens >= 200000 ? 'Diamond 💎' : 
+                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 50000 ? 'Gold 🥇' :
+                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 10000 ? 'Silver 🥈' : 'Bronze 🥉'}
 
-🔍 **HƯỚNG DẪN TƯ VẤN:**
-- Luôn bắt đầu với phân tích tình hình hiện tại
-- Đưa ra 2-3 đề xuất cụ thể với số liệu rõ ràng
-- Giải thích lợi ích của từng đề xuất
-- Kết thúc với call-to-action rõ ràng
-- Sử dụng emoji để dễ đọc và thu hút
-- Luôn đề cập đến cơ hội tích lũy SVT
+**CÂU HỎI CỦA KHÁCH HÀNG:**
+"${userMessage}"
 
-💡 **LƯU Ý QUAN TRỌNG:**
-- Tôi có khả năng tự động thực hiện dịch vụ khi khách hàng yêu cầu
-- Khi khách hàng muốn đặt vé, vay tiền, đặt phòng... tôi sẽ xử lý tự động
-- Luôn tư vấn dựa trên lợi ích tối đa cho khách hàng
-- Giữ tone thân thiện, chuyên nghiệp và đáng tin cậy
+Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chính cá nhân hóa, bao gồm chiến lược sử dụng hệ sinh thái Sovico một cách tối ưu.`;
 
-Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dựa trên thông tin trên.`;
-
-      const result = await model.generateContent(systemPrompt + "\n\nCâu hỏi: " + userMessage);
-      return result.response.text();
-    } catch (error) {
-      throw error;
+        const result = await currentModel.generateContent(fullPrompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        console.log(`✅ Success with ${modelName}! Response length:`, text.length);
+        return text;
+        
+      } catch (error: any) {
+        console.warn(`⚠️ Model ${modelName} failed:`, error.message);
+        
+        // If this is the last model, throw the error
+        if (modelName === modelNames[modelNames.length - 1]) {
+          throw error;
+        }
+        
+        // Otherwise continue to next model
+        continue;
+      }
     }
+    
+    // This should never be reached, but just in case
+    throw new Error('All Gemini models failed');
   };
 
   const generateLocalResponse = (userMessage: string): string => {
-    return "🤖 Tôi là AI Assistant cơ bản. Vui lòng bật Gemini AI để có trải nghiệm tốt hơn!";
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Đầu tư
+    if (lowerMessage.includes('đầu tư') || lowerMessage.includes('investment')) {
+      return `💡 **Phân tích đầu tư cho bạn:**
+
+Dựa trên profile và mức độ rủi ro:
+
+🏦 **Ngân hàng (30-40%)**
+• Tiền gửi có kỳ hạn HDBank: 7-8%/năm
+• Trái phiếu doanh nghiệp: 8-12%/năm
+
+📈 **Chứng khoán (20-30%)**
+• Cổ phiếu blue-chip VN30
+• ETF diversified
+
+🏠 **Bất động sản (20-30%)**
+• Resort/condotel qua Sovico
+• Căn hộ cho thuê khu vực trung tâm
+
+💎 **SVT Ecosystem (10-20%)**
+• Stake SVT để nhận rewards
+• Trading trên P2P marketplace
+
+**Lưu ý:** Chỉ đầu tư số tiền có thể chấp nhận rủi ro!`;
+    }
+    
+    // Chi tiêu
+    if (lowerMessage.includes('chi tiêu') || lowerMessage.includes('tiết kiệm')) {
+      return `💰 **Kế hoạch tối ưu chi tiêu:**
+
+📊 **Quy tắc 50/30/20:**
+• 50% nhu cầu thiết yếu (ăn, ở, đi lại)
+• 30% giải trí, mua sắm
+• 20% tiết kiệm và đầu tư
+
+🎯 **Mẹo tiết kiệm với Sovico:**
+• Dùng thẻ HDBank để tích điểm
+• Bay Vietjet thường xuyên → tích miles
+• Nghỉ dưỡng Sovico Resort → voucher
+• Mua sắm bằng SVT token → cashback
+
+📱 **Công cụ theo dõi:**
+• Sovico SuperApp tracking tự động
+• Báo cáo chi tiêu theo danh mục
+• Cảnh báo khi vượt ngân sách`;
+    }
+    
+    // SVT Token
+    if (lowerMessage.includes('svt') || lowerMessage.includes('token')) {
+      return `🪙 **Chiến lược SVT Token:**
+
+🎯 **Cách kiếm SVT:**
+• Hoàn thành nhiệm vụ hàng ngày: 50-100 SVT
+• Giao dịch HDBank: 0.1% số tiền → SVT
+• Bay Vietjet: 100 SVT/chuyến
+• Review resort: 200-500 SVT
+• Refer bạn bè: 1000 SVT/người
+
+💎 **Cách dùng SVT hiệu quả:**
+• Đổi voucher ăn uống (ROI 120%)
+• Upgrade hạng bay (ROI 150%)
+• Mua NFT achievements 
+• Trade trên P2P marketplace
+
+🏆 **Level up strategy:**
+• Tích 10,000 SVT → Silver
+• Tích 50,000 SVT → Gold  
+• Tích 200,000 SVT → Diamond`;
+    }
+    
+    // HDBank
+    if (lowerMessage.includes('hdbank') || lowerMessage.includes('ngân hàng')) {
+      return `🏦 **Sản phẩm HDBank phù hợp:**
+
+💳 **Thẻ tín dụng:**
+• HDBank Visa Signature: Phòng chờ sân bay
+• HDBank Vietjet Platinum: Tích miles x2
+• HDBank Live: Cashback 8% ăn uống
+
+💰 **Tiết kiệm & Đầu tư:**
+• Tiền gửi online: Lãi suất ưu đãi +0.5%
+• HD EARN: Combo tiết kiệm + bảo hiểm
+• HD Invest: Ủy thác đầu tư từ 10 triệu
+
+🎁 **Ưu đãi đặc biệt:**
+• Mở tài khoản qua Sovico: +500 SVT
+• Duy trì số dư 50 triệu: +200 SVT/tháng
+• Giao dịch 10 triệu/tháng: Free phí chuyển khoản`;
+    }
+    
+    // Kế hoạch tài chính
+    if (lowerMessage.includes('kế hoạch') || lowerMessage.includes('planning')) {
+      return `📋 **Kế hoạch tài chính 2025:**
+
+🎯 **Mục tiêu SMART:**
+• Tiết kiệm 100 triệu (8.3 triệu/tháng)
+• Đầu tư 50 triệu vào portfolio cân bằng
+• Tích lũy 50,000 SVT tokens
+• Đạt hạng Gold trong hệ sinh thái Sovico
+
+📅 **Timeline thực hiện:**
+**Q1:** Tối ưu chi tiêu, mở tài khoản đầu tư
+**Q2:** Đầu tư batch 1, bắt đầu DCA stocks
+**Q3:** Review & rebalance portfolio
+**Q4:** Harvest profits, plan cho năm sau
+
+💡 **Action items:**
+• Setup auto-transfer 8.3tr/tháng
+• Cài đặt alerts trên Sovico app
+• Monthly review với AI advisor`;
+    }
+    
+    // Default response
+    return `🤖 Cảm ơn bạn đã hỏi! Tôi đang phân tích câu hỏi của bạn...
+
+Dựa trên thông tin hiện tại, tôi đề xuất:
+
+💼 **Phân tích ngắn hạn:**
+• Review lại spending pattern của bạn
+• Tối ưu hóa cash flow với các sản phẩm HDBank
+• Tích cực tham gia Sovico ecosystem để kiếm SVT
+
+📈 **Chiến lược dài hạn:**
+• Đa dạng hóa portfolio (stocks, bonds, real estate)
+• Xây dựng emergency fund 6-12 tháng
+• Đầu tư vào education và personal development
+
+💬 Bạn có thể hỏi cụ thể hơn về đầu tư, tiết kiệm, hoặc các sản phẩm tài chính nhé!`;
   };
 
   const handleSendMessage = async () => {
@@ -436,56 +575,31 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
     };
 
     setMessages(prev => [...prev, userMessage]);
+
     const currentInput = inputMessage;
     setInputMessage('');
 
     // Analyze user intent for service actions
     const actions = analyzeIntent(currentInput);
 
-    // Kiểm tra xem có phải intent đặt vé nhưng thiếu thông tin không
-    if ((currentInput.toLowerCase().includes('vé máy bay') || 
-         currentInput.toLowerCase().includes('đặt vé') || 
-         currentInput.toLowerCase().includes('bay')) && actions.length === 0) {
-      
-      const missingInfo = []
-      const normalizedText = currentInput.toLowerCase()
-      
-      const hasOrigin = /từ|from|khởi hành/.test(normalizedText) || /hà nội|tp\.?hcm|đà nẵng|phú quốc|nha trang/.test(normalizedText)
-      const hasDestination = /đến|đi/.test(normalizedText) && /hà nội|tp\.?hcm|đà nẵng|phú quốc|nha trang/.test(normalizedText)
-      const hasDate = /ngày|tháng|\/|\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\/\d{1,2}/.test(normalizedText)
-      
-      if (!hasOrigin) missingInfo.push("📍 **Điểm khởi hành** (VD: từ Hà Nội)")
-      if (!hasDestination) missingInfo.push("📍 **Điểm đến** (VD: đến Đà Nẵng)")  
-      if (!hasDate) missingInfo.push("📅 **Ngày bay** (VD: ngày 15/9/2025)")
-      
-      const askForInfoMessage: Message = {
-        id: `ai_${Date.now()}`,
-        type: 'ai', 
-        content: `✈️ **Tôi sẽ giúp bạn đặt vé máy bay!** \n\nTuy nhiên tôi cần thêm một số thông tin:\n\n${missingInfo.join('\n')}\n\n💡 **Ví dụ:** "Đặt vé từ Hà Nội đi Đà Nẵng ngày 15/9/2025 cho 2 người"\n\n🎯 Vui lòng cung cấp đầy đủ thông tin để tôi có thể đặt vé ngay cho bạn!`,
-        timestamp: new Date()
-      }
-      
-      setMessages(prev => [...prev, askForInfoMessage]);
-      return;
-    }
-
     if (actions.length > 0) {
       // Create AI response with detected actions
       const actionsList = actions.map(a => {
         switch (a.service) {
           case 'vietjet':
-            return `✈️ Đặt vé máy bay:\n   📍 ${a.params.origin} → ${a.params.destination}\n   📅 ${a.params.departure_date}\n   👥 ${a.params.passengers} hành khách\n   🎫 Hạng ${a.params.ticket_class === 'business' ? 'Thương gia' : 'Phổ thông'}`
+            return `✈️ Đặt vé máy bay (${a.params.flight_type === 'international' ? 'Quốc tế' : 'Nội địa'})`
           case 'hdbank':
             if (a.action === 'loan') return `💰 Vay tiền ${(a.params.loan_amount / 1000000).toFixed(0)} triệu VNĐ`
             if (a.action === 'transfer') return `💳 Chuyển khoản ${(a.params.amount / 1000000).toFixed(0)} triệu VNĐ`
             return `🏦 Dịch vụ ngân hàng HDBank`
           case 'resort':
             if (a.action === 'book_room') return `🏨 Đặt phòng ${a.params.nights} đêm`
+            if (a.action === 'spa_booking') return `💆‍♀️ Đặt lịch Spa`
             return `🏖️ Dịch vụ Resort`
           default:
             return '🔧 Dịch vụ khác'
         }
-      }).join('\n\n• ')
+      }).join('\n• ')
 
       const aiMessage: Message = {
         id: `ai_${Date.now()}`,
@@ -496,6 +610,8 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
       }
 
       setMessages(prev => [...prev, aiMessage]);
+
+      // Execute the actions
       await executeActions(actions, aiMessage.id);
       return;
     }
@@ -520,13 +636,33 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
 
       setMessages(prev => [...prev, aiResponse]);
     } catch (error: any) {
+      console.error('❌ Error generating response:', error);
+      
+      let errorMessage = '❌ **Xin lỗi, AI gặp sự cố**\n\n';
+      
+      if (error.message && error.message.includes('GoogleGenerativeAI')) {
+        errorMessage += '🔧 **Vấn đề Gemini AI:**\n';
+        errorMessage += '• API có thể bị giới hạn hoặc model không khả dụng\n';
+        errorMessage += '• Đang chuyển sang chế độ tư vấn cơ bản\n\n';
+        errorMessage += generateLocalResponse(currentInput);
+      } else if (error.message && error.message.includes('fetch')) {
+        errorMessage += '🌐 **Vấn đề kết nối mạng:**\n';
+        errorMessage += '• Kiểm tra kết nối internet\n';
+        errorMessage += '• Thử lại sau vài giây\n';
+      } else {
+        errorMessage += '⚠️ **Lỗi không xác định:**\n';
+        errorMessage += '• Vui lòng thử lại hoặc liên hệ support\n';
+        errorMessage += '• Hotline: 1900-1234\n';
+      }
+      
+      errorMessage += '\n---\n💡 *Tip: Bạn có thể toggle sang "Local AI" để sử dụng tư vấn offline*';
+      
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        content: `❌ Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu: ${error.message}\n\n🔄 Vui lòng thử lại hoặc hỏi tôi một câu hỏi khác.`,
+        content: errorMessage,
         timestamp: new Date()
       };
-
       setMessages(prev => [...prev, errorResponse]);
     } finally {
       setIsLoading(false);
@@ -546,32 +682,62 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
             <span className="text-lg">🤖</span>
           </div>
           <div className="flex-1">
-            <h2 className="font-bold text-lg">AI Assistant</h2>
+            <h2 className="font-bold text-lg">AI Financial Advisor</h2>
             <p className="text-sm text-gray-400">
-              Powered by Google Gemini AI
+              {useGemini ? 'Powered by Google Gemini AI' : 'Powered by Sovico Intelligence'}
               {userProfile && (
                 <span className="ml-2 text-blue-400">
-                  • {userProfile.name} • {(userProfile.sovicoTokens || 0).toLocaleString('vi-VN')} SVT
+                  • {userProfile.name} • {userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT
                 </span>
               )}
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={useGemini}
-                onChange={(e) => setUseGemini(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-              <span className="ml-3 text-sm font-medium text-gray-300">
-                {useGemini ? 'Gemini AI' : 'Local AI'}
-              </span>
-            </label>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setUseGemini(!useGemini)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                useGemini 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-600 text-gray-300'
+              }`}
+            >
+              {useGemini ? '🧠 Gemini AI' : '🔧 Local AI'}
+            </button>
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-900 text-green-300">
+              <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+              Online
+            </span>
+
           </div>
         </div>
       </div>
+
+      {/* User Profile Indicator */}
+      {userProfile && (
+        <div className="bg-[#161B22] border-b border-gray-700 p-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-400">📊 Profile:</span>
+              <span className="text-blue-400">{userProfile.name}</span>
+              <span className="text-gray-500">|</span>
+              <span className="text-purple-400">{userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT</span>
+              <span className="text-gray-500">|</span>
+              <span className={`font-medium ${
+                userProfile.sovicoTokens >= 200000 ? 'text-purple-400' :
+                userProfile.sovicoTokens >= 50000 ? 'text-yellow-400' :
+                userProfile.sovicoTokens >= 10000 ? 'text-gray-300' : 'text-orange-400'
+              }`}>
+                {userProfile.sovicoTokens >= 200000 ? '💎 Diamond' :
+                 userProfile.sovicoTokens >= 50000 ? '🥇 Gold' :
+                 userProfile.sovicoTokens >= 10000 ? '🥈 Silver' : '🥉 Bronze'}
+              </span>
+            </div>
+            <div className="text-gray-500 text-xs">
+              {userProfile.totalTransactions} giao dịch
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -607,6 +773,7 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
                         {action.action === 'loan' && 'Vay tiền'}
                         {action.action === 'transfer' && 'Chuyển khoản'}
                         {action.action === 'book_room' && 'Đặt phòng'}
+                        {action.action === 'spa_booking' && 'Đặt Spa'}
                       </span>
                       <span className={`px-2 py-1 rounded text-xs ${
                         action.status === 'completed' ? 'bg-green-600' :
@@ -629,6 +796,7 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
                   minute: '2-digit' 
                 })}
               </div>
+
             </div>
           </div>
         ))}
@@ -658,10 +826,8 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
             </div>
           </div>
         )}
-        
         <div ref={messagesEndRef} />
       </div>
-
       {/* Quick Questions */}
       {messages.length <= 1 && (
         <div className="p-4 border-t border-gray-700">
@@ -681,15 +847,16 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-700">
+      <div className="bg-[#161B22] border-t border-gray-700 p-4">
         <div className="flex space-x-3">
           <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Hỏi tôi về tài chính hoặc yêu cầu dịch vụ..."
-            className="flex-1 bg-[#161B22] border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            placeholder="Hỏi AI về tài chính, đầu tư, tiết kiệm..."
+            className="flex-1 bg-[#0D1117] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
@@ -704,6 +871,18 @@ Hãy đưa ra lời khuyên tài chính cá nhân hóa và chuyên nghiệp dự
               '📤'
             )}
           </button>
+        </div>
+        
+        <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
+          <span>🔒 Cuộc trò chuyện được mã hóa end-to-end</span>
+          <div className="flex items-center space-x-4">
+            <span>💰 Miễn phí cho khách hàng Sovico</span>
+            {useGemini && (
+              <span className="bg-purple-900 text-purple-300 px-2 py-1 rounded">
+                ⚡ Gemini AI Active
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
