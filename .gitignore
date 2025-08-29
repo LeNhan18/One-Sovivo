@@ -26,6 +26,7 @@ dl_model/
 .installed.cfg
 *.egg
 MANIFEST
+csv/
 hdbank.csv
 vietjet.csv
 resorts.csv

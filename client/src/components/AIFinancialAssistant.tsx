@@ -4,10 +4,19 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Message {
   id: string;
-  type: 'user' | 'ai';
+  type: 'user' | 'ai' | 'system';
   content: string;
   timestamp: Date;
+  actions?: ServiceAction[];
+}
 
+interface ServiceAction {
+  id: string
+  service: 'vietjet' | 'hdbank' | 'resort'
+  action: string
+  params: any
+  status: 'pending' | 'executing' | 'completed' | 'failed'
+  result?: any
 }
 
 interface UserProfile {
@@ -45,12 +54,13 @@ const AIFinancialAssistant: React.FC = () => {
     {
       id: '1',
       type: 'ai',
-      content: '👋 Chào bạn! Tôi là AI Financial Advisor của Sovico được hỗ trợ bởi Google Gemini.\n\n🎯 **Khả năng của tôi:**\n• 📊 Phân tích tài chính cá nhân 360°\n• 💎 Tư vấn tối ưu hóa SVT và NFT\n• � Đề xuất sản phẩm HDBank phù hợp\n• ✈️ Chiến lược tích điểm Vietjet\n• �️ Lập kế hoạch nghỉ dưỡng thông minh\n• � Dự báo và phân tích thị trường\n\n💡 Tôi sẽ phân tích profile của bạn để đưa ra lời khuyên cá nhân hóa. Hãy hỏi tôi bất cứ điều gì!',
+      content: '👋 Chào bạn! Tôi là AI Assistant của Sovico được hỗ trợ bởi Google Gemini.\n\n🎯 **Khả năng của tôi:**\n• 📊 Phân tích tài chính cá nhân và tư vấn\n• ✈️ **Tự động đặt vé máy bay Vietjet**\n• 🏦 **Tự động xử lý giao dịch HDBank**\n• 🏨 **Tự động đặt phòng resort**\n• 💎 Tối ưu hóa SVT và NFT\n• 🤖 **Thực hiện dịch vụ tự động theo yêu cầu**\n\n💡 **Thử nói:** "Đặt vé máy bay cho tôi", "Vay 500 triệu", "Đặt phòng khách sạn"\n\nHãy hỏi tôi bất cứ điều gì!',
       timestamp: new Date()
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [useGemini, setUseGemini] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -81,7 +91,7 @@ const AIFinancialAssistant: React.FC = () => {
           }
 
           setUserProfile({
-            name: userData.name || 'Khách hàng',
+            name: userData.customer_name || 'Khách hàng',
             age: 30, // Default, could be enhanced
             customer_id: userData.customer_id,
             riskTolerance: 'moderate', // Default, could be from survey
@@ -110,11 +120,225 @@ const AIFinancialAssistant: React.FC = () => {
 
   const predefinedQuestions = [
     "Phân tích profile tài chính và đề xuất chiến lược cho tôi",
+    "Đặt vé máy bay cho tôi đi Đà Nẵng",
+    "Vay 500 triệu để mua nhà",
+    "Đặt phòng khách sạn 3 đêm", 
+    "Chuyển khoản 10 triệu cho bạn",
     "Làm thế nào để nâng cấp lên cấp bậc Diamond với SVT?",
-    "Tôi nên đầu tư vào đâu với profile hiện tại?",
-    "Tối ưu hóa việc sử dụng hệ sinh thái Sovico như thế nào?",
-    "Lập kế hoạch tài chính 5 năm dựa trên thu nhập của tôi"
+    "Tối ưu hóa việc sử dụng hệ sinh thái Sovico như thế nào?"
   ];
+
+  // AI Intent Recognition - Phân tích ý định từ text
+  const analyzeIntent = (text: string): ServiceAction[] => {
+    const normalizedText = text.toLowerCase()
+    const actions: ServiceAction[] = []
+
+    // Flight booking intents - Mở rộng keyword detection
+    if (normalizedText.includes('vé máy bay') || normalizedText.includes('đặt vé') || 
+        normalizedText.includes('bay') || normalizedText.includes('chuyến bay') ||
+        normalizedText.includes('vietjet') || normalizedText.includes('máy bay') ||
+        (normalizedText.includes('đi') && (normalizedText.includes('vé') || normalizedText.includes('bay'))) ||
+        normalizedText.includes('book flight') || normalizedText.includes('flight')) {
+      actions.push({
+        id: `flight_${Date.now()}`,
+        service: 'vietjet',
+        action: 'book_flight',
+        params: {
+          flight_type: normalizedText.includes('quốc tế') || normalizedText.includes('nước ngoài') ? 'international' : 'domestic',
+          ticket_class: normalizedText.includes('thương gia') || normalizedText.includes('business') ? 'business' : 'economy'
+        },
+        status: 'pending'
+      })
+    }
+
+    // Banking intents
+    if (normalizedText.includes('vay') || normalizedText.includes('khoản vay') || 
+        normalizedText.includes('vay tiền')) {
+      const amount = extractAmount(normalizedText, 'loan')
+      actions.push({
+        id: `loan_${Date.now()}`,
+        service: 'hdbank',
+        action: 'loan',
+        params: {
+          loan_amount: amount,
+          loan_type: normalizedText.includes('nhà') ? 'home' : 
+                    normalizedText.includes('xe') ? 'car' : 
+                    normalizedText.includes('kinh doanh') ? 'business' : 'personal'
+        },
+        status: 'pending'
+      })
+    }
+
+    if (normalizedText.includes('chuyển khoản') || normalizedText.includes('chuyển tiền') ||
+        normalizedText.includes('gửi tiền')) {
+      const amount = extractAmount(normalizedText, 'transfer')
+      actions.push({
+        id: `transfer_${Date.now()}`,
+        service: 'hdbank',
+        action: 'transfer',
+        params: {
+          amount: amount,
+          transfer_type: normalizedText.includes('nước ngoài') || normalizedText.includes('quốc tế') ? 'international' : 'internal'
+        },
+        status: 'pending'
+      })
+    }
+
+    // Hotel/Resort intents
+    if (normalizedText.includes('khách sạn') || normalizedText.includes('đặt phòng') || 
+        normalizedText.includes('resort') || normalizedText.includes('nghỉ dưỡng')) {
+      const nights = extractNights(normalizedText)
+      actions.push({
+        id: `hotel_${Date.now()}`,
+        service: 'resort',
+        action: 'book_room',
+        params: {
+          nights: nights,
+          room_type: normalizedText.includes('cao cấp') || normalizedText.includes('suite') ? 'suite' :
+                    normalizedText.includes('deluxe') ? 'deluxe' : 'standard'
+        },
+        status: 'pending'
+      })
+    }
+
+    // Spa intents
+    if (normalizedText.includes('spa') || normalizedText.includes('massage') || 
+        normalizedText.includes('thư giãn')) {
+      actions.push({
+        id: `spa_${Date.now()}`,
+        service: 'resort',
+        action: 'spa_booking',
+        params: {
+          spa_type: normalizedText.includes('cao cấp') ? 'premium_package' :
+                   normalizedText.includes('mặt') ? 'facial' :
+                   normalizedText.includes('body') ? 'body_treatment' : 'massage'
+        },
+        status: 'pending'
+      })
+    }
+
+    return actions
+  }
+
+  // Extract amount from text
+  const extractAmount = (text: string, type: 'loan' | 'transfer'): number => {
+    const numbers = text.match(/\d+/g)
+    if (numbers) {
+      const amount = parseInt(numbers[0])
+      if (text.includes('tỷ')) return amount * 1000000000
+      if (text.includes('triệu')) return amount * 1000000
+      if (text.includes('nghìn')) return amount * 1000
+    }
+    
+    // Default amounts
+    return type === 'loan' ? 500000000 : 5000000
+  }
+
+  // Extract nights from text
+  const extractNights = (text: string): number => {
+    const numbers = text.match(/(\d+)\s*(đêm|ngày)/g)
+    if (numbers) {
+      const match = numbers[0].match(/\d+/)
+      if (match) return parseInt(match[0])
+    }
+    return 2 // Default 2 nights
+  }
+
+  // Execute service actions
+  const executeActions = async (actions: ServiceAction[], messageId: string) => {
+    setIsProcessing(true)
+    
+    for (const action of actions) {
+      // Update action status to executing
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, actions: msg.actions?.map(a => a.id === action.id ? { ...a, status: 'executing' } : a) }
+          : msg
+      ))
+
+      try {
+        // Call the actual service API
+        const apiUrl = getApiUrl(action.service, action.action)
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: userProfile?.customer_id || 1001,
+            ...action.params
+          })
+        })
+
+        const result = await response.json()
+        
+        if (result.success) {
+          // Update action status to completed
+          setMessages(prev => prev.map(msg => 
+            msg.id === messageId 
+              ? { ...msg, actions: msg.actions?.map(a => 
+                  a.id === action.id ? { ...a, status: 'completed', result } : a
+                ) }
+              : msg
+          ))
+        } else {
+          throw new Error(result.message || 'Service failed')
+        }
+
+      } catch (error) {
+        console.error('Service execution failed:', error)
+        // Update action status to failed
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, actions: msg.actions?.map(a => 
+                a.id === action.id ? { ...a, status: 'failed', result: { error: error.message } } : a
+              ) }
+            : msg
+        ))
+      }
+    }
+
+    setIsProcessing(false)
+
+    // Add completion message
+    const completedActions = actions.filter(a => a.status === 'completed').length
+    const totalActions = actions.length
+    
+    const completionMessage: Message = {
+      id: `completion_${Date.now()}`,
+      type: 'ai',
+      content: `✅ Hoàn thành! Tôi đã thực hiện ${completedActions}/${totalActions} yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, completionMessage])
+  }
+
+  const getApiUrl = (service: string, action: string): string => {
+    const baseUrl = 'http://127.0.0.1:5000/api/service'
+    switch (service) {
+      case 'vietjet':
+        return `${baseUrl}/vietjet/book-flight`
+      case 'hdbank':
+        if (action === 'transfer') return `${baseUrl}/hdbank/transfer`
+        if (action === 'loan') return `${baseUrl}/hdbank/loan`
+        return ''
+      case 'resort':
+        if (action === 'book_room') return `${baseUrl}/resort/book-room`
+        if (action === 'spa_booking') return `${baseUrl}/resort/book-spa`
+        return ''
+      default:
+        return ''
+    }
+  }
+
+  const getActionStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return '⏳'
+      case 'executing': return '🔄'
+      case 'completed': return '✅'
+      case 'failed': return '❌'
+      default: return '❔'
+    }
+  }
 
   // Enhanced AI response using Gemini with model fallback
   const generateGeminiResponse = async (userMessage: string): Promise<string> => {
@@ -341,10 +565,9 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isLoading || isProcessing) return;
 
     const userMessage: Message = {
-
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage,
@@ -355,6 +578,45 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
 
     const currentInput = inputMessage;
     setInputMessage('');
+
+    // Analyze user intent for service actions
+    const actions = analyzeIntent(currentInput);
+
+    if (actions.length > 0) {
+      // Create AI response with detected actions
+      const actionsList = actions.map(a => {
+        switch (a.service) {
+          case 'vietjet':
+            return `✈️ Đặt vé máy bay (${a.params.flight_type === 'international' ? 'Quốc tế' : 'Nội địa'})`
+          case 'hdbank':
+            if (a.action === 'loan') return `💰 Vay tiền ${(a.params.loan_amount / 1000000).toFixed(0)} triệu VNĐ`
+            if (a.action === 'transfer') return `💳 Chuyển khoản ${(a.params.amount / 1000000).toFixed(0)} triệu VNĐ`
+            return `🏦 Dịch vụ ngân hàng HDBank`
+          case 'resort':
+            if (a.action === 'book_room') return `🏨 Đặt phòng ${a.params.nights} đêm`
+            if (a.action === 'spa_booking') return `💆‍♀️ Đặt lịch Spa`
+            return `🏖️ Dịch vụ Resort`
+          default:
+            return '🔧 Dịch vụ khác'
+        }
+      }).join('\n• ')
+
+      const aiMessage: Message = {
+        id: `ai_${Date.now()}`,
+        type: 'ai',
+        content: `🎯 Tôi hiểu rồi! Bạn muốn:\n\n• ${actionsList}\n\n⏳ Đang thực hiện các yêu cầu này cho bạn...`,
+        timestamp: new Date(),
+        actions: actions
+      }
+
+      setMessages(prev => [...prev, aiMessage]);
+
+      // Execute the actions
+      await executeActions(actions, aiMessage.id);
+      return;
+    }
+
+    // No specific actions detected, use normal AI chat
     setIsLoading(true);
 
     try {
@@ -494,6 +756,40 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
               <div className="whitespace-pre-line text-sm">
                 {message.content}
               </div>
+              
+              {/* Display service actions if available */}
+              {message.actions && message.actions.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs font-semibold text-purple-400">🔧 Tiến trình thực hiện:</div>
+                  {message.actions.map((action) => (
+                    <div key={action.id} className="flex items-center space-x-2 p-2 bg-gray-800 rounded text-xs">
+                      <span>{getActionStatusIcon(action.status)}</span>
+                      <span className="flex-1">
+                        {action.service === 'vietjet' && '✈️ Vietjet Air'}
+                        {action.service === 'hdbank' && '🏦 HDBank'}
+                        {action.service === 'resort' && '🏨 Resort'}
+                        {' - '}
+                        {action.action === 'book_flight' && 'Đặt vé máy bay'}
+                        {action.action === 'loan' && 'Vay tiền'}
+                        {action.action === 'transfer' && 'Chuyển khoản'}
+                        {action.action === 'book_room' && 'Đặt phòng'}
+                        {action.action === 'spa_booking' && 'Đặt Spa'}
+                      </span>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        action.status === 'completed' ? 'bg-green-600' :
+                        action.status === 'executing' ? 'bg-yellow-600' :
+                        action.status === 'failed' ? 'bg-red-600' : 'bg-gray-600'
+                      }`}>
+                        {action.status === 'pending' && 'Chờ xử lý'}
+                        {action.status === 'executing' && 'Đang thực hiện'}
+                        {action.status === 'completed' && 'Hoàn thành'}
+                        {action.status === 'failed' && 'Thất bại'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
               <div className="text-xs opacity-70 mt-2">
                 {message.timestamp.toLocaleTimeString('vi-VN', { 
                   hour: '2-digit', 
@@ -515,7 +811,17 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
                 <span className="text-sm text-gray-400">AI đang suy nghĩ...</span>
+              </div>
+            </div>
+          </div>
+        )}
 
+        {isProcessing && (
+          <div className="flex justify-start">
+            <div className="bg-[#161B22] border border-purple-600 rounded-lg p-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm text-purple-400">🤖 Đang thực hiện dịch vụ...</span>
               </div>
             </div>
           </div>
@@ -554,11 +860,13 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isLoading}
+            disabled={!inputMessage.trim() || isLoading || isProcessing}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium transition-colors"
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : isProcessing ? (
+              <div className="w-5 h-5 border-2 border-purple-300 border-t-transparent rounded-full animate-spin"></div>
             ) : (
               '📤'
             )}

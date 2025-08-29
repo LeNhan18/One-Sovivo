@@ -37,6 +37,7 @@ const SVTMarketplace: React.FC = () => {
   const [exchangeItems, setExchangeItems] = useState<ExchangeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [customerId, setCustomerId] = useState<number | null>(null);
+  const [notification, setNotification] = useState<{type: 'success' | 'error'; message: string} | null>(null);
 
   // Get customer ID and SVT balance
   useEffect(() => {
@@ -71,52 +72,51 @@ const SVTMarketplace: React.FC = () => {
   }, []);
 
   // Fetch marketplace data
-  useEffect(() => {
-    const fetchMarketplaceData = async () => {
-      setLoading(true);
-      try {
-        // Fetch marketplace items from database
-        const itemsResponse = await fetch('http://127.0.0.1:5000/api/marketplace/items');
-        if (itemsResponse.ok) {
-          const itemsData = await itemsResponse.json();
-          const formattedItems = itemsData.items.map((item: any) => ({
-            id: item.id.toString(),
-            name: item.name,
-            description: item.description,
-            price: item.price_svt,
-            category: 'voucher' as const, // Default category
-            provider: (item.partner_brand?.toLowerCase() || 'sovico') as any,
-            image: getItemIcon(item.partner_brand, item.name),
-            availability: item.quantity,
-            rating: 4.8, // Default rating
-            isExclusive: item.quantity < 50,
-            validUntil: '2025-12-31'
-          }));
-          setMarketplaceItems(formattedItems);
-        }
+  const fetchMarketplaceData = async () => {
+    setLoading(true);
+    try {
+      // Fetch marketplace items from database
+      const itemsResponse = await fetch('http://127.0.0.1:5000/api/marketplace/items');
+      if (itemsResponse.ok) {
+        const itemsData = await itemsResponse.json();
+        const formattedItems = itemsData.items.map((item: any) => ({
+          id: item.id.toString(),
+          name: item.name,
+          description: item.description,
+          price: item.price_svt,
+          category: 'voucher' as const, // Default category
+          provider: (item.partner_brand?.toLowerCase() || 'sovico') as any,
+          image: getItemIcon(item.partner_brand, item.name),
+          availability: item.quantity,
+          rating: 4.8, // Default rating
+          isExclusive: item.quantity < 50,
+          validUntil: '2025-12-31'
+        }));
+        setMarketplaceItems(formattedItems);
+      }
 
-        // Fetch P2P listings
-        const p2pResponse = await fetch('http://127.0.0.1:5000/api/p2p/listings');
-        if (p2pResponse.ok) {
-          const p2pData = await p2pResponse.json();
-          const formattedP2P = p2pData.listings.map((listing: any) => ({
-            id: listing.id.toString(),
-            name: listing.item_name,
-            description: listing.description || 'Sản phẩm từ người dùng khác',
-            offerPrice: listing.price_svt,
-            originalPrice: Math.floor(listing.price_svt * 1.2), // Estimate original price
-            sellerName: listing.seller.name,
-            sellerRating: 4.5, // Default rating
-            condition: 'good' as const,
-            category: 'Khác',
-            image: '📦',
-            postedDate: new Date(listing.created_at).toLocaleDateString('vi-VN')
-          }));
-          setExchangeItems(formattedP2P);
-        }
+      // Fetch P2P listings
+      const p2pResponse = await fetch('http://127.0.0.1:5000/api/p2p/listings');
+      if (p2pResponse.ok) {
+        const p2pData = await p2pResponse.json();
+        const formattedP2P = p2pData.listings.map((listing: any) => ({
+          id: listing.id.toString(),
+          name: listing.item_name,
+          description: listing.description || 'Sản phẩm từ người dùng khác',
+          offerPrice: listing.price_svt,
+          originalPrice: Math.floor(listing.price_svt * 1.2), // Estimate original price
+          sellerName: listing.seller.name,
+          sellerRating: 4.5, // Default rating
+          condition: 'good' as const,
+          category: 'Khác',
+          image: '📦',
+          postedDate: new Date(listing.created_at).toLocaleDateString('vi-VN')
+        }));
+        setExchangeItems(formattedP2P);
+      }
 
-      } catch (error) {
-        console.error('Error fetching marketplace data:', error);
+    } catch (error) {
+      console.error('Error fetching marketplace data:', error);
         // Fallback to some basic items
         setMarketplaceItems([
           {
@@ -138,6 +138,8 @@ const SVTMarketplace: React.FC = () => {
       }
     };
 
+  // useEffect to fetch data on component mount
+  useEffect(() => {
     fetchMarketplaceData();
   }, []);
 
@@ -157,7 +159,11 @@ const SVTMarketplace: React.FC = () => {
     }
 
     if (userSVT < item.price) {
-      alert(`Không đủ SVT! Bạn cần ${item.price} SVT nhưng chỉ có ${userSVT} SVT`);
+      setNotification({
+        type: 'error',
+        message: `Không đủ SVT! Bạn cần ${item.price} SVT nhưng chỉ có ${userSVT} SVT`
+      });
+      setTimeout(() => setNotification(null), 5000);
       return;
     }
 
@@ -176,21 +182,41 @@ const SVTMarketplace: React.FC = () => {
       });
 
       const result = await response.json();
+      console.log('Purchase response:', result);
       
-      if (response.ok) {
-        alert(`🎉 Mua thành công ${item.name}! Còn lại ${result.remaining_svt} SVT`);
+      if (response.ok && result.success) {
+        console.log(`✅ Purchase successful: ${item.name}`);
+        setNotification({
+          type: 'success',
+          message: `🎉 Mua thành công ${item.name}! Còn lại ${result.remaining_svt} SVT`
+        });
         setUserSVT(result.remaining_svt);
         
         // Update item availability
         setMarketplaceItems(prev => prev.map(i => 
-          i.id === item.id ? { ...i, availability: i.availability - 1 } : i
+          i.id === item.id ? { ...i, availability: Math.max(0, i.availability - 1) } : i
         ));
+        
+        // Optionally refresh the marketplace data
+        await fetchMarketplaceData();
+        
+        // Auto hide notification after 3 seconds
+        setTimeout(() => setNotification(null), 3000);
       } else {
-        alert(`❌ Lỗi: ${result.error}`);
+        console.error('Purchase failed:', result);
+        setNotification({
+          type: 'error',
+          message: `❌ Lỗi: ${result.error || 'Không thể mua hàng'}`
+        });
+        setTimeout(() => setNotification(null), 5000);
       }
     } catch (error) {
       console.error('Purchase error:', error);
-      alert('❌ Lỗi kết nối. Vui lòng thử lại sau.');
+      setNotification({
+        type: 'error',
+        message: '❌ Lỗi kết nối. Vui lòng thử lại sau.'
+      });
+      setTimeout(() => setNotification(null), 5000);
     }
   };
 
@@ -211,6 +237,25 @@ const SVTMarketplace: React.FC = () => {
 
   return (
     <div className="bg-[#0D1117] text-white p-6 rounded-lg max-w-7xl mx-auto">
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md ${
+          notification.type === 'success' 
+            ? 'bg-green-600 border border-green-500' 
+            : 'bg-red-600 border border-red-500'
+        }`}>
+          <div className="flex items-center justify-between">
+            <p className="text-white font-medium">{notification.message}</p>
+            <button 
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white hover:text-gray-300"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>

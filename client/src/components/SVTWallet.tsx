@@ -4,7 +4,7 @@ interface Mission {
   id: string;
   title: string;
   description: string;
-  requirements: string[];
+  requirements?: string[];
   reward: number;
   badge: string;
   progress: number;
@@ -180,17 +180,18 @@ const SVTWallet: React.FC = () => {
         setProgressionStats(data.progression_stats || {});
 
         // Convert API missions to component format
-        const progressiveMissions = data.recommended_missions.map((mission: any) => ({
+        const progressiveMissions = (data.recommended_missions || []).map((mission: any) => ({
           id: mission.id,
           title: mission.title,
           description: mission.description,
+          requirements: mission.instructions || mission.requirements || ['Hoàn thành nhiệm vụ'],
           reward: mission.svt_reward,
           progress: 0, // Will be updated with real progress
           maxProgress: 100,
           isCompleted: false,
           deadline: mission.estimated_time || 'Không giới hạn',
           category: mapCategoryToType(mission.category),
-          icon: mission.icon || '🎯',
+          badge: mission.icon || '🎯',
           level: mission.level || 'beginner',
           customerType: mission.customer_type || 'new'
         }));
@@ -474,7 +475,7 @@ const SVTWallet: React.FC = () => {
           console.log(`✅ Mission completed! New missions unlocked: ${completeData.newly_unlocked_missions}`);
           
           if (completeData.next_recommendations?.length > 0) {
-            console.log('🎯 Next recommended missions:', completeData.next_recommendations.map((m: any) => m.title));
+            console.log('🎯 Next recommended missions:', (completeData.next_recommendations || []).map((m: any) => m.title));
           }
           
           return;
@@ -647,7 +648,7 @@ const SVTWallet: React.FC = () => {
               <div className="mb-4">
                 <p className="text-sm text-gray-400 mb-2">Yêu cầu:</p>
                 <ul className="space-y-1">
-                  {mission.requirements.map((req, index) => (
+                  {(mission.requirements || []).map((req, index) => (
                     <li key={index} className="text-sm text-gray-300 flex items-center">
                       <span className="text-blue-400 mr-2">•</span>
                       {req}
