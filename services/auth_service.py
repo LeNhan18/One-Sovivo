@@ -3,12 +3,16 @@ import datetime
 import jwt
 from functools import wraps
 from flask import request, jsonify, current_app
-from models import User, Customer
+from models import get_models
 
 class AuthService:
     def __init__(self, db, bcrypt):
         self.db = db
         self.bcrypt = bcrypt
+        # Get model classes after initialization
+        self.models = get_models()
+        self.User = self.models['User']
+        self.Customer = self.models['Customer']
     
     def create_token(self, user_id: int):
         payload = {
@@ -36,7 +40,7 @@ class AuthService:
             if not user_id:
                 return jsonify({'error': 'Token đã hết hạn'}), 401
             
-            user = User.query.get(user_id)
+            user = self.User.query.get(user_id)
             if not user:
                 return jsonify({'error': 'Người dùng không tồn tại'}), 401
             
@@ -50,7 +54,7 @@ class AuthService:
         email = email.strip().lower()
         name = name or email.split('@')[0]
         
-        if User.query.filter_by(email=email).first():
+        if self.User.query.filter_by(email=email).first():
             return {'error': 'Email đã tồn tại'}, 409
 
         # Determine role based on email domain
@@ -61,11 +65,11 @@ class AuthService:
         customer_business_id = None
         if role == 'customer':
             # Find max customer_id and increment
-            max_customer = Customer.query.order_by(Customer.customer_id.desc()).first()
+            max_customer = self.Customer.query.order_by(self.Customer.customer_id.desc()).first()
             next_customer_id = (max_customer.customer_id + 1) if max_customer else 2001
             
             # Create customer record
-            customer = Customer(
+            customer = self.Customer(
                 customer_id=next_customer_id,
                 name=name,
                 age=25,
@@ -79,7 +83,7 @@ class AuthService:
             customer_db_id = customer.id
             customer_business_id = customer.customer_id
 
-        user = User(email=email, name=name, role=role, customer_id=customer_db_id)
+        user = self.User(email=email, name=name, role=role, customer_id=customer_db_id)
         user.set_password(password)
 
         self.db.session.add(user)
@@ -100,7 +104,7 @@ class AuthService:
         """Đăng nhập"""
         email = email.strip().lower()
         
-        user = User.query.filter_by(email=email).first()
+        user = self.User.query.filter_by(email=email).first()
         if not user or not user.check_password(password):
             return {'error': 'Sai email hoặc mật khẩu'}, 401
 
@@ -125,7 +129,6 @@ class AuthService:
         actual_customer_id = None
         if user.customer_id and user.customer:
             actual_customer_id = user.customer.customer_id
-        
         return {
             'email': user.email, 
             'name': user.name, 

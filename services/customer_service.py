@@ -1,18 +1,24 @@
 # services/customer_service.py
-from models import Customer, HDBankTransaction, VietjetFlight, ResortBooking
+from models import get_models
 
 class CustomerService:
     def __init__(self, db):
         self.db = db
+        # Get model classes after initialization
+        self.models = get_models()
+        self.Customer = self.models['Customer']
+        self.HDBankTransaction = self.models['HDBankTransaction']
+        self.VietjetFlight = self.models['VietjetFlight']
+        self.ResortBooking = self.models['ResortBooking']
 
     def get_customer_360_profile(self, customer_id):
         """Lấy hồ sơ 360° từ MySQL."""
-        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        customer = self.Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return None
 
         # HDBank summary
-        hdbank_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).all()
+        hdbank_transactions = self.HDBankTransaction.query.filter_by(customer_id=customer_id).all()
         hdbank_summary = {}
         if hdbank_transactions:
             balances = [float(t.balance) for t in hdbank_transactions]
@@ -25,7 +31,7 @@ class CustomerService:
             }
 
         # Vietjet summary
-        vietjet_flights = VietjetFlight.query.filter_by(customer_id=customer_id).all()
+        vietjet_flights = self.VietjetFlight.query.filter_by(customer_id=customer_id).all()
         vietjet_summary = {}
         if vietjet_flights:
             vietjet_summary = {
@@ -36,7 +42,7 @@ class CustomerService:
             }
 
         # Resort summary
-        resort_bookings = ResortBooking.query.filter_by(customer_id=customer_id).all()
+        resort_bookings = self.ResortBooking.query.filter_by(customer_id=customer_id).all()
         resort_summary = {}
         if resort_bookings:
             resort_summary = {
@@ -68,12 +74,12 @@ class CustomerService:
 
         try:
             q_id = int(q)
-            customers = Customer.query.filter(
-                (Customer.customer_id == q_id) |
-                (Customer.name.ilike(f'%{q}%'))
+            customers = self.Customer.query.filter(
+                (self.Customer.customer_id == q_id) |
+                (self.Customer.name.ilike(f'%{q}%'))
             ).limit(20).all()
         except ValueError:
-            customers = Customer.query.filter(Customer.name.ilike(f'%{q}%')).limit(20).all()
+            customers = self.Customer.query.filter(self.Customer.name.ilike(f'%{q}%')).limit(20).all()
 
         return [
             {
@@ -125,7 +131,7 @@ class CustomerService:
         except Exception as e:
             print(f"❌ Error in suggestions: {e}")
             # Fallback to simple query
-            customers = Customer.query.limit(5).all()
+            customers = self.Customer.query.limit(5).all()
             return [{
                 'customer_id': c.customer_id,
                 'name': c.name,

@@ -54,7 +54,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 # Initialize detailed mission system
-detailed_mission_system = DetailedMissionSystem()
+# detailed_mission_system = DetailedMissionSystem()
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)

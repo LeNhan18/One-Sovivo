@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import joblib
 import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from models import Customer, HDBankTransaction, VietjetFlight, ResortBooking
+from models import get_models
 
 class AIService:
     def __init__(self, db, model_dir):
@@ -19,6 +19,13 @@ class AIService:
         self.encoder = None
         self.feature_columns = ['age', 'avg_balance', 'total_flights', 'is_business_flyer_int', 
                                'total_nights_stayed', 'total_resort_spending']
+        
+        # Get model classes after initialization
+        self.models = get_models()
+        self.Customer = self.models['Customer']
+        self.HDBankTransaction = self.models['HDBankTransaction']
+        self.VietjetFlight = self.models['VietjetFlight']
+        self.ResortBooking = self.models['ResortBooking']
 
     def load_model(self):
         """Tải model đã được huấn luyện."""

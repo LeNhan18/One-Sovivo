@@ -63,25 +63,26 @@ if MISSION_SYSTEM_ENABLED:
     detailed_mission_system = DetailedMissionSystem()
 
 # =============================================================================
-# INITIALIZE MODELS WITH DB INJECTION
+# INITIALIZE MODELS WITH LAZY LOADING
 # =============================================================================
-from models import user, customer, transactions, achievements, missions, marketplace
+from models import init_models, get_models
 
-# Inject database instances into models
-user.init_db(db, bcrypt)
-customer.init_db(db)
-transactions.init_db(db)
-achievements.init_db(db)
-missions.init_db(db)
-marketplace.init_db(db)
+# Initialize models with database instances
+model_classes = init_models(db, bcrypt)
 
-# Import models after initialization
-from models.user import User
-from models.customer import Customer
-from models.transactions import HDBankTransaction, VietjetFlight, ResortBooking, TokenTransaction
-from models.achievements import Achievement, CustomerAchievement
-from models.missions import CustomerMission, CustomerMissionProgress
-from models.marketplace import MarketplaceItem, P2PListing
+# Extract model classes for direct use
+User = model_classes['User']
+Customer = model_classes['Customer']
+HDBankTransaction = model_classes['HDBankTransaction']
+VietjetFlight = model_classes['VietjetFlight']
+ResortBooking = model_classes['ResortBooking']
+TokenTransaction = model_classes['TokenTransaction']
+Achievement = model_classes['Achievement']
+CustomerAchievement = model_classes['CustomerAchievement']
+CustomerMission = model_classes['CustomerMission']
+CustomerMissionProgress = model_classes['CustomerMissionProgress']
+MarketplaceItem = model_classes['MarketplaceItem']
+P2PListing = model_classes['P2PListing']
 
 # =============================================================================
 # INITIALIZE SERVICES
