@@ -2540,6 +2540,348 @@ def vietjet_book_flight():
         }), 500
 
 
+def check_customer_has_card(customer_id):
+    """Kiểm tra khách hàng đã có thẻ chưa"""
+    try:
+        # Kiểm tra transaction mở thẻ
+        card_count = HDBankTransaction.query.filter_by(
+            customer_id=customer_id,
+            transaction_type="card_opening"
+        ).count()
+        
+        # Nếu có transaction mở thẻ, return True
+        if card_count > 0:
+            return True
+            
+        # Nếu không có transaction mở thẻ nhưng có transaction HDBank khác
+        # (có thể là dữ liệu cũ), tự động tạo transaction mở thẻ
+        other_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
+        if other_transactions > 0:
+            print(f"Auto-creating card opening transaction for customer {customer_id}")
+            
+            # Tạo transaction mở thẻ tự động
+            card_number = f"4{random.randint(100000000000000, 999999999999999)}"
+            card_id = f"AUTOCARD{int(time.time())}"
+            
+            card_opening_tx = HDBankTransaction(
+                customer_id=customer_id,
+                transaction_id=card_id,
+                transaction_type="card_opening",
+                amount=0,  # Không tính phí cho auto-create
+                description=f"Mở thẻ HDBank Classic (Auto) - Số thẻ: {card_number}",
+                transaction_date=datetime.datetime.now(),
+                status="approved"
+            )
+            db.session.add(card_opening_tx)
+            db.session.commit()
+            
+            return True
+            
+        return False
+    except Exception as e:
+        print(f"Error in check_customer_has_card: {e}")
+        return False
+
+
+def get_customer_card_info(customer_id):
+    """Lấy thông tin thẻ của khách hàng"""
+    try:
+        card_tx = HDBankTransaction.query.filter_by(
+            customer_id=customer_id,
+            transaction_type="card_opening"
+        ).first()
+        
+        if card_tx:
+            # Parse thông tin từ description
+            description = card_tx.description
+            card_name = description.split(" - ")[0].replace("Mở thẻ ", "")
+            card_number = description.split("Số thẻ: ")[1] if "Số thẻ: " in description else "****-****-****-0000"
+            
+            return {
+                "has_card": True,
+                "card_id": card_tx.transaction_id,
+                "card_name": card_name,
+                "card_number": f"****-****-****-{card_number[-4:]}",
+                "opened_date": card_tx.transaction_date.strftime('%Y-%m-%d')
+            }
+        else:
+            return {"has_card": False}
+    except:
+        return {"has_card": False}
+
+
+@app.route('/api/fix/auto-create-card/<int:customer_id>', methods=['POST'])
+def auto_create_card_for_existing_customer(customer_id):
+    """Tự động tạo thẻ cho khách hàng đã có dữ liệu HDBank"""
+    try:
+        # Kiểm tra customer có tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({
+                "success": False,
+                "message": "Khách hàng không tồn tại"
+            }), 404
+            
+        # Kiểm tra đã có thẻ chưa
+        existing_card = HDBankTransaction.query.filter_by(
+            customer_id=customer_id,
+            transaction_type="card_opening"
+        ).first()
+        
+        if existing_card:
+            return jsonify({
+                "success": False,
+                "message": "Khách hàng đã có thẻ",
+                "card_info": {
+                    "transaction_id": existing_card.transaction_id,
+                    "created_date": existing_card.transaction_date.isoformat()
+                }
+            })
+        
+        # Tạo thẻ tự động
+        card_number = f"4{random.randint(100000000000000, 999999999999999)}"
+        card_id = f"AUTOFIX{int(time.time())}"
+        
+        card_opening_tx = HDBankTransaction(
+            customer_id=customer_id,
+            transaction_id=card_id,
+            transaction_type="card_opening",
+            amount=0,  # Không tính phí
+            balance=1000000,  # Số dư khởi tạo 1 triệu
+            description=f"Mở thẻ HDBank Classic (Auto-Fix) - Số thẻ: {card_number}",
+            transaction_date=datetime.datetime.now()
+        )
+        db.session.add(card_opening_tx)
+        
+        # Tặng SVT tokens
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="auto_card_fix",
+            amount=500,
+            description="Auto-fix card opening bonus",
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
+        )
+        db.session.add(token_tx)
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Đã tự động tạo thẻ cho {customer.name}",
+            "card_details": {
+                "card_id": card_id,
+                "card_number": f"****-****-****-{card_number[-4:]}",
+                "customer_name": customer.name,
+                "auto_created": True
+            },
+            "rewards": {
+                "svt_tokens": 500
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi tạo thẻ tự động: {str(e)}"
+        }), 500
+
+
+@app.route('/api/debug/customer-info/<int:customer_id>', methods=['GET'])
+def debug_customer_info(customer_id):
+    """Debug endpoint để kiểm tra thông tin khách hàng"""
+    try:
+        # Kiểm tra customer
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        
+        # Kiểm tra HDBank transactions
+        hdbank_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).all()
+        card_transactions = HDBankTransaction.query.filter_by(
+            customer_id=customer_id,
+            transaction_type="card_opening"
+        ).all()
+        
+        # Kiểm tra user account
+        user = User.query.filter_by(customer_id=customer_id).first()
+        
+        return jsonify({
+            "debug_info": {
+                "customer_id": customer_id,
+                "customer_exists": customer is not None,
+                "customer_name": customer.name if customer else None,
+                "user_exists": user is not None,
+                "user_username": user.username if user else None,
+                "total_hdbank_transactions": len(hdbank_transactions),
+                "card_opening_transactions": len(card_transactions),
+                "card_transactions_details": [
+                    {
+                        "transaction_id": tx.transaction_id,
+                        "description": tx.description,
+                        "date": tx.transaction_date.isoformat() if tx.transaction_date else None
+                    } for tx in card_transactions
+                ],
+                "has_card_check": len(card_transactions) > 0
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "debug_info": {
+                "customer_id": customer_id,
+                "error": str(e)
+            }
+        }), 500
+
+
+@app.route('/api/service/hdbank/dashboard/<int:customer_id>', methods=['GET'])
+def hdbank_dashboard(customer_id):
+    """Dashboard tổng quan dịch vụ HDBank cho khách hàng"""
+    try:
+        # Kiểm tra khách hàng
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({
+                "success": False,
+                "message": "Khách hàng không tồn tại"
+            }), 404
+        
+        # Kiểm tra thẻ
+        card_info = get_customer_card_info(customer_id)
+        
+        # Nếu chưa có thẻ, hiển thị giao diện mở thẻ
+        if not card_info["has_card"]:
+            return jsonify({
+                "success": True,
+                "customer_id": customer_id,
+                "customer_name": customer.name,
+                "has_card": False,
+                "message": "Chào mừng đến với HDBank! Mở thẻ ngay để sử dụng dịch vụ",
+                "action_required": {
+                    "type": "open_card",
+                    "title": "🏦 Mở thẻ HDBank miễn phí",
+                    "description": "Nhận ngay 1 triệu VND + 500 SVT Token",
+                    "benefits": [
+                        "✅ Miễn phí thường niên trọn đời",
+                        "🎁 Thưởng chào mừng 1 triệu VND",
+                        "🪙 Tặng 500 SVT Token",
+                        "💳 Hạn mức tín dụng 10 triệu VND",
+                        "🏧 Sử dụng dịch vụ chuyển khoản, vay vốn"
+                    ],
+                    "button_text": "Mở thẻ ngay",
+                    "endpoint": "/api/service/hdbank/open-card"
+                },
+                "available_services": []
+            })
+        
+        # Nếu đã có thẻ, hiển thị dashboard đầy đủ
+        total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
+        total_spent = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
+            HDBankTransaction.customer_id == customer_id,
+            HDBankTransaction.amount < 0
+        ).scalar() or 0
+        
+        total_received = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
+            HDBankTransaction.customer_id == customer_id,
+            HDBankTransaction.amount > 0
+        ).scalar() or 0
+        
+        return jsonify({
+            "success": True,
+            "customer_id": customer_id,
+            "customer_name": customer.name,
+            "has_card": True,
+            "card_info": card_info,
+            "account_summary": {
+                "total_transactions": total_transactions,
+                "total_spent": abs(total_spent),
+                "total_received": total_received,
+                "current_balance": 500000000  # Giả lập
+            },
+            "available_services": [
+                {
+                    "type": "transfer",
+                    "title": "💸 Chuyển khoản",
+                    "description": "Chuyển tiền nhanh, nhận SVT Token",
+                    "endpoint": "/api/service/hdbank/transfer",
+                    "icon": "💸"
+                },
+                {
+                    "type": "loan",
+                    "title": "💰 Đăng ký vay",
+                    "description": "Vay vốn lãi suất ưu đãi",
+                    "endpoint": "/api/service/hdbank/loan",
+                    "icon": "💰"
+                }
+            ]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi tải dashboard: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/hdbank/status/<int:customer_id>', methods=['GET'])
+def hdbank_service_status(customer_id):
+    """Kiểm tra trạng thái dịch vụ ngân hàng của khách hàng"""
+    try:
+        # Kiểm tra khách hàng có tồn tại không
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({
+                "success": False,
+                "message": "Khách hàng không tồn tại"
+            }), 404
+        
+        # Kiểm tra thẻ
+        card_info = get_customer_card_info(customer_id)
+        
+        # Thống kê giao dịch
+        total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
+        total_amount = db.session.query(db.func.sum(HDBankTransaction.amount)).filter_by(customer_id=customer_id).scalar() or 0
+        
+        # Lấy giao dịch gần nhất
+        recent_transactions = HDBankTransaction.query.filter_by(
+            customer_id=customer_id
+        ).order_by(HDBankTransaction.transaction_date.desc()).limit(5).all()
+        
+        recent_list = []
+        for tx in recent_transactions:
+            recent_list.append({
+                "transaction_id": tx.transaction_id,
+                "type": tx.transaction_type,
+                "amount": tx.amount,
+                "description": tx.description,
+                "date": tx.transaction_date.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        return jsonify({
+            "success": True,
+            "customer_id": customer_id,
+            "customer_name": customer.name,
+            "card_status": card_info,
+            "account_summary": {
+                "total_transactions": total_transactions,
+                "total_amount": total_amount,
+                "account_balance": 500000000  # Giả lập số dư
+            },
+            "recent_transactions": recent_list,
+            "available_services": {
+                "transfer": card_info["has_card"],
+                "loan": card_info["has_card"],
+                "open_card": not card_info["has_card"]
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi kiểm tra trạng thái: {str(e)}"
+        }), 500
+
+
 @app.route('/api/service/hdbank/transfer', methods=['POST'])
 def hdbank_transfer():
     """Thực hiện chuyển khoản HDBank và lưu vào database"""
@@ -2554,6 +2896,20 @@ def hdbank_transfer():
                 "success": False,
                 "message": "customer_id is required"
             }), 400
+        
+        # Kiểm tra khách hàng có thẻ chưa
+        if not check_customer_has_card(customer_id):
+            return jsonify({
+                "success": False,
+                "message": "Bạn cần mở thẻ HDBank trước khi sử dụng dịch vụ chuyển khoản",
+                "error_code": "NO_CARD",
+                "action_required": {
+                    "type": "open_card",
+                    "title": "Mở thẻ HDBank",
+                    "description": "Nhấn để mở thẻ HDBank miễn phí và nhận thưởng chào mừng",
+                    "endpoint": "/api/service/hdbank/open-card"
+                }
+            }), 403
         
         # Tạo transaction ID
         transaction_id = f"HD{int(time.time())}"
@@ -2619,6 +2975,20 @@ def hdbank_loan():
                 "success": False,
                 "message": "customer_id is required"
             }), 400
+        
+        # Kiểm tra khách hàng có thẻ chưa
+        if not check_customer_has_card(customer_id):
+            return jsonify({
+                "success": False,
+                "message": "Bạn cần mở thẻ HDBank trước khi đăng ký khoản vay",
+                "error_code": "NO_CARD",
+                "action_required": {
+                    "type": "open_card",
+                    "title": "Mở thẻ HDBank",
+                    "description": "Nhấn để mở thẻ HDBank miễn phí và đăng ký vay",
+                    "endpoint": "/api/service/hdbank/open-card"
+                }
+            }), 403
         
         # Tạo loan transaction ID
         loan_id = f"LOAN{int(time.time())}"
