@@ -142,8 +142,6 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         )
 
       case 'hdbank':
-        console.log('🔍 ServiceModal - userData:', userData);
-        console.log('🔍 ServiceModal - customerId:', userData?.customerId || 1001);
         return (
           <HDBankCard 
             customerId={userData?.customerId || 1001}
