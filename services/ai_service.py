@@ -3,12 +3,14 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import joblib
 import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from models import get_models
+
 
 class AIService:
     def __init__(self, db, model_dir):
@@ -17,9 +19,9 @@ class AIService:
         self.ai_model = None
         self.scaler = None
         self.encoder = None
-        self.feature_columns = ['age', 'avg_balance', 'total_flights', 'is_business_flyer_int', 
-                               'total_nights_stayed', 'total_resort_spending']
-        
+        self.feature_columns = ['age', 'avg_balance', 'total_flights', 'is_business_flyer_int',
+                                'total_nights_stayed', 'total_resort_spending']
+
         # Get model classes after initialization
         self.models = get_models()
         self.Customer = self.models['Customer']
@@ -214,33 +216,106 @@ class AIService:
 
         return evidences
 
-    def get_recommendations(self, predicted_persona, input_data):
-        """Tạo đề xuất dựa trên persona được dự đoán."""
-        recommendations = []
+    def get_recommendations(self, predicted_persona, profile):
+        """
+        HỆ THỐNG ĐỀ XUẤT ĐA TẦNG
+        Tạo đề xuất dựa trên persona, tín hiệu hành vi và chấm điểm.
+        """
+        all_recommendations = {}
 
-        if predicted_persona == 'doanh_nhan':
-            recommendations.append({
-                'offer_code': 'DN001',
+        # --- Tầng 1: Đề xuất dựa trên Phân khúc (Persona-based) ---
+        persona_recs = self._get_persona_recommendations(predicted_persona)
+        for rec in persona_recs:
+            all_recommendations[rec['offer_code']] = rec
+
+        # --- Tầng 2: Đề xuất dựa trên Tín hiệu (Trigger-based) ---
+        trigger_recs = self._get_trigger_recommendations(profile)
+        for rec in trigger_recs:
+            all_recommendations[rec['offer_code']] = rec
+
+        # --- Tầng 3: Chấm điểm & Xếp hạng ---
+        ranked_recs = sorted(
+            all_recommendations.values(),
+            key=lambda x: x.get('score', 0),
+            reverse=True
+        )
+
+        # Trả về Top 3 đề xuất tốt nhất
+        return ranked_recs[:3]
+
+    def _get_persona_recommendations(self, persona):
+        """Helper: Lấy các đề xuất nền tảng theo persona."""
+        recs = []
+        if persona == 'doanh_nhan':
+            recs.append({
+                'offer_code': 'DN001', 'score': 70,
                 'title': 'Mở thẻ HDBank Visa Signature',
                 'description': 'Tận hưởng đặc quyền phòng chờ sân bay và các ưu đãi golf cao cấp.'
             })
-            if input_data.get('total_resort_spending', 0) > 20_000_000:
-                recommendations.append({
-                    'offer_code': 'DN002',
-                    'title': 'Sovico Resort VIP Package',
-                    'description': 'Ưu đãi độc quyền cho khách hàng doanh nhân cao cấp.'
-                })
-        elif predicted_persona == 'gia_dinh':
-            recommendations.append({
-                'offer_code': 'GD001',
+            recs.append({
+                'offer_code': 'DN003', 'score': 60,
+                'title': 'Gói Đầu tư Trái phiếu Doanh nghiệp',
+                'description': 'Lợi suất hấp dẫn và an toàn cho dòng tiền nhàn rỗi của bạn.'
+            })
+        elif persona == 'gia_dinh':
+            recs.append({
+                'offer_code': 'GD001', 'score': 70,
                 'title': 'Combo Du lịch Hè Vietjet',
                 'description': 'Giảm giá 30% cho cả gia đình khi đặt vé máy bay và khách sạn qua HDBank App.'
             })
-        elif predicted_persona == 'nguoi_tre':
-            recommendations.append({
-                'offer_code': 'NT001',
+            recs.append({
+                'offer_code': 'GD002', 'score': 65,
+                'title': 'Gói Tiết kiệm "Chắp cánh Tương lai"',
+                'description': 'Bắt đầu tích lũy cho việc học của con bạn với lãi suất ưu đãi.'
+            })
+        elif persona == 'nguoi_tre':
+            recs.append({
+                'offer_code': 'NT001', 'score': 70,
                 'title': 'Mở thẻ tín dụng đầu tiên',
                 'description': 'Bắt đầu xây dựng lịch sử tín dụng của bạn với thẻ HDBank Vietjet Platinum.'
             })
+        return recs
 
-        return recommendations
+    def _get_trigger_recommendations(self, profile):
+        """Helper: Quét profile để tìm các tín hiệu và kích hoạt đề xuất."""
+        recs = []
+
+        # Lấy các chỉ số chính từ profile
+        avg_balance = profile.get('hdbank_summary', {}).get('average_balance', 0)
+        total_flights = profile.get('vietjet_summary', {}).get('total_flights_last_year', 0)
+        resort_spending = profile.get('resort_summary', {}).get('total_spending', 0)
+        has_loan = profile.get('hdbank_summary', {}).get('total_loan_amount', 0) > 0
+
+        # Tín hiệu 1: Khách hàng tiềm năng cao cho thẻ VIP
+        if avg_balance > 500_000_000 and total_flights > 10:
+            recs.append({
+                'offer_code': 'TRG001', 'score': 100,
+                'title': 'Nâng cấp miễn phí HDBank Visa Signature',
+                'description': 'Tri ân sự gắn bó, tận hưởng đặc quyền phòng chờ thương gia miễn phí.'
+            })
+
+        # Tín hiệu 2: Khách hàng tiềm năng cho BĐS nghỉ dưỡng
+        if resort_spending > 50_000_000 and avg_balance > 1_000_000_000:
+            recs.append({
+                'offer_code': 'TRG002', 'score': 95,
+                'title': 'Đặc quyền tham dự sự kiện BĐS Sovico',
+                'description': 'Nhận vé mời tham dự sự kiện ra mắt dự án bất động sản nghỉ dưỡng mới nhất.'
+            })
+
+        # Tín hiệu 3: Khách hàng có tiền nhưng chưa bay
+        if total_flights == 0 and avg_balance > 200_000_000:
+            recs.append({
+                'offer_code': 'TRG003', 'score': 90,
+                'title': 'Trải nghiệm bay Vietjet với ưu đãi 50%',
+                'description': 'Tặng voucher giảm 50% cho chuyến bay nội địa đầu tiên của bạn.'
+            })
+
+        # Tín hiệu 4: Người trẻ có thu nhập ổn định, tiềm năng vay
+        if (profile.get('basic_info', {}).get('age', 30) < 30) and (avg_balance > 20_000_000) and not has_loan:
+            recs.append({
+                'offer_code': 'TRG004', 'score': 85,
+                'title': 'Gói vay tiêu dùng trả góp 0%',
+                'description': 'Sở hữu ngay các sản phẩm công nghệ mới nhất với ưu đãi trả góp 0% qua HD Saison.'
+            })
+
+        return recs
