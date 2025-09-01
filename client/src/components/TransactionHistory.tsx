@@ -69,11 +69,11 @@ const TransactionHistory: React.FC = () => {
           setCustomerId(2015); // Use 2015 where we have data
           return;
         }
-        
+
         const response = await fetch('http://127.0.0.1:5000/auth/me', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
           const user = await response.json();
           console.log('🔍 User from auth:', user);
@@ -103,11 +103,11 @@ const TransactionHistory: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('🔍 Transaction History Data:', data);
-          
+
           if (data.success) {
             // Set total balance from API
             setTotalSVT(data.total_balance || 0);
-            
+
             // Convert API data to Transaction format
             const convertedTransactions: Transaction[] = data.transactions.map((tx: any) => ({
               id: tx.id?.toString() || `TXN_${Date.now()}`,
@@ -162,15 +162,15 @@ const TransactionHistory: React.FC = () => {
 
   const filteredTransactions = transactions.filter(tx => {
     const typeMatch = filterType === 'all' || tx.type === filterType;
-    
+
     if (!typeMatch) return false;
-    
+
     if (filterPeriod === 'all') return true;
-    
+
     const days = filterPeriod === '7d' ? 7 : filterPeriod === '30d' ? 30 : 90;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
-    
+
     return new Date(tx.date) >= cutoff;
   });
 
@@ -272,7 +272,7 @@ const TransactionHistory: React.FC = () => {
                 <option value="30d">30 ngày qua</option>
                 <option value="90d">90 ngày qua</option>
               </select>
-              
+
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}

@@ -2671,6 +2671,229 @@ def hdbank_loan():
         }), 500
 
 
+@app.route('/api/service/hdbank/open-card', methods=['POST'])
+def hdbank_open_card():
+    """Mở thẻ ngân hàng HDBank mới"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        card_type = data.get('card_type', 'classic')  # classic, gold, platinum
+        
+        if not customer_id:
+            return jsonify({
+                "success": False,
+                "message": "customer_id is required"
+            }), 400
+        
+        # Kiểm tra khách hàng có tồn tại không
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({
+                "success": False,
+                "message": "Khách hàng không tồn tại trong hệ thống"
+            }), 404
+        
+        # Tạo số thẻ ngẫu nhiên
+        card_number = f"4{random.randint(100000000000000, 999999999999999)}"
+        card_id = f"CARD{int(time.time())}"
+        
+        # Định nghĩa các loại thẻ và phí
+        card_config = {
+            'classic': {
+                'name': 'HDBank Classic Card',
+                'annual_fee': 0,
+                'credit_limit': 10000000,  # 10 triệu
+                'svt_reward': 500
+            },
+            'gold': {
+                'name': 'HDBank Gold Card',
+                'annual_fee': 500000,  # 500k phí năm
+                'credit_limit': 50000000,  # 50 triệu
+                'svt_reward': 1000
+            },
+            'platinum': {
+                'name': 'HDBank Platinum Card',
+                'annual_fee': 2000000,  # 2 triệu phí năm
+                'credit_limit': 200000000,  # 200 triệu
+                'svt_reward': 2000
+            }
+        }
+        
+        card_info = card_config.get(card_type, card_config['classic'])
+        
+        # Tạo transaction mở thẻ
+        card_opening_tx = HDBankTransaction(
+            customer_id=customer_id,
+            transaction_id=card_id,
+            transaction_type="card_opening",
+            amount=-card_info['annual_fee'],  # Trừ phí mở thẻ (nếu có)
+            description=f"Mở thẻ {card_info['name']} - Số thẻ: {card_number}",
+            transaction_date=datetime.datetime.now(),
+            status="approved"
+        )
+        db.session.add(card_opening_tx)
+        
+        # Tạo SVT reward cho việc mở thẻ
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="card_opening_reward",
+            amount=card_info['svt_reward'],
+            description=f"Thưởng mở thẻ {card_info['name']}",
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
+        )
+        db.session.add(token_tx)
+        
+        # Nếu là thẻ free (classic), tặng thêm bonus
+        if card_type == 'classic':
+            welcome_bonus = HDBankTransaction(
+                customer_id=customer_id,
+                transaction_id=f"WELCOME{int(time.time())}",
+                transaction_type="welcome_bonus",
+                amount=1000000,  # Tặng 1 triệu VND
+                description="Thưởng chào mừng mở thẻ Classic",
+                transaction_date=datetime.datetime.now(),
+                status="approved"
+            )
+            db.session.add(welcome_bonus)
+        
+        db.session.commit()
+        
+        # Tạo thông tin thẻ trả về
+        expiry_date = datetime.datetime.now() + datetime.timedelta(days=365*4)  # Thẻ hết hạn sau 4 năm
+        
+        return jsonify({
+            "success": True,
+            "message": f"Mở thẻ {card_info['name']} thành công!",
+            "card_details": {
+                "card_id": card_id,
+                "card_number": f"****-****-****-{card_number[-4:]}",  # Ẩn số thẻ
+                "card_type": card_type,
+                "card_name": card_info['name'],
+                "credit_limit": card_info['credit_limit'],
+                "annual_fee": card_info['annual_fee'],
+                "expiry_date": expiry_date.strftime('%m/%y'),
+                "status": "active"
+            },
+            "rewards": {
+                "svt_tokens": card_info['svt_reward'],
+                "welcome_bonus_vnd": 1000000 if card_type == 'classic' else 0
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi mở thẻ: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/hdbank/cards/<int:customer_id>', methods=['GET'])
+def get_customer_cards(customer_id):
+    """Xem danh sách thẻ của khách hàng"""
+    try:
+        # Lấy tất cả transaction mở thẻ của khách hàng
+        card_transactions = HDBankTransaction.query.filter_by(
+            customer_id=customer_id,
+            transaction_type="card_opening"
+        ).all()
+        
+        cards = []
+        for tx in card_transactions:
+            # Parse thông tin thẻ từ description
+            description = tx.description
+            card_number = description.split("Số thẻ: ")[1] if "Số thẻ: " in description else "****-****-****-0000"
+            
+            cards.append({
+                "card_id": tx.transaction_id,
+                "card_number": f"****-****-****-{card_number[-4:]}",
+                "card_name": description.split(" - ")[0].replace("Mở thẻ ", ""),
+                "opened_date": tx.transaction_date.strftime('%Y-%m-%d'),
+                "status": "active"
+            })
+        
+        return jsonify({
+            "success": True,
+            "cards": cards,
+            "total_cards": len(cards)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi lấy thông tin thẻ: {str(e)}"
+        }), 500
+
+
+@app.route('/api/service/hdbank/card-types', methods=['GET'])
+def get_card_types():
+    """Xem các loại thẻ có sẵn"""
+    try:
+        card_types = {
+            "classic": {
+                "name": "HDBank Classic Card",
+                "description": "Thẻ cơ bản miễn phí cho khách hàng mới",
+                "annual_fee": 0,
+                "credit_limit": 10000000,
+                "benefits": [
+                    "Miễn phí thường niên",
+                    "Hạn mức tín dụng 10 triệu VND",
+                    "Tặng 500 SVT Token",
+                    "Thưởng chào mừng 1 triệu VND"
+                ],
+                "requirements": [
+                    "Độ tuổi từ 18-65",
+                    "Có thu nhập ổn định"
+                ]
+            },
+            "gold": {
+                "name": "HDBank Gold Card", 
+                "description": "Thẻ cao cấp với nhiều ưu đãi",
+                "annual_fee": 500000,
+                "credit_limit": 50000000,
+                "benefits": [
+                    "Hạn mức tín dụng 50 triệu VND",
+                    "Tặng 1000 SVT Token",
+                    "Cashback 1% cho mọi giao dịch",
+                    "Miễn phí rút tiền ATM"
+                ],
+                "requirements": [
+                    "Thu nhập tối thiểu 15 triệu/tháng",
+                    "Có lịch sử tín dụng tốt"
+                ]
+            },
+            "platinum": {
+                "name": "HDBank Platinum Card",
+                "description": "Thẻ cao cấp nhất với đặc quyền VIP",
+                "annual_fee": 2000000,
+                "credit_limit": 200000000,
+                "benefits": [
+                    "Hạn mức tín dụng 200 triệu VND",
+                    "Tặng 2000 SVT Token",
+                    "Cashback 2% cho mọi giao dịch",
+                    "Dịch vụ concierge 24/7",
+                    "Miễn phí phòng chờ sân bay"
+                ],
+                "requirements": [
+                    "Thu nhập tối thiểu 50 triệu/tháng",
+                    "Tài sản chứng minh từ 1 tỷ VND"
+                ]
+            }
+        }
+        
+        return jsonify({
+            "success": True,
+            "card_types": card_types
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi lấy thông tin loại thẻ: {str(e)}"
+        }), 500
+
+
 @app.route('/api/service/resort/book-room', methods=['POST'])
 def resort_book_room():
     """Đặt phòng Resort và lưu vào database"""

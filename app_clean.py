@@ -13,6 +13,7 @@ import random
 import pandas as pd
 import numpy as np
 import matplotlib
+
 matplotlib.use('Agg')
 import jwt
 
@@ -29,10 +30,11 @@ from config import Config
 try:
     from blockchain_simple import update_nft_on_blockchain, get_nft_metadata
     from blockchain_config import (
-        evaluate_all_achievements, 
+        evaluate_all_achievements,
         get_highest_rank_from_achievements,
         ACHIEVEMENT_CONFIG
     )
+
     BLOCKCHAIN_ENABLED = True
     print("✅ Blockchain integration loaded successfully")
 except ImportError as e:
@@ -42,6 +44,7 @@ except ImportError as e:
 try:
     from mission_progression import mission_system, get_missions_for_customer
     from detailed_missions import DetailedMissionSystem
+
     MISSION_SYSTEM_ENABLED = True
     print("✅ Mission progression system loaded successfully")
 except ImportError as e:
@@ -93,6 +96,7 @@ auth_service = AuthService(db, bcrypt)
 ai_service = AIService(db, app.config['MODEL_DIR'])
 customer_service = CustomerService(db)
 
+
 # =============================================================================
 # CORE BUSINESS LOGIC ROUTES (Keep in main file for now)
 # =============================================================================
@@ -111,6 +115,7 @@ def register_api():
     result, status_code = auth_service.register(email, password, name)
     return jsonify(result), status_code
 
+
 @app.route('/auth/login', methods=['POST'])
 def login_api():
     data = request.get_json(force=True) or {}
@@ -120,12 +125,14 @@ def login_api():
     result, status_code = auth_service.login(email, password)
     return jsonify(result), status_code
 
+
 @app.route('/auth/me', methods=['GET'])
 @auth_service.require_auth
 def me_api():
     user = request.current_user
     result = auth_service.get_current_user(user)
     return jsonify(result)
+
 
 # CUSTOMER DATA ENDPOINTS
 @app.route('/customer/<int:customer_id>', methods=['GET'])
@@ -135,6 +142,7 @@ def get_customer_profile_api(customer_id):
     if profile is None:
         return jsonify({'error': f'Không tìm thấy khách hàng với ID {customer_id}'}), 404
     return jsonify(profile)
+
 
 @app.route('/customer/<int:customer_id>/insights', methods=['GET'])
 def get_insights_api(customer_id):
@@ -167,6 +175,7 @@ def get_insights_api(customer_id):
         'recommendations': recommendations
     })
 
+
 @app.route('/customers/search', methods=['GET'])
 def search_customers_api():
     """Tìm kiếm khách hàng theo từ khóa."""
@@ -174,11 +183,13 @@ def search_customers_api():
     result = customer_service.search_customers(q)
     return jsonify(result)
 
+
 @app.route('/customers/suggestions', methods=['GET'])
 def get_customer_suggestions_api():
     """API gợi ý khách hàng đáng chú ý."""
     result = customer_service.get_customer_suggestions()
     return jsonify(result)
+
 
 # AI PREDICTION ENDPOINT
 @app.route('/predict', methods=['POST'])
@@ -206,7 +217,7 @@ def predict_persona():
     # =============================================================================
     achievements = []
     customer_id = data.get('customer_id', 0)
-    
+
     # Tạo profile 360° từ input data để kiểm tra thành tựu
     profile = {
         'vietjet_summary': {
@@ -226,7 +237,7 @@ def predict_persona():
     if BLOCKCHAIN_ENABLED:
         try:
             earned_achievements = evaluate_all_achievements(profile)
-            
+
             if earned_achievements:
                 highest_rank = get_highest_rank_from_achievements(earned_achievements)
                 for achievement in earned_achievements:
@@ -240,7 +251,7 @@ def predict_persona():
                 print(f"🏆 {len(earned_achievements)} achievements triggered!")
             else:
                 print("📊 Không có thành tựu mới trong lần phân tích này")
-                
+
         except Exception as evaluation_error:
             print(f"❌ Achievement evaluation error: {evaluation_error}")
             achievements.append({
@@ -253,7 +264,7 @@ def predict_persona():
     else:
         # Fallback: Simple achievement check without blockchain
         print("⚠️ Blockchain disabled - using fallback achievement system")
-        
+
         if profile['vietjet_summary']['total_flights_last_year'] > 20:
             achievements.append({
                 'title': 'Frequent Flyer',
@@ -273,6 +284,7 @@ def predict_persona():
         "total_svt_reward": sum(ach.get('svt_reward', 0) for ach in achievements)
     })
 
+
 # =============================================================================
 # TOKEN & NFT ENDPOINTS
 # =============================================================================
@@ -287,11 +299,11 @@ def get_user_tokens(user_id):
             FROM token_transactions 
             WHERE customer_id = :user_id
         """
-        
+
         result = db.session.execute(db.text(token_query), {"user_id": user_id})
         row = result.fetchone()
         total_svt = float(row.total_svt) if row and row.total_svt else 0
-        
+
         # Get recent transactions
         recent_query = """
             SELECT tx_hash, transaction_type, amount, description, created_at
@@ -300,10 +312,10 @@ def get_user_tokens(user_id):
             ORDER BY created_at DESC
             LIMIT 10
         """
-        
+
         recent_result = db.session.execute(db.text(recent_query), {"user_id": user_id})
         transactions = []
-        
+
         for row in recent_result:
             transactions.append({
                 "txHash": row.tx_hash[:10] + "...",
@@ -311,14 +323,14 @@ def get_user_tokens(user_id):
                 "amount": f"{'+ ' if row.amount > 0 else '- '}{abs(row.amount):,.0f} SVT",
                 "time": row.created_at.strftime("%d/%m/%Y %H:%M") if row.created_at else "N/A"
             })
-        
+
         return jsonify({
             "success": True,
             "user_id": user_id,
             "total_svt": total_svt,
             "transactions": transactions
         })
-        
+
     except Exception as e:
         print(f"❌ Error getting tokens for user {user_id}: {e}")
         return jsonify({
@@ -327,6 +339,7 @@ def get_user_tokens(user_id):
             "total_svt": 0,
             "transactions": []
         }), 500
+
 
 @app.route('/api/tokens/add', methods=['POST'])
 def add_svt_tokens():
@@ -339,19 +352,19 @@ def add_svt_tokens():
         description = data.get('description', 'Mission reward')
         mission_id = data.get('mission_id', '')
         log_blockchain = data.get('log_blockchain', False)
-        
+
         if not customer_id or not amount:
             return jsonify({
                 "success": False,
                 "error": "Missing customer_id or amount"
             }), 400
-        
+
         # Generate blockchain transaction hash with better uniqueness
         timestamp = int(time.time() * 1000000)
         unique_id = str(uuid.uuid4()).replace('-', '')[:16]
         random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
         tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
-        
+
         # Add token transaction record
         new_transaction = TokenTransaction(
             customer_id=customer_id,
@@ -360,9 +373,9 @@ def add_svt_tokens():
             description=description,
             tx_hash=tx_hash
         )
-        
+
         db.session.add(new_transaction)
-        
+
         # 🔗 BLOCKCHAIN LOGGING
         blockchain_result = None
         if log_blockchain and BLOCKCHAIN_ENABLED:
@@ -377,18 +390,18 @@ def add_svt_tokens():
                 print(f"⚠️ Blockchain logging failed: {blockchain_error}")
 
         db.session.commit()
-        
+
         # Get updated balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
             FROM token_transactions 
             WHERE customer_id = :customer_id
         """
-        
+
         result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
         row = result.fetchone()
         new_balance = float(row.total_svt) if row and row.total_svt else 0
-        
+
         response_data = {
             "success": True,
             "message": f"Successfully added {amount} SVT tokens",
@@ -397,7 +410,7 @@ def add_svt_tokens():
             "tx_hash": tx_hash,
             "gas_used": 21000 if log_blockchain else 0
         }
-        
+
         # Add blockchain info if available
         if blockchain_result and blockchain_result.get('success'):
             response_data.update({
@@ -405,9 +418,9 @@ def add_svt_tokens():
                 "blockchain_gas": blockchain_result.get('gas_used'),
                 "blockchain_status": "confirmed"
             })
-        
+
         return jsonify(response_data)
-        
+
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error adding SVT tokens: {e}")
@@ -415,6 +428,7 @@ def add_svt_tokens():
             "success": False,
             "error": str(e)
         }), 500
+
 
 @app.route('/api/nft/<int:user_id>', methods=['GET'])
 def get_nft_passport(user_id):
@@ -449,6 +463,61 @@ def get_nft_passport(user_id):
             "metadata": None
         }), 500
 
+
+@app.route('/api/nft/<int:user_id>/achievements', methods=['GET'])
+def get_nft_achievements(user_id):
+    """Get achievements for a specific user from database"""
+    try:
+        # Query achievements and customer_achievements tables
+        query = """
+            SELECT 
+                a.id,
+                a.name,
+                a.description,
+                a.badge_image_url,
+                CASE 
+                    WHEN ca.customer_id IS NOT NULL THEN 1 
+                    ELSE 0 
+                END as is_earned,
+                CASE 
+                    WHEN ca.customer_id IS NOT NULL THEN 'earned' 
+                    ELSE 'locked' 
+                END as status,
+                COALESCE(ca.unlocked_at, '') as unlocked_at
+            FROM achievements a
+            LEFT JOIN customer_achievements ca ON a.id = ca.achievement_id AND ca.customer_id = :user_id
+            ORDER BY a.id
+        """
+        
+        result = db.session.execute(db.text(query), {"user_id": user_id})
+        achievements = []
+        
+        for row in result:
+            achievements.append({
+                "id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "badge_image_url": row.badge_image_url,
+                "is_earned": bool(row.is_earned),
+                "status": row.status,
+                "unlocked_at": row.unlocked_at if row.unlocked_at else None
+            })
+        
+        return jsonify({
+            "success": True,
+            "user_id": user_id,
+            "achievements": achievements
+        })
+        
+    except Exception as e:
+        print(f"❌ Error getting achievements for user {user_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "achievements": []
+        }), 500
+
+
 # =============================================================================
 # SERVICE INTEGRATION APIs
 # =============================================================================
@@ -461,13 +530,13 @@ def vietjet_book_flight():
         customer_id = data.get('customer_id', 1001)
         flight_type = data.get('flight_type', 'domestic')
         ticket_class = data.get('ticket_class', 'economy')
-        
+
         # Generate booking data
         flight_id = f"VJ{random.randint(1000, 9999)}"
         booking_value = 2500000 if flight_type == 'international' else 1500000
         if ticket_class == 'business':
             booking_value *= 3
-            
+
         # Create flight record
         new_flight = VietjetFlight(
             flight_id=flight_id,
@@ -479,11 +548,11 @@ def vietjet_book_flight():
             booking_value=booking_value
         )
         db.session.add(new_flight)
-        
+
         # Award SVT tokens
         svt_reward = 500 if ticket_class == 'business' else 200
         tx_hash = f"flight_{flight_id}_{int(time.time())}"
-        
+
         token_transaction = TokenTransaction(
             customer_id=customer_id,
             amount=svt_reward,
@@ -492,9 +561,9 @@ def vietjet_book_flight():
             tx_hash=tx_hash
         )
         db.session.add(token_transaction)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã đặt vé máy bay {flight_id} thành công',
@@ -503,13 +572,14 @@ def vietjet_book_flight():
             'svt_earned': svt_reward,
             'tx_hash': tx_hash
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
 
 @app.route('/api/service/hdbank/transfer', methods=['POST'])
 def hdbank_transfer():
@@ -519,10 +589,10 @@ def hdbank_transfer():
         customer_id = data.get('customer_id', 1001)
         amount = data.get('amount', 5000000)
         transfer_type = data.get('transfer_type', 'internal')
-        
+
         # Generate transaction data
         transaction_id = f"TF{random.randint(100000, 999999)}"
-        
+
         # Create bank transaction record
         new_transaction = HDBankTransaction(
             transaction_id=transaction_id,
@@ -534,11 +604,11 @@ def hdbank_transfer():
             description=f'Chuyển khoản {transfer_type}'
         )
         db.session.add(new_transaction)
-        
+
         # Award SVT tokens
         svt_reward = int(amount * 0.001)  # 0.1% of transfer amount
         tx_hash = f"transfer_{transaction_id}_{int(time.time())}"
-        
+
         token_transaction = TokenTransaction(
             customer_id=customer_id,
             amount=svt_reward,
@@ -547,9 +617,9 @@ def hdbank_transfer():
             tx_hash=tx_hash
         )
         db.session.add(token_transaction)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Chuyển khoản {transaction_id} thành công',
@@ -558,13 +628,14 @@ def hdbank_transfer():
             'svt_earned': svt_reward,
             'tx_hash': tx_hash
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
 
 @app.route('/api/service/hdbank/loan', methods=['POST'])
 def hdbank_loan():
@@ -574,10 +645,10 @@ def hdbank_loan():
         customer_id = data.get('customer_id', 1001)
         loan_amount = data.get('loan_amount', 500000000)
         loan_type = data.get('loan_type', 'personal')
-        
+
         # Generate loan data
         transaction_id = f"LN{random.randint(100000, 999999)}"
-        
+
         # Create loan transaction record
         new_transaction = HDBankTransaction(
             transaction_id=transaction_id,
@@ -589,11 +660,11 @@ def hdbank_loan():
             description=f'Khoản vay {loan_type} - {transaction_id}'
         )
         db.session.add(new_transaction)
-        
+
         # Award SVT tokens
         svt_reward = int(loan_amount * 0.002)  # 0.2% of loan amount
         tx_hash = f"loan_{transaction_id}_{int(time.time())}"
-        
+
         token_transaction = TokenTransaction(
             customer_id=customer_id,
             amount=svt_reward,
@@ -602,9 +673,9 @@ def hdbank_loan():
             tx_hash=tx_hash
         )
         db.session.add(token_transaction)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đăng ký khoản vay {transaction_id} thành công',
@@ -613,13 +684,14 @@ def hdbank_loan():
             'svt_earned': svt_reward,
             'tx_hash': tx_hash
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
 
 @app.route('/api/service/resort/book-room', methods=['POST'])
 def resort_book_room():
@@ -629,12 +701,12 @@ def resort_book_room():
         customer_id = data.get('customer_id', 1001)
         nights = data.get('nights', 2)
         room_type = data.get('room_type', 'standard')
-        
+
         # Generate booking data
         booking_id = f"RS{random.randint(10000, 99999)}"
         price_per_night = 3000000 if room_type == 'suite' else 1500000 if room_type == 'deluxe' else 800000
         booking_value = price_per_night * nights
-        
+
         # Create resort booking record
         new_booking = ResortBooking(
             booking_id=booking_id,
@@ -645,11 +717,11 @@ def resort_book_room():
             booking_value=booking_value
         )
         db.session.add(new_booking)
-        
+
         # Award SVT tokens
         svt_reward = int(booking_value * 0.05)  # 5% of booking value
         tx_hash = f"resort_{booking_id}_{int(time.time())}"
-        
+
         token_transaction = TokenTransaction(
             customer_id=customer_id,
             amount=svt_reward,
@@ -658,9 +730,9 @@ def resort_book_room():
             tx_hash=tx_hash
         )
         db.session.add(token_transaction)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đặt phòng {booking_id} thành công',
@@ -670,13 +742,14 @@ def resort_book_room():
             'svt_earned': svt_reward,
             'tx_hash': tx_hash
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
 
 @app.route('/api/service/resort/book-spa', methods=['POST'])
 def resort_book_spa():
@@ -685,7 +758,7 @@ def resort_book_spa():
         data = request.get_json()
         customer_id = data.get('customer_id', 1001)
         spa_type = data.get('spa_type', 'massage')
-        
+
         # Generate spa booking data
         booking_id = f"SP{random.randint(10000, 99999)}"
         service_prices = {
@@ -695,7 +768,7 @@ def resort_book_spa():
             'premium_package': 2500000
         }
         booking_value = service_prices.get(spa_type, 500000)
-        
+
         # Create spa booking record (using resort_bookings table)
         new_booking = ResortBooking(
             booking_id=booking_id,
@@ -706,11 +779,11 @@ def resort_book_spa():
             booking_value=booking_value
         )
         db.session.add(new_booking)
-        
+
         # Award SVT tokens
         svt_reward = int(booking_value * 0.1)  # 10% of spa value
         tx_hash = f"spa_{booking_id}_{int(time.time())}"
-        
+
         token_transaction = TokenTransaction(
             customer_id=customer_id,
             amount=svt_reward,
@@ -719,9 +792,9 @@ def resort_book_spa():
             tx_hash=tx_hash
         )
         db.session.add(token_transaction)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đặt dịch vụ spa {booking_id} thành công',
@@ -731,13 +804,14 @@ def resort_book_spa():
             'svt_earned': svt_reward,
             'tx_hash': tx_hash
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
 
 # =============================================================================
 # UTILITY ENDPOINTS
@@ -755,10 +829,12 @@ def health_check():
         'timestamp': datetime.datetime.utcnow().isoformat()
     })
 
+
 @app.route('/metrics/<filename>')
 def get_metric_chart(filename):
     """API để xem các biểu đồ đã lưu."""
     return send_from_directory(app.config['MODEL_DIR'], filename)
+
 
 # =============================================================================
 # TEST ENDPOINTS
@@ -770,12 +846,12 @@ def test_add_svt_tokens(customer_id):
     try:
         data = request.get_json() or {}
         amount = data.get('amount', 1000)
-        
+
         timestamp = int(time.time() * 1000000)
         unique_id = str(uuid.uuid4()).replace('-', '')[:16]
         random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
         tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
-        
+
         test_transaction = TokenTransaction(
             customer_id=customer_id,
             amount=amount,
@@ -783,8 +859,127 @@ def test_add_svt_tokens(customer_id):
             description=f'Test tokens for marketplace testing',
             tx_hash=tx_hash
         )
-        
+
         db.session.add(test_transaction)
+        db.session.commit()
+
+        # Get updated balance
+        token_query = """
+            SELECT COALESCE(SUM(amount), 0) as total_svt
+            FROM token_transactions 
+            WHERE customer_id = :customer_id
+        """
+
+        result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
+        row = result.fetchone()
+        new_balance = float(row.total_svt) if row and row.total_svt else 0
+
+        return jsonify({
+            "success": True,
+            "message": f"Added {amount} test SVT tokens",
+            "new_balance": new_balance,
+            "transaction_id": test_transaction.id,
+            "tx_hash": tx_hash
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# =============================================================================
+# SIMULATION ENDPOINTS
+# =============================================================================
+
+@app.route('/simulate_event', methods=['POST'])
+def simulate_event():
+    """Simulate various events and update blockchain"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id', 1001)
+        event_type = data.get('event_type', 'vip_upgrade')
+        
+        print(f"🎮 Simulating {event_type} for customer {customer_id}")
+        
+        # Simulate different event types
+        if event_type == 'vip_upgrade':
+            # Simulate VIP upgrade
+            svt_reward = 5000
+            achievement_title = "VIP Customer"
+            achievement_description = "Upgraded to VIP status"
+            
+        elif event_type == 'frequent_flyer':
+            # Simulate frequent flyer achievement
+            svt_reward = 3000
+            achievement_title = "Frequent Flyer"
+            achievement_description = "Completed 20+ flights this year"
+            
+        elif event_type == 'high_roller':
+            # Simulate high roller achievement
+            svt_reward = 10000
+            achievement_title = "High Roller"
+            achievement_description = "Spent over 100M VND on services"
+            
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Unknown event type: {event_type}"
+            }), 400
+        
+        # Add SVT tokens
+        timestamp = int(time.time() * 1000000)
+        unique_id = str(uuid.uuid4()).replace('-', '')[:16]
+        random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
+        tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
+        
+        token_transaction = TokenTransaction(
+            customer_id=customer_id,
+            amount=svt_reward,
+            transaction_type='simulation_reward',
+            description=f'Simulation: {achievement_title}',
+            tx_hash=tx_hash
+        )
+        db.session.add(token_transaction)
+        
+        # 🔗 BLOCKCHAIN INTEGRATION
+        blockchain_result = None
+        if BLOCKCHAIN_ENABLED:
+            try:
+                blockchain_result = update_nft_on_blockchain(
+                    user_id=customer_id,
+                    achievements=[achievement_title],
+                    persona_data={
+                        "event_type": event_type,
+                        "achievement": achievement_title,
+                        "svt_reward": svt_reward
+                    }
+                )
+                print(f"🔗 Blockchain updated: {blockchain_result.get('transaction_hash', 'N/A')}")
+            except Exception as blockchain_error:
+                print(f"⚠️ Blockchain update failed: {blockchain_error}")
+        
+        # Evaluate achievements
+        achievement_result = None
+        if BLOCKCHAIN_ENABLED:
+            try:
+                # Get customer profile for achievement evaluation
+                profile = customer_service.get_customer_360_profile(customer_id)
+                if profile:
+                    earned_achievements = evaluate_all_achievements(profile)
+                    if earned_achievements:
+                        highest_rank = get_highest_rank_from_achievements(earned_achievements)
+                        achievement_result = {
+                            "earned_achievements": len(earned_achievements),
+                            "highest_rank": highest_rank,
+                            "achievements": earned_achievements
+                        }
+                        print(f"🏆 {len(earned_achievements)} achievements evaluated!")
+            except Exception as eval_error:
+                print(f"⚠️ Achievement evaluation failed: {eval_error}")
+        
         db.session.commit()
         
         # Get updated balance
@@ -798,20 +993,40 @@ def test_add_svt_tokens(customer_id):
         row = result.fetchone()
         new_balance = float(row.total_svt) if row and row.total_svt else 0
         
-        return jsonify({
+        response_data = {
             "success": True,
-            "message": f"Added {amount} test SVT tokens",
+            "message": f"Successfully simulated {event_type}",
+            "customer_id": customer_id,
+            "event_type": event_type,
+            "svt_reward": svt_reward,
             "new_balance": new_balance,
-            "transaction_id": test_transaction.id,
+            "achievement_title": achievement_title,
+            "achievement_description": achievement_description,
             "tx_hash": tx_hash
-        })
+        }
+        
+        # Add blockchain info if available
+        if blockchain_result and blockchain_result.get('success'):
+            response_data.update({
+                "blockchain_tx": blockchain_result.get('transaction_hash'),
+                "blockchain_gas": blockchain_result.get('gas_used'),
+                "blockchain_status": "confirmed"
+            })
+        
+        # Add achievement evaluation result
+        if achievement_result:
+            response_data["achievement_evaluation"] = achievement_result
+        
+        return jsonify(response_data)
         
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Simulation error: {e}")
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
+
 
 # =============================================================================
 # BLOCKCHAIN TEST ENDPOINTS
@@ -822,16 +1037,16 @@ def test_blockchain():
     """Test blockchain integration endpoint."""
     if not BLOCKCHAIN_ENABLED:
         return jsonify({"error": "Blockchain integration not enabled"}), 503
-    
+
     data = request.json or {}
     token_id = data.get('token_id', 0)
     rank = data.get('rank', 'Gold')
     badge = data.get('badge', 'test_badge')
-    
+
     try:
         print(f"🧪 Testing blockchain update: Token {token_id}, Rank: {rank}, Badge: {badge}")
         tx_hash = update_nft_on_blockchain(token_id, rank, badge)
-        
+
         if tx_hash:
             return jsonify({
                 "success": True,
@@ -843,13 +1058,14 @@ def test_blockchain():
                 "success": False,
                 "message": "Blockchain update failed"
             }), 500
-            
+
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e),
             "message": "Blockchain integration error"
         }), 500
+
 
 # =============================================================================
 # INITIALIZATION
@@ -862,16 +1078,17 @@ def init_app():
             print("🗃️ Khởi tạo database tables...")
             db.create_all()
             print("✅ Database tables created successfully")
-            
+
             print("🤖 Khởi tạo AI model...")
             ai_model_loaded = ai_service.load_model()
             if ai_model_loaded:
                 print("✅ AI model loaded successfully")
             else:
                 print("⚠️ AI model fallback to mock model")
-                
+
         except Exception as e:
             print(f"❌ Initialization error: {e}")
+
 
 # =============================================================================
 # MAIN
