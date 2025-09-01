@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import HDBankCard from './HDBankCard'
+import VietjetBooking from './VietjetBooking'
 
 interface ServiceModalProps {
   isOpen: boolean
@@ -16,19 +17,6 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [formData, setFormData] = useState({
-    // Vietjet fields
-    flightType: 'domestic',
-    departureDate: '',
-    origin: 'HAN',
-    destination: 'SGN',
-    ticketClass: 'economy',
-    
-    // HDBank fields - Giữ lại cho compatibility nhưng không dùng nữa
-    transferAmount: '5000000',
-    transferType: 'internal',
-    loanAmount: '500000000',
-    loanType: 'personal',
-    
     // Resort fields
     checkInDate: '',
     nights: '2',
@@ -48,12 +36,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       }
       
       // Xác định API endpoint và data dựa trên service type và action
-      if (serviceType === 'vietjet') {
-        if (actionType === 'book_flight') {
-          apiUrl = 'http://127.0.0.1:5000/api/service/vietjet/book-flight'
-          requestData.flight_type = formData.flightType
-        }
-      } else if (serviceType === 'resort') {
+      if (serviceType === 'resort') {
         if (actionType === 'book_room') {
           apiUrl = 'http://127.0.0.1:5000/api/service/resort/book-room'
           requestData.nights = parseInt(formData.nights)
@@ -77,9 +60,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         
         let message = ''
         if (result.success) {
-          if (serviceType === 'vietjet' && actionType === 'book_flight') {
-            message = `✈️ ${result.message}\\nChuyến bay: ${result.flight_details?.origin}-${result.flight_details?.destination}\\n🪙 SVT thưởng: ${result.svt_reward}`
-          } else if (serviceType === 'resort' && actionType === 'book_room') {
+          if (serviceType === 'resort' && actionType === 'book_room') {
             message = `🏨 ${result.message}\\nLoại phòng: ${result.booking_details?.room_type}\\n🪙 SVT thưởng: ${result.svt_reward}`
           } else if (serviceType === 'resort' && actionType === 'book_spa') {
             message = `💆 ${result.message}\\nDịch vụ: ${result.spa_details?.spa_type}\\n🪙 SVT thưởng: ${result.svt_reward}`
@@ -103,42 +84,12 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     switch (serviceType) {
       case 'vietjet':
         return (
-          <div className="space-y-4">
-            <div className="text-center">
-              <div className="text-6xl mb-4">✈️</div>
-              <h3 className="text-2xl font-bold text-white mb-2">Vietjet</h3>
-              <p className="text-gray-300">Đặt vé máy bay</p>
-            </div>
-            
-            <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">{userData?.services?.vietjet?.total_flights || 0}</div>
-                <div className="text-green-200 text-sm">Chuyến bay năm nay</div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Loại chuyến bay</label>
-                <select 
-                  value={formData.flightType}
-                  onChange={(e) => setFormData({...formData, flightType: e.target.value})}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-blue-500"
-                >
-                  <option value="domestic">Nội địa (HAN ↔ SGN)</option>
-                  <option value="international">Quốc tế (HAN → NRT)</option>
-                </select>
-              </div>
-
-              <button
-                onClick={() => handleServiceAction('book_flight')}
-                disabled={isProcessing}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-3 px-4 rounded-lg font-medium transition-colors"
-              >
-                {isProcessing ? '⏳ Đang đặt vé...' : '✈️ Đặt vé máy bay'}
-              </button>
-            </div>
-          </div>
+          <VietjetBooking 
+            customerId={userData?.customerId || 1001}
+            onSuccess={() => {
+              console.log('Vietjet booking completed successfully');
+            }}
+          />
         )
 
       case 'hdbank':

@@ -74,7 +74,9 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
       setLoading(true);
       console.log('🔍 HDBankCard Debug - Customer ID:', customerId);
       
-      const response = await fetch(`http://127.0.0.1:5000/api/service/hdbank/dashboard/${customerId}`);
+      // Add cache busting
+      const timestamp = new Date().getTime();
+      const response = await fetch(`http://127.0.0.1:5000/api/service/hdbank/dashboard/${customerId}?_t=${timestamp}`);
       const data = await response.json();
       
       console.log('🔍 HDBankCard Debug - Dashboard Response:', data);

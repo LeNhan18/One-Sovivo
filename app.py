@@ -2468,7 +2468,12 @@ def vietjet_book_flight():
     try:
         data = request.get_json()
         customer_id = data.get('customer_id')
-        flight_type = data.get('flight_type', 'domestic')  # domestic/international
+        origin = data.get('origin', 'HAN')
+        destination = data.get('destination', 'SGN')
+        flight_date = data.get('flight_date')
+        ticket_class = data.get('ticket_class', 'economy')
+        booking_value = data.get('booking_value', 2500000)
+        passengers = data.get('passengers', 1)
         
         if not customer_id:
             return jsonify({
@@ -2476,34 +2481,31 @@ def vietjet_book_flight():
                 "message": "customer_id is required"
             }), 400
         
-        # Sinh flight_id và thông tin chuyến bay
-        flight_id = f"VJ{int(time.time())}"
-        if flight_type == "domestic":
-            origin = "HAN"
-            destination = "SGN"
-            ticket_class = "economy"
-            booking_value = 2500000
+        # Sinh flight_id
+        flight_id = f"VJ{int(time.time() * 1000)}"
+        
+        # Parse flight_date
+        if flight_date:
+            flight_datetime = datetime.datetime.strptime(flight_date, '%Y-%m-%d')
         else:
-            origin = "HAN"
-            destination = "NRT"
-            ticket_class = "business"
-            booking_value = 8500000
-
-        flight_date = datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30))
+            flight_datetime = datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30))
 
         new_flight = VietjetFlight(
             flight_id=flight_id,
             customer_id=customer_id,
-            flight_date=flight_date,
+            flight_date=flight_datetime,
             origin=origin,
             destination=destination,
             ticket_class=ticket_class,
-            booking_value=booking_value
+            booking_value=booking_value * passengers
         )
         db.session.add(new_flight)
         
-        # Tính SVT reward dựa trên loại vé
-        svt_reward = 500 if flight_type == "domestic" else 1200
+        # Tính SVT reward dựa trên route
+        if origin in ['HAN', 'SGN', 'DAD'] and destination in ['HAN', 'SGN', 'DAD']:
+            svt_reward = 500  # Domestic
+        else:
+            svt_reward = 1200  # International
 
         # Thêm SVT token transaction
         token_tx = TokenTransaction(
@@ -2527,8 +2529,8 @@ def vietjet_book_flight():
                 "origin": origin,
                 "destination": destination,
                 "ticket_class": ticket_class,
-                "booking_value": booking_value,
-                "flight_date": flight_date.strftime('%Y-%m-%d')
+                "booking_value": booking_value * passengers,
+                "flight_date": flight_datetime.strftime('%Y-%m-%d')
             }
         })
         
@@ -2540,13 +2542,56 @@ def vietjet_book_flight():
         }), 500
 
 
+@app.route('/api/service/vietjet/history/<int:customer_id>', methods=['GET'])
+def vietjet_booking_history(customer_id):
+    """Lấy lịch sử đặt vé của khách hàng"""
+    try:
+        flights = VietjetFlight.query.filter_by(customer_id=customer_id)\
+            .order_by(VietjetFlight.flight_date.desc()).all()
+        
+        flight_data = []
+        for flight in flights:
+            flight_data.append({
+                "flight_id": flight.flight_id,
+                "flight_date": flight.flight_date.strftime('%Y-%m-%d'),
+                "origin": flight.origin,
+                "destination": flight.destination,
+                "ticket_class": flight.ticket_class,
+                "booking_value": float(flight.booking_value),
+                "created_at": flight.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            })
+        
+        # Tính thống kê
+        total_flights = len(flights)
+        total_spending = sum(float(f.booking_value) for f in flights)
+        business_flights = sum(1 for f in flights if f.ticket_class == 'business')
+        
+        return jsonify({
+            "success": True,
+            "customer_id": customer_id,
+            "flights": flight_data,
+            "statistics": {
+                "total_flights": total_flights,
+                "total_spending": total_spending,
+                "business_flights": business_flights,
+                "favorite_route": f"{flights[0].origin}-{flights[0].destination}" if flights else "Chưa có"
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi lấy lịch sử: {str(e)}"
+        }), 500
+
+
 def check_customer_has_card(customer_id):
     """Kiểm tra khách hàng đã có thẻ chưa"""
     try:
-        # Kiểm tra transaction mở thẻ
-        card_count = HDBankTransaction.query.filter_by(
-            customer_id=customer_id,
-            transaction_type="card_opening"
+        # Kiểm tra transaction mở thẻ bằng description (vì không có transaction_type="card_opening")
+        card_count = HDBankTransaction.query.filter(
+            HDBankTransaction.customer_id == customer_id,
+            HDBankTransaction.description.like('%Mở thẻ HDBank%')
         ).count()
         
         # Nếu có transaction mở thẻ, return True
@@ -2566,11 +2611,11 @@ def check_customer_has_card(customer_id):
             card_opening_tx = HDBankTransaction(
                 customer_id=customer_id,
                 transaction_id=card_id,
-                transaction_type="card_opening",
-                amount=0,  # Không tính phí cho auto-create
+                transaction_type="credit",  # Dùng credit
+                amount=1000000,  # Thưởng chào mừng
+                balance=1000000,  # Số dư khởi tạo
                 description=f"Mở thẻ HDBank Classic (Auto) - Số thẻ: {card_number}",
-                transaction_date=datetime.datetime.now(),
-                status="approved"
+                transaction_date=datetime.datetime.now()
             )
             db.session.add(card_opening_tx)
             db.session.commit()
@@ -2586,9 +2631,9 @@ def check_customer_has_card(customer_id):
 def get_customer_card_info(customer_id):
     """Lấy thông tin thẻ của khách hàng"""
     try:
-        card_tx = HDBankTransaction.query.filter_by(
-            customer_id=customer_id,
-            transaction_type="card_opening"
+        card_tx = HDBankTransaction.query.filter(
+            HDBankTransaction.customer_id == customer_id,
+            HDBankTransaction.description.like('%Mở thẻ HDBank%')
         ).first()
         
         if card_tx:
@@ -2623,9 +2668,9 @@ def auto_create_card_for_existing_customer(customer_id):
             }), 404
             
         # Kiểm tra đã có thẻ chưa
-        existing_card = HDBankTransaction.query.filter_by(
-            customer_id=customer_id,
-            transaction_type="card_opening"
+        existing_card = HDBankTransaction.query.filter(
+            HDBankTransaction.customer_id == customer_id,
+            HDBankTransaction.description.like('%Mở thẻ HDBank%')
         ).first()
         
         if existing_card:
@@ -2645,8 +2690,8 @@ def auto_create_card_for_existing_customer(customer_id):
         card_opening_tx = HDBankTransaction(
             customer_id=customer_id,
             transaction_id=card_id,
-            transaction_type="card_opening",
-            amount=0,  # Không tính phí
+            transaction_type="credit",  # Dùng credit vì card opening tặng tiền
+            amount=1000000,  # Thưởng chào mừng 1 triệu
             balance=1000000,  # Số dư khởi tạo 1 triệu
             description=f"Mở thẻ HDBank Classic (Auto-Fix) - Số thẻ: {card_number}",
             transaction_date=datetime.datetime.now()
@@ -2786,6 +2831,11 @@ def hdbank_dashboard(customer_id):
             HDBankTransaction.amount > 0
         ).scalar() or 0
         
+        # Lấy balance từ transaction mới nhất
+        latest_transaction = HDBankTransaction.query.filter_by(customer_id=customer_id)\
+            .order_by(HDBankTransaction.transaction_date.desc()).first()
+        current_balance = float(latest_transaction.balance) if latest_transaction else 0
+        
         return jsonify({
             "success": True,
             "customer_id": customer_id,
@@ -2796,7 +2846,7 @@ def hdbank_dashboard(customer_id):
                 "total_transactions": total_transactions,
                 "total_spent": abs(total_spent),
                 "total_received": total_received,
-                "current_balance": 500000000  # Giả lập
+                "current_balance": current_balance
             },
             "available_services": [
                 {
