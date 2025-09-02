@@ -54,7 +54,7 @@ const AIFinancialAssistant: React.FC = () => {
     {
       id: '1',
       type: 'ai',
-      content: '👋 Chào bạn! Tôi là AI Assistant của Sovico được hỗ trợ bởi Google Gemini.\n\n🎯 **Khả năng của tôi:**\n• 📊 Phân tích tài chính cá nhân và tư vấn\n• ✈️ **Tự động đặt vé máy bay Vietjet**\n• 🏦 **Tự động xử lý giao dịch HDBank**\n• 🏨 **Tự động đặt phòng resort**\n• 💎 Tối ưu hóa SVT và NFT\n• 🤖 **Thực hiện dịch vụ tự động theo yêu cầu**\n\n💡 **Thử nói:** "Đặt vé máy bay cho tôi", "Vay 500 triệu", "Đặt phòng khách sạn"\n\nHãy hỏi tôi bất cứ điều gì!',
+      content: '🤖 **Chào bạn! Tôi là AI AGENT của Sovico** - Không chỉ tư vấn mà còn thực hiện dịch vụ!\n\n⚡ **AGENT MODE - THỰC THI TỰ ĐỘNG:**\n• ✈️ **Đặt vé máy bay Vietjet tức thì** khi có đủ thông tin\n• 🏦 **Xử lý giao dịch HDBank ngay lập tức**\n• 🏨 **Đặt phòng resort tự động**\n• � **Chuyển khoản, vay vốn tức thì**\n• 💎 **Tối ưu SVT và phân tích tài chính**\n\n🚀 **CÁCH ĐẶT VÉ AGENT (Tự động thực hiện):**\n• "Đặt vé từ **Hà Nội** đi **Phú Quốc** ngày **20/10** cho **2 người**" → Agent đặt ngay!\n• "Bay từ **TP.HCM** đến **Singapore** **ngày mai**" → Agent thực hiện tức thì!\n\n� **LỢI ÍCH AGENT:**\n• ⚡ Không cần confirm - Agent thực hiện ngay\n• 🎯 Chủ động hoàn tất tất cả bước\n• 🚀 Nhanh chóng, hiệu quả\n• 💎 Tự động cộng SVT rewards\n\n**Agent sẵn sàng phục vụ! Hãy yêu cầu bất cứ điều gì!** 🎯',
       timestamp: new Date()
     }
   ]);
@@ -119,13 +119,13 @@ const AIFinancialAssistant: React.FC = () => {
   }, [messages]);
 
   const predefinedQuestions = [
-    "Phân tích profile tài chính và đề xuất chiến lược cho tôi",
-    "Đặt vé máy bay cho tôi đi Đà Nẵng",
-    "Vay 500 triệu để mua nhà",
-    "Đặt phòng khách sạn 3 đêm", 
-    "Chuyển khoản 10 triệu cho bạn",
-    "Làm thế nào để nâng cấp lên cấp bậc Diamond với SVT?",
-    "Tối ưu hóa việc sử dụng hệ sinh thái Sovico như thế nào?"
+    "Agent đặt vé từ Hà Nội đi Phú Quốc ngày 25/10 cho 2 người",
+    "Agent mở thẻ Visa Platinum HDBank với thu nhập cao",
+    "Agent phân tích profile tài chính và đề xuất chiến lược", 
+    "Agent vay 500 triệu để mua nhà ngay",
+    "Agent đặt phòng resort 3 đêm tức thì",
+    "Agent chuyển khoản 10 triệu cho bạn",
+    "Agent nâng cấp lên Diamond với SVT"
   ];
 
   // AI Intent Recognition - Phân tích ý định từ text
@@ -133,17 +133,42 @@ const AIFinancialAssistant: React.FC = () => {
     const normalizedText = text.toLowerCase()
     const actions: ServiceAction[] = []
 
-    // Flight booking intents - Mở rộng keyword detection
+    console.log('🔍 Analyzing intent for:', normalizedText) // Debug
+
+    // Flight booking intents - Yêu cầu thông tin đầy đủ
     if (normalizedText.includes('vé máy bay') || normalizedText.includes('đặt vé') || 
         normalizedText.includes('bay') || normalizedText.includes('chuyến bay') ||
         normalizedText.includes('vietjet') || normalizedText.includes('máy bay') ||
         (normalizedText.includes('đi') && (normalizedText.includes('vé') || normalizedText.includes('bay'))) ||
-        normalizedText.includes('book flight') || normalizedText.includes('flight')) {
+        normalizedText.includes('book flight') || normalizedText.includes('flight') ||
+        normalizedText.includes('agent')) {
+      
+      console.log('✈️ Flight booking intent detected') // Debug
+      
+      // Kiểm tra xem có đủ thông tin chi tiết không
+      const hasOrigin = extractLocation(normalizedText, 'origin')
+      const hasDestination = extractLocation(normalizedText, 'destination')
+      const hasDate = extractDate(normalizedText)
+      const hasPassengerCount = extractPassengerCount(normalizedText)
+      
+      console.log('📍 Origin:', hasOrigin, 'Destination:', hasDestination, 'Date:', hasDate, 'Passengers:', hasPassengerCount) // Debug
+      
+      // Nếu thiếu thông tin, không tạo action mà sẽ yêu cầu thông tin
+      if (!hasOrigin || !hasDestination || !hasDate) {
+        console.log('❌ Missing flight information - not creating action') // Debug
+        return [] // Không tạo action, để AI hỏi thông tin
+      }
+      
+      console.log('✅ Creating flight booking action') // Debug
       actions.push({
         id: `flight_${Date.now()}`,
         service: 'vietjet',
         action: 'book_flight',
         params: {
+          origin: hasOrigin,
+          destination: hasDestination,
+          departure_date: hasDate,
+          passenger_count: hasPassengerCount || 1,
           flight_type: normalizedText.includes('quốc tế') || normalizedText.includes('nước ngoài') ? 'international' : 'domestic',
           ticket_class: normalizedText.includes('thương gia') || normalizedText.includes('business') ? 'business' : 'economy'
         },
@@ -164,6 +189,32 @@ const AIFinancialAssistant: React.FC = () => {
           loan_type: normalizedText.includes('nhà') ? 'home' : 
                     normalizedText.includes('xe') ? 'car' : 
                     normalizedText.includes('kinh doanh') ? 'business' : 'personal'
+        },
+        status: 'pending'
+      })
+    }
+
+    // Card opening intents - Mở thẻ ngân hàng
+    if (normalizedText.includes('mở thẻ') || normalizedText.includes('làm thẻ') || 
+        normalizedText.includes('đăng ký thẻ') || normalizedText.includes('tạo thẻ') ||
+        normalizedText.includes('thẻ tín dụng') || normalizedText.includes('thẻ visa') ||
+        normalizedText.includes('open card') || normalizedText.includes('credit card')) {
+      
+      // Determine card type from text
+      let cardType = 'classic'
+      if (normalizedText.includes('platinum') || normalizedText.includes('bạch kim')) cardType = 'platinum'
+      else if (normalizedText.includes('gold') || normalizedText.includes('vàng')) cardType = 'gold'
+      else if (normalizedText.includes('signature') || normalizedText.includes('cao cấp')) cardType = 'signature'
+      else if (normalizedText.includes('vietjet')) cardType = 'vietjet'
+      
+      actions.push({
+        id: `card_${Date.now()}`,
+        service: 'hdbank',
+        action: 'open_card',
+        params: {
+          card_type: cardType,
+          income_verification: normalizedText.includes('thu nhập cao') || normalizedText.includes('lương cao'),
+          delivery_method: normalizedText.includes('nhận tại nhà') ? 'home' : 'branch'
         },
         status: 'pending'
       })
@@ -244,11 +295,214 @@ const AIFinancialAssistant: React.FC = () => {
     return 2 // Default 2 nights
   }
 
+  // Extract location from text - Enhanced version
+  const extractLocation = (text: string, type: 'origin' | 'destination'): string | null => {
+    // Normalize Vietnamese characters
+    const normalizedText = text.toLowerCase()
+      .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
+      .replace(/è|é|ẻ|ẽ|ẹ|ê|ề|ế|ể|ễ|ệ/g, 'e')
+      .replace(/ì|í|ỉ|ĩ|ị/g, 'i')
+      .replace(/ò|ó|ỏ|õ|ọ|ô|ồ|ố|ổ|ỗ|ộ|ơ|ờ|ớ|ở|ỡ|ợ/g, 'o')
+      .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
+      .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
+      .replace(/đ/g, 'd')
+    
+    console.log('🔍 Extracting location from:', normalizedText) // Debug
+    
+    const locations = {
+      'ha noi': 'HAN',
+      'hanoi': 'HAN',
+      'thu do': 'HAN',
+      'sai gon': 'SGN', 
+      'ho chi minh': 'SGN',
+      'tphcm': 'SGN',
+      'saigon': 'SGN',
+      'da nang': 'DAD',
+      'danang': 'DAD',
+      'phu quoc': 'PQC',
+      'phuquoc': 'PQC',
+      'nha trang': 'CXR',
+      'nhatrang': 'CXR',
+      'cam ranh': 'CXR',
+      'da lat': 'DLI',
+      'dalat': 'DLI',
+      'can tho': 'VCA',
+      'cantho': 'VCA',
+      'tokyo': 'NRT',
+      'nhat ban': 'NRT',
+      'seoul': 'ICN',
+      'han quoc': 'ICN',
+      'singapore': 'SIN',
+      'bangkok': 'BKK',
+      'thai lan': 'BKK'
+    }
+
+    // Strategy 1: Direct location match
+    for (const [name, code] of Object.entries(locations)) {
+      if (normalizedText.includes(name)) {
+        console.log(`✅ Found location (direct): ${name} -> ${code}`) // Debug
+        return code
+      }
+    }
+    
+    // Strategy 2: Pattern matching for Vietnamese structure
+    if (type === 'origin') {
+      // Look for "từ X" or "từ X đi" patterns
+      const patterns = [
+        /tu\s+([a-z\s]+?)(?:\s+di\s+|\s+den\s+|$)/,
+        /dat\s+ve\s+tu\s+([a-z\s]+?)(?:\s+di\s+|\s+den\s+)/
+      ]
+      
+      for (const pattern of patterns) {
+        const match = normalizedText.match(pattern)
+        if (match) {
+          const location = match[1].trim()
+          console.log(`🔍 Found origin pattern: "${location}"`) // Debug
+          for (const [name, code] of Object.entries(locations)) {
+            if (location.includes(name)) {
+              console.log(`✅ Matched origin: ${name} -> ${code}`) // Debug
+              return code
+            }
+          }
+        }
+      }
+    } else {
+      // Look for "đi X" or "đến X" patterns
+      const patterns = [
+        /(?:di|den)\s+([a-z\s]+?)(?:\s+ngay|\s+\d|$)/,
+        /(?:di|den)\s+([a-z\s]+?)(?:\s+cho|\s+ve)/
+      ]
+      
+      for (const pattern of patterns) {
+        const match = normalizedText.match(pattern)
+        if (match) {
+          const location = match[1].trim()
+          console.log(`🔍 Found destination pattern: "${location}"`) // Debug
+          for (const [name, code] of Object.entries(locations)) {
+            if (location.includes(name)) {
+              console.log(`✅ Matched destination: ${name} -> ${code}`) // Debug
+              return code
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`❌ No location found for type: ${type}`) // Debug
+    return null
+  }
+
+  // Extract date from text - Enhanced version
+  const extractDate = (text: string): string | null => {
+    console.log('📅 Extracting date from:', text) // Debug
+    
+    // Normalize text for better matching
+    const normalizedText = text.toLowerCase()
+    
+    // Tìm pattern ngày tháng
+    const datePatterns = [
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // DD/MM/YYYY
+      /(\d{1,2})-(\d{1,2})-(\d{4})/,   // DD-MM-YYYY
+      /(\d{1,2})\/(\d{1,2})/,          // DD/MM (current year)
+      /(\d{1,2})-(\d{1,2})/,           // DD-MM (current year)
+      /ngay\s+(\d{1,2})\/(\d{1,2})/,   // ngày DD/MM
+      /ngay\s+(\d{1,2})-(\d{1,2})/,    // ngày DD-MM
+      /(\d{1,2})\s+(thang\s+)?(\d{1,2})/,  // DD tháng MM
+    ]
+
+    for (const pattern of datePatterns) {
+      const match = normalizedText.match(pattern)
+      if (match) {
+        let day, month, year
+        
+        if (pattern.source.includes('ngay')) {
+          // Pattern with "ngày"
+          day = match[1]
+          month = match[2]
+          year = new Date().getFullYear()
+        } else if (pattern.source.includes('thang')) {
+          // Pattern with "tháng"
+          day = match[1]
+          month = match[3]
+          year = new Date().getFullYear()
+        } else {
+          // Standard DD/MM patterns
+          day = match[1]
+          month = match[2]
+          year = match[3] || new Date().getFullYear()
+        }
+        
+        const result = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+        console.log(`✅ Found date pattern: ${match[0]} -> ${result}`) // Debug
+        return result
+      }
+    }
+
+    // Tìm từ khóa ngày
+    const today = new Date()
+    if (normalizedText.includes('hom nay') || normalizedText.includes('hôm nay')) {
+      const result = today.toISOString().split('T')[0]
+      console.log(`✅ Found "hôm nay" -> ${result}`) // Debug
+      return result
+    } else if (normalizedText.includes('ngay mai') || normalizedText.includes('ngày mai')) {
+      const tomorrow = new Date(today)
+      tomorrow.setDate(today.getDate() + 1)
+      const result = tomorrow.toISOString().split('T')[0]
+      console.log(`✅ Found "ngày mai" -> ${result}`) // Debug
+      return result
+    } else if (normalizedText.includes('tuan sau') || normalizedText.includes('tuần sau')) {
+      const nextWeek = new Date(today)
+      nextWeek.setDate(today.getDate() + 7)
+      const result = nextWeek.toISOString().split('T')[0]
+      console.log(`✅ Found "tuần sau" -> ${result}`) // Debug
+      return result
+    }
+
+    console.log(`❌ No date found`) // Debug
+    return null
+  }
+
+  // Extract passenger count from text
+  const extractPassengerCount = (text: string): number => {
+    console.log('👥 Extracting passenger count from:', text) // Debug
+    
+    const passengerMatch = text.match(/(\d+)\s*(nguoi|khach|hanh khach|người|khách|hành khách)/)
+    if (passengerMatch) {
+      const count = parseInt(passengerMatch[1])
+      console.log(`✅ Found passenger count: ${count}`) // Debug
+      return count
+    }
+    
+    // Tìm từ khóa số lượng
+    if (text.includes('hai nguoi') || text.includes('hai người') || text.includes('2 nguoi') || text.includes('2 người')) {
+      console.log(`✅ Found "hai người" -> 2`) // Debug
+      return 2
+    }
+    if (text.includes('ba nguoi') || text.includes('ba người') || text.includes('3 nguoi') || text.includes('3 người')) {
+      console.log(`✅ Found "ba người" -> 3`) // Debug
+      return 3
+    }
+    if (text.includes('bon nguoi') || text.includes('bốn người') || text.includes('4 nguoi') || text.includes('4 người')) {
+      console.log(`✅ Found "bốn người" -> 4`) // Debug
+      return 4
+    }
+    if (text.includes('gia dinh') || text.includes('gia đình')) {
+      console.log(`✅ Found "gia đình" -> 4`) // Debug
+      return 4 // Giả định gia đình 4 người
+    }
+
+    console.log(`⚠️ No passenger count found, defaulting to 1`) // Debug
+    return 1 // Mặc định 1 người
+  }
+
   // Execute service actions
   const executeActions = async (actions: ServiceAction[], messageId: string) => {
+    console.log('🚀 Starting executeActions with:', actions.length, 'actions') // Debug
     setIsProcessing(true)
     
     for (const action of actions) {
+      console.log('⚙️ Processing action:', action) // Debug
+      
       // Update action status to executing
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
@@ -259,6 +513,8 @@ const AIFinancialAssistant: React.FC = () => {
       try {
         // Call the actual service API
         const apiUrl = getApiUrl(action.service, action.action)
+        console.log('📡 Calling API:', apiUrl, 'with params:', action.params) // Debug
+        
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -269,8 +525,10 @@ const AIFinancialAssistant: React.FC = () => {
         })
 
         const result = await response.json()
+        console.log('📤 API Response:', result) // Debug
         
         if (result.success) {
+          console.log('✅ Action completed successfully') // Debug
           // Update action status to completed
           setMessages(prev => prev.map(msg => 
             msg.id === messageId 
@@ -284,7 +542,7 @@ const AIFinancialAssistant: React.FC = () => {
         }
 
       } catch (error) {
-        console.error('Service execution failed:', error)
+        console.error('❌ Service execution failed:', error) // Debug
         // Update action status to failed
         setMessages(prev => prev.map(msg => 
           msg.id === messageId 
@@ -301,6 +559,8 @@ const AIFinancialAssistant: React.FC = () => {
     // Add completion message
     const completedActions = actions.filter(a => a.status === 'completed').length
     const totalActions = actions.length
+    
+    console.log(`🏁 ExecuteActions completed: ${completedActions}/${totalActions}`) // Debug
     
     const completionMessage: Message = {
       id: `completion_${Date.now()}`,
@@ -320,6 +580,7 @@ const AIFinancialAssistant: React.FC = () => {
       case 'hdbank':
         if (action === 'transfer') return `${baseUrl}/hdbank/transfer`
         if (action === 'loan') return `${baseUrl}/hdbank/loan`
+        if (action === 'open_card') return `${baseUrl}/hdbank/open-card`
         return ''
       case 'resort':
         if (action === 'book_room') return `${baseUrl}/resort/book-room`
@@ -352,8 +613,29 @@ const AIFinancialAssistant: React.FC = () => {
         const currentModel = genAI.getGenerativeModel({ model: modelName });
         
         // Professional System Prompt
-        const systemPrompt = `Bạn là một Trợ lý Tài chính AI chuyên nghiệp của Tập đoàn Sovico.
-Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên dữ liệu 360° của khách hàng.
+        const systemPrompt = `Bạn là một Agent AI tài chính thông minh của Tập đoàn Sovico.
+Vai trò: KHÔNG CHỈ TƯ VẤN mà còn THỰC THI các dịch vụ tự động khi có đủ thông tin.
+
+**🤖 CHẾ ĐỘ AGENT - THỰC THI TỰ ĐỘNG:**
+✅ **AGENT MODE**: Khi khách hàng yêu cầu cụ thể → Thực hiện ngay lập tức
+⚡ **Auto-execute**: Đặt vé máy bay, chuyển khoản, đặt phòng khi có đủ thông tin
+🎯 **Proactive**: Không hỏi xác nhận, trực tiếp thực hiện yêu cầu
+💪 **Action-oriented**: "Đang thực hiện...", "Agent đang xử lý...", "Hoàn tất!"
+
+**QUAN TRỌNG VỀ ĐẶT VÉ MÁY BAY:**
+🚀 **CÓ ĐỦ THÔNG TIN** (điểm đi + điểm đến + ngày bay) → Thực hiện đặt vé NGAY LẬP TỨC
+❓ **THIẾU THÔNG TIN** → Hỏi cụ thể và khẳng định sẽ đặt vé khi có đủ
+Thông tin cần thiết:
+1. 📍 **Điểm đi** (ví dụ: Hà Nội, TP.HCM, Đà Nẵng...)
+2. 📍 **Điểm đến** (ví dụ: Phú Quốc, Nha Trang, Singapore...)
+3. 📅 **Ngày bay** (cụ thể DD/MM/YYYY hoặc "ngày mai", "tuần sau"...)
+4. 👥 **Số hành khách** (mặc định 1 người nếu không nói)
+5. 💺 **Hạng vé** (mặc định Economy nếu không nói)
+
+**QUY TRÌNH AGENT:**
+- ✅ **CÓ ĐỦ INFO** → Thực hiện tức thì, thông báo "Agent đang xử lý..."
+- ❓ **THIẾU INFO** → Hỏi ngắn gọn, khẳng định "Agent sẽ đặt ngay khi có đủ thông tin"
+- 🚀 **Luôn thể hiện tính chủ động**: "Tôi sẽ thực hiện...", "Đang đặt vé...", "Hoàn tất!"
 
 **KIẾN THỨC NỀN TẢNG VỀ HỆ SINH THÁI SOVICO:**
 
@@ -387,7 +669,8 @@ Nhiệm vụ của bạn là đưa ra lời khuyên cá nhân hóa dựa trên d
 4. Luôn bao gồm chiến lược tích lũy SVT
 5. Sử dụng format Markdown với emoji để dễ đọc
 6. Đưa ra timeline và action steps cụ thể
-7. Tính toán ROI và lợi ích số liệu cụ thể`;
+7. Tính toán ROI và lợi ích số liệu cụ thể
+8. **ĐẶC BIỆT: Luôn hỏi đủ thông tin trước khi đặt vé máy bay**`;
 
         // Build complete prompt with user profile
         const fullPrompt = `${systemPrompt}
@@ -434,6 +717,91 @@ Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chín
 
   const generateLocalResponse = (userMessage: string): string => {
     const lowerMessage = userMessage.toLowerCase();
+    
+    // Flight booking
+    if (lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') || 
+        lowerMessage.includes('bay') || lowerMessage.includes('vietjet')) {
+      
+      // Check if all required info is present
+      const hasOrigin = extractLocation(lowerMessage, 'origin')
+      const hasDestination = extractLocation(lowerMessage, 'destination') 
+      const hasDate = extractDate(lowerMessage)
+      const hasPassengerCount = extractPassengerCount(lowerMessage)
+      
+      if (!hasOrigin || !hasDestination || !hasDate) {
+        return `✈️ **Đặt vé máy bay Vietjet**
+
+Tôi là Agent AI của bạn và sẽ đặt vé ngay khi có đủ thông tin! 
+
+📍 **Thông tin còn thiếu:**
+${!hasOrigin ? '• Điểm đi (ví dụ: Hà Nội, TP.HCM, Đà Nẵng...)' : '✅ Điểm đi: ' + hasOrigin}
+${!hasDestination ? '• Điểm đến (ví dụ: Phú Quốc, Nha Trang, Singapore...)' : '✅ Điểm đến: ' + hasDestination}
+${!hasDate ? '• Ngày bay (ví dụ: 15/10/2025, ngày mai, tuần sau...)' : '✅ Ngày bay: ' + hasDate}
+• Số hành khách: ${hasPassengerCount} người
+• Hạng vé: Economy (có thể upgrade lên Business)
+
+🤖 **Agent sẽ tự động đặt vé khi bạn cung cấp đủ thông tin!**
+
+🎯 **Ví dụ hoàn chỉnh:**
+"Đặt vé từ Hà Nội đi Phú Quốc ngày 20/10 cho 2 người"
+
+💡 **Ưu đãi đặc biệt:**
+• Bay với Vietjet: +100 SVT/chuyến
+• Thanh toán qua HDBank: +0.1% cashback
+• Thành viên Gold: Miễn phí chọn chỗ ngồi
+
+Hãy cung cấp thông tin còn thiếu để Agent đặt vé cho bạn! 🎫`;
+      }
+      
+      return `✈️ **Agent đang xử lý đặt vé máy bay**
+
+🤖 **THÔNG BÁO: Agent mode ON** - Tôi sẽ thực hiện đặt vé ngay bây giờ!
+
+📋 **Thông tin chuyến bay:**
+• Từ: ${hasOrigin}
+• Đến: ${hasDestination} 
+• Ngày: ${hasDate}
+• Hành khách: ${hasPassengerCount} người
+• Hạng: Economy
+
+� **Agent đang thực hiện:**
+1. Kiểm tra chuyến bay khả dụng
+2. So sánh giá tốt nhất
+3. Đặt vé và thanh toán
+4. Gửi boarding pass về email
+5. Cập nhật SVT token reward
+
+⚡ Bạn không cần làm gì thêm, Agent sẽ hoàn tất tất cả!`;
+    }
+    
+    // Card opening - Mở thẻ ngân hàng
+    if (lowerMessage.includes('mở thẻ') || lowerMessage.includes('làm thẻ') || 
+        lowerMessage.includes('thẻ tín dụng') || lowerMessage.includes('thẻ visa')) {
+      return `💳 **Agent mở thẻ HDBank ngay lập tức**
+
+🤖 **THÔNG BÁO: Agent mode ON** - Đang xử lý mở thẻ cho bạn!
+
+🏦 **Thông tin thẻ được đề xuất:**
+• Loại thẻ: Visa ${lowerMessage.includes('platinum') ? 'Platinum' : lowerMessage.includes('gold') ? 'Gold' : 'Classic'}
+• Hạn mức: Dựa trên thu nhập và profile
+• Phí thường niên: Miễn phí năm đầu
+• Ưu đãi: Cashback 2%, tích điểm không giới hạn
+
+🚀 **Agent đang thực hiện:**
+1. Kiểm tra điều kiện tài chính
+2. Đánh giá credit score
+3. Chọn thẻ phù hợp nhất
+4. Xử lý hồ sơ và duyệt tự động
+5. Sản xuất và giao thẻ tận nơi
+
+💎 **Lợi ích đặc biệt:**
+• Tích 100 SVT khi mở thẻ thành công
+• Liên kết với Vietjet Miles
+• Ưu đãi tại Sovico Resort
+• Chuyển đổi điểm thành SVT
+
+⚡ Thẻ sẽ được giao trong 3-5 ngày làm việc!`;
+    }
     
     // Đầu tư
     if (lowerMessage.includes('đầu tư') || lowerMessage.includes('investment')) {
@@ -582,61 +950,66 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
     // Analyze user intent for service actions
     const actions = analyzeIntent(currentInput);
 
-    if (actions.length > 0) {
-      // Create AI response with detected actions
-      const actionsList = actions.map(a => {
-        switch (a.service) {
-          case 'vietjet':
-            return `✈️ Đặt vé máy bay (${a.params.flight_type === 'international' ? 'Quốc tế' : 'Nội địa'})`
-          case 'hdbank':
-            if (a.action === 'loan') return `💰 Vay tiền ${(a.params.loan_amount / 1000000).toFixed(0)} triệu VNĐ`
-            if (a.action === 'transfer') return `💳 Chuyển khoản ${(a.params.amount / 1000000).toFixed(0)} triệu VNĐ`
-            return `🏦 Dịch vụ ngân hàng HDBank`
-          case 'resort':
-            if (a.action === 'book_room') return `🏨 Đặt phòng ${a.params.nights} đêm`
-            if (a.action === 'spa_booking') return `💆‍♀️ Đặt lịch Spa`
-            return `🏖️ Dịch vụ Resort`
-          default:
-            return '🔧 Dịch vụ khác'
+    setIsLoading(true);
+    
+    try {
+      // Luôn tạo AI response thông minh trước (dù có hay không có actions)
+      let aiResponse = '';
+      
+      if (useGemini) {
+        try {
+          aiResponse = await generateGeminiResponse(currentInput);
+        } catch (error) {
+          console.error('Gemini failed, falling back to local response:', error);
+          aiResponse = generateLocalResponse(currentInput);
         }
-      }).join('\n• ')
+      } else {
+        aiResponse = generateLocalResponse(currentInput);
+      }
 
+      // Nếu có actions, thêm thông báo Agent vào response
+      if (actions.length > 0) {
+        const actionsList = actions.map(a => {
+          switch (a.service) {
+            case 'vietjet':
+              return `✈️ Đặt vé máy bay (${a.params.flight_type === 'international' ? 'Quốc tế' : 'Nội địa'})`
+            case 'hdbank':
+              if (a.action === 'loan') return `💰 Vay tiền ${(a.params.loan_amount / 1000000).toFixed(0)} triệu VNĐ`
+              if (a.action === 'transfer') return `💳 Chuyển khoản ${(a.params.amount / 1000000).toFixed(0)} triệu VNĐ`
+              if (a.action === 'open_card') return `💳 Mở thẻ ${a.params.card_type.toUpperCase()} HDBank`
+              return `🏦 Dịch vụ ngân hàng HDBank`
+            case 'resort':
+              if (a.action === 'book_room') return `🏨 Đặt phòng ${a.params.nights} đêm`
+              if (a.action === 'spa_booking') return `💆‍♀️ Đặt lịch Spa`
+              return `🏖️ Dịch vụ Resort`
+            default:
+              return '🔧 Dịch vụ khác'
+          }
+        }).join('\n• ')
+
+        aiResponse += `\n\n🤖 **Agent sẽ thực hiện:**\n• ${actionsList}\n\n⏳ Đang xử lý yêu cầu...`;
+      }
+
+      // Tạo AI message với cả response và actions (nếu có)
       const aiMessage: Message = {
         id: `ai_${Date.now()}`,
         type: 'ai',
-        content: `🎯 Tôi hiểu rồi! Bạn muốn:\n\n• ${actionsList}\n\n⏳ Đang thực hiện các yêu cầu này cho bạn...`,
+        content: aiResponse,
         timestamp: new Date(),
-        actions: actions
-      }
-
-      setMessages(prev => [...prev, aiMessage]);
-
-      // Execute the actions
-      await executeActions(actions, aiMessage.id);
-      return;
-    }
-
-    // No specific actions detected, use normal AI chat
-    setIsLoading(true);
-
-    try {
-      let aiResponseContent;
-      if (useGemini) {
-        aiResponseContent = await generateGeminiResponse(currentInput);
-      } else {
-        aiResponseContent = generateLocalResponse(currentInput);
-      }
-
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: aiResponseContent,
-        timestamp: new Date()
+        actions: actions.length > 0 ? actions : undefined
       };
 
-      setMessages(prev => [...prev, aiResponse]);
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Nếu có actions, thực hiện chúng sau khi AI đã trả lời
+      if (actions.length > 0) {
+        setTimeout(() => {
+          executeActions(actions, aiMessage.id);
+        }, 1500); // Delay để user đọc được response trước
+      }
+
     } catch (error: any) {
-      console.error('❌ Error generating response:', error);
+      console.error('Error generating AI response:', error);
       
       let errorMessage = '❌ **Xin lỗi, AI gặp sự cố**\n\n';
       
@@ -645,28 +1018,21 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
         errorMessage += '• API có thể bị giới hạn hoặc model không khả dụng\n';
         errorMessage += '• Đang chuyển sang chế độ tư vấn cơ bản\n\n';
         errorMessage += generateLocalResponse(currentInput);
-      } else if (error.message && error.message.includes('fetch')) {
-        errorMessage += '🌐 **Vấn đề kết nối mạng:**\n';
-        errorMessage += '• Kiểm tra kết nối internet\n';
-        errorMessage += '• Thử lại sau vài giây\n';
       } else {
         errorMessage += '⚠️ **Lỗi không xác định:**\n';
         errorMessage += '• Vui lòng thử lại hoặc liên hệ support\n';
-        errorMessage += '• Hotline: 1900-1234\n';
       }
       
-      errorMessage += '\n---\n💡 *Tip: Bạn có thể toggle sang "Local AI" để sử dụng tư vấn offline*';
-      
       const errorResponse: Message = {
-        id: (Date.now() + 1).toString(),
+        id: `error_${Date.now()}`,
         type: 'ai',
         content: errorMessage,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorResponse]);
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
 
   const handleQuestionClick = (question: string) => {
