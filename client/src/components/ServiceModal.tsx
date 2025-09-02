@@ -99,8 +99,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
           <HDBankCard 
             customerId={userData?.customerId || 1001}
             onSuccess={() => {
-              // Có thể thêm logic để refresh data hoặc show notification
               console.log('HDBank service completed successfully');
+              // Đóng modal sau khi mở thẻ thành công
+              setTimeout(() => {
+                onClose();
+              }, 2000); // Đợi 2 giây để user thấy thông báo thành công
             }}
           />
         )

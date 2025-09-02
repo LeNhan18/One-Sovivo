@@ -123,6 +123,36 @@ class HDBankTransaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 
+class HDBankCard(db.Model):
+    __tablename__ = 'hdbank_cards'
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False, index=True)
+    card_id = db.Column(db.String(50), unique=True, nullable=False)
+    card_number = db.Column(db.String(20), nullable=False)
+    card_type = db.Column(db.Enum('classic', 'gold', 'platinum'), nullable=False)
+    card_name = db.Column(db.String(100), nullable=False)
+    credit_limit = db.Column(db.BigInteger, nullable=False)
+    annual_fee = db.Column(db.BigInteger, nullable=False)
+    status = db.Column(db.Enum('active', 'blocked', 'expired'), default='active')
+    opened_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    expiry_date = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'card_id': self.card_id,
+            'card_number': f"****-****-****-{self.card_number[-4:]}",
+            'card_type': self.card_type,
+            'card_name': self.card_name,
+            'credit_limit': self.credit_limit,
+            'status': self.status,
+            'opened_date': self.opened_date.strftime('%Y-%m-%d'),
+            'expiry_date': self.expiry_date.strftime('%Y-%m-%d')
+        }
+
+
 class VietjetFlight(db.Model):
     __tablename__ = 'vietjet_flights'
 
@@ -2629,29 +2659,27 @@ def check_customer_has_card(customer_id):
 
 
 def get_customer_card_info(customer_id):
-    """Lấy thông tin thẻ của khách hàng"""
+    """Lấy thông tin thẻ của khách hàng từ bảng hdbank_cards"""
     try:
-        card_tx = HDBankTransaction.query.filter(
-            HDBankTransaction.customer_id == customer_id,
-            HDBankTransaction.description.like('%Mở thẻ HDBank%')
-        ).first()
+        # Tìm thẻ trong bảng hdbank_cards
+        card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
         
-        if card_tx:
-            # Parse thông tin từ description
-            description = card_tx.description
-            card_name = description.split(" - ")[0].replace("Mở thẻ ", "")
-            card_number = description.split("Số thẻ: ")[1] if "Số thẻ: " in description else "****-****-****-0000"
-            
+        if card:
             return {
                 "has_card": True,
-                "card_id": card_tx.transaction_id,
-                "card_name": card_name,
-                "card_number": f"****-****-****-{card_number[-4:]}",
-                "opened_date": card_tx.transaction_date.strftime('%Y-%m-%d')
+                "card_id": card.card_id,
+                "card_name": card.card_name,
+                "card_number": f"****-****-****-{card.card_number[-4:]}",
+                "card_type": card.card_type,
+                "credit_limit": card.credit_limit,
+                "opened_date": card.opened_date.strftime('%Y-%m-%d'),
+                "expiry_date": card.expiry_date.strftime('%Y-%m-%d'),
+                "status": card.status
             }
         else:
             return {"has_card": False}
-    except:
+    except Exception as e:
+        print(f"❌ Error in get_customer_card_info: {e}")
         return {"has_card": False}
 
 
@@ -3141,17 +3169,62 @@ def hdbank_open_card():
         
         card_info = card_config.get(card_type, card_config['classic'])
         
-        # Tạo transaction mở thẻ
+        # Kiểm tra khách hàng đã có thẻ chưa
+        existing_card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
+        if existing_card:
+            return jsonify({
+                "success": False,
+                "message": "Khách hàng đã có thẻ HDBank rồi"
+            }), 400
+        
+        # Get current balance for customer
+        latest_tx = HDBankTransaction.query.filter_by(customer_id=customer_id).order_by(HDBankTransaction.transaction_date.desc()).first()
+        current_balance = latest_tx.balance if latest_tx else 0
+        
+        # Tạo thông tin thẻ trong bảng hdbank_cards
+        expiry_date = datetime.datetime.now() + datetime.timedelta(days=365*4)  # Thẻ hết hạn sau 4 năm
+        new_card = HDBankCard(
+            customer_id=customer_id,
+            card_id=card_id,
+            card_number=card_number,
+            card_type=card_type,
+            card_name=card_info['name'],
+            credit_limit=card_info['credit_limit'],
+            annual_fee=card_info['annual_fee'],
+            status='active',
+            opened_date=datetime.datetime.now(),
+            expiry_date=expiry_date
+        )
+        db.session.add(new_card)
+        
+        # Tạo transaction mở thẻ chính thức (cho tất cả loại thẻ)
         card_opening_tx = HDBankTransaction(
             customer_id=customer_id,
             transaction_id=card_id,
-            transaction_type="card_opening",
-            amount=-card_info['annual_fee'],  # Trừ phí mở thẻ (nếu có)
+            transaction_type="credit" if card_type == 'classic' else "debit",
+            amount=0 if card_type == 'classic' else card_info['annual_fee'],
+            balance=current_balance if card_type == 'classic' else current_balance - card_info['annual_fee'],
             description=f"Mở thẻ {card_info['name']} - Số thẻ: {card_number}",
-            transaction_date=datetime.datetime.now(),
-            status="approved"
+            transaction_date=datetime.datetime.now()
         )
         db.session.add(card_opening_tx)
+        
+        # Cập nhật balance sau khi mở thẻ
+        if card_type != 'classic':
+            current_balance = current_balance - card_info['annual_fee']
+        
+        # Tạo transaction phí (nếu có phí)
+        if card_info['annual_fee'] > 0:
+            fee_tx = HDBankTransaction(
+                customer_id=customer_id,
+                transaction_id=f"FEE{int(time.time())}",
+                transaction_type="debit",  # Debit for fee
+                amount=card_info['annual_fee'],
+                balance=current_balance,
+                description=f"Phí thường niên {card_info['name']}",
+                transaction_date=datetime.datetime.now()
+            )
+            db.session.add(fee_tx)
         
         # Tạo SVT reward cho việc mở thẻ
         token_tx = TokenTransaction(
@@ -3166,14 +3239,15 @@ def hdbank_open_card():
         
         # Nếu là thẻ free (classic), tặng thêm bonus
         if card_type == 'classic':
+            new_balance = current_balance + 1000000  # Tặng 1 triệu VND
             welcome_bonus = HDBankTransaction(
                 customer_id=customer_id,
                 transaction_id=f"WELCOME{int(time.time())}",
-                transaction_type="welcome_bonus",
-                amount=1000000,  # Tặng 1 triệu VND
+                transaction_type="credit",  # Credit for bonus
+                amount=1000000,
+                balance=new_balance,
                 description="Thưởng chào mừng mở thẻ Classic",
-                transaction_date=datetime.datetime.now(),
-                status="approved"
+                transaction_date=datetime.datetime.now()
             )
             db.session.add(welcome_bonus)
         
