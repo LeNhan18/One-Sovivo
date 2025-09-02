@@ -10,6 +10,8 @@ interface CardInfo {
   card_id?: string;
   card_name?: string;
   card_number?: string;
+  card_type?: string;
+  credit_limit?: number;
   opened_date?: string;
 }
 
@@ -44,58 +46,45 @@ interface DashboardData {
   };
 }
 
-const BankIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+// Modern Bank Icon Component
+const BankIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-);
-
-const CreditCardIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-  </svg>
-);
-
-const CheckIcon = () => (
-  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
   </svg>
 );
 
 const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
   const [openingCard, setOpeningCard] = useState(false);
   const [processingService, setProcessingService] = useState<string | null>(null);
-  const [message, setMessage] = useState<string>('');
 
   const fetchDashboard = async () => {
     try {
       setLoading(true);
       console.log('🔍 HDBankCard Debug - Customer ID:', customerId);
       
-      // Add cache busting
-      const timestamp = new Date().getTime();
-      const response = await fetch(`http://127.0.0.1:5000/api/service/hdbank/dashboard/${customerId}?_t=${timestamp}`);
+      const response = await fetch(`http://127.0.0.1:5000/api/service/hdbank/dashboard/${customerId}?_t=${Date.now()}`);
       const data = await response.json();
       
       console.log('🔍 HDBankCard Debug - Dashboard Response:', data);
       
-      if (data.success) {
+      if (response.ok && data.success) {
         setDashboardData(data);
+        setMessage('');
       } else {
-        console.log('❌ Dashboard failed, checking if need auto-fix...');
-        // Check if this might be an existing customer without card record
-        if (data.error && (data.error.includes('Customer ID') || data.error.includes('not found'))) {
-          console.log('🔧 Attempting auto-fix for missing customer card...');
-          await attemptAutoFix();
-        } else {
-          setMessage(data.message || 'Lỗi tải dữ liệu');
+        console.error('❌ Dashboard fetch failed:', data);
+        setMessage(data.message || 'Không thể tải dữ liệu dashboard');
+        
+        // Auto-fix for existing customers
+        if (data.message && data.message.includes('chưa có thẻ')) {
+          attemptAutoFix();
         }
       }
-    } catch (error) {
-      console.error('Error fetching dashboard:', error);
-      setMessage('Lỗi kết nối server');
+    } catch (err) {
+      console.error('❌ Dashboard fetch error:', err);
+      setMessage('Lỗi kết nối. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -112,7 +101,6 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
       if (response.ok && data.success) {
         console.log('✅ Auto-fix successful, rechecking dashboard...');
         setMessage('🔧 Đã tự động tạo thẻ cho tài khoản hiện có. Đang tải lại...');
-        // Recheck dashboard after auto-fix
         setTimeout(() => {
           fetchDashboard();
         }, 1500);
@@ -150,7 +138,6 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
 
       if (result.success) {
         setMessage(`🎉 ${result.message}`);
-        // Refresh dashboard sau khi mở thẻ thành công
         setTimeout(() => {
           fetchDashboard();
           onSuccess?.();
@@ -175,12 +162,11 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
         customer_id: customerId
       };
 
-      // Customize request based on service type
       if (serviceType === 'transfer') {
-        requestBody.amount = 5000000; // 5 triệu VND default
+        requestBody.amount = 5000000;
         requestBody.transfer_type = 'internal';
       } else if (serviceType === 'loan') {
-        requestBody.loan_amount = 50000000; // 50 triệu VND default
+        requestBody.loan_amount = 50000000;
         requestBody.loan_type = 'personal';
       }
 
@@ -196,18 +182,13 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
 
       if (result.success) {
         setMessage(`✅ ${result.message}`);
-        // Refresh dashboard to update transaction history
         setTimeout(() => {
           fetchDashboard();
           onSuccess?.();
         }, 2000);
       } else {
-        // Nếu lỗi do chưa có thẻ, hiển thị thông báo đặc biệt
         if (result.error_code === 'NO_CARD') {
           setMessage(`⚠️ ${result.message}`);
-          // Auto scroll to open card section
-          const openCardSection = document.getElementById('open-card-section');
-          openCardSection?.scrollIntoView({ behavior: 'smooth' });
         } else {
           setMessage(`❌ ${result.message}`);
         }
@@ -222,128 +203,229 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
 
   if (loading) {
     return (
-      <div className="bg-[#161B22] rounded-xl p-6">
+      <div className="bg-gradient-to-br from-[#0B1426] via-[#1A2332] to-[#161B22] rounded-2xl border border-blue-500/20 shadow-2xl p-6">
         <div className="flex items-center space-x-3 mb-4">
           <BankIcon />
           <h3 className="text-lg font-semibold text-white">HDBank</h3>
         </div>
-        <div className="text-gray-400">Đang tải...</div>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-3 text-gray-400">Đang tải...</span>
+        </div>
       </div>
     );
   }
 
   if (!dashboardData) {
     return (
-      <div className="bg-[#161B22] rounded-xl p-6">
-        <div className="text-red-400">{message || 'Không thể tải dữ liệu'}</div>
+      <div className="bg-gradient-to-br from-[#0B1426] via-[#1A2332] to-[#161B22] rounded-2xl border border-red-500/20 shadow-2xl p-6">
+        <div className="text-center">
+          <div className="text-red-400 text-lg mb-2">⚠️ Lỗi kết nối</div>
+          <div className="text-gray-400">{message || 'Không thể tải dữ liệu'}</div>
+          <button 
+            onClick={fetchDashboard}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#161B22] rounded-xl p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <BankIcon />
-          <div>
-            <h3 className="text-lg font-semibold text-white">HDBank</h3>
-            <p className="text-sm text-gray-400">Dịch vụ ngân hàng số</p>
-          </div>
+    <div className="bg-gradient-to-br from-[#0B1426] via-[#1A2332] to-[#161B22] rounded-2xl border border-blue-500/20 shadow-2xl overflow-hidden">
+      {/* Modern Header with HDBank Branding */}
+      <div className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 p-6">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-300 rounded-full blur-2xl"></div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-400">Khách hàng</p>
-          <p className="text-white font-medium">{dashboardData.customer_name}</p>
+        
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            {/* HDBank Logo Container */}
+            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
+              <img 
+                src="./Image/hdbank.jpg" 
+                alt="HDBank" 
+                className="w-8 h-8 rounded-lg object-cover"
+                onError={(e) => {
+                  // Fallback to icon if image not found
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'block';
+                }}
+              />
+              <BankIcon className="hidden w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white flex items-center">
+                HDBank
+                <span className="ml-2 px-2 py-1 bg-white/20 rounded-full text-xs font-medium">
+                  Digital Banking
+                </span>
+              </h3>
+              <p className="text-blue-100 text-sm opacity-90">
+                {dashboardData.customer_name} • ID: {dashboardData.customer_id}
+              </p>
+            </div>
+          </div>
+          
+          {/* Status Indicator */}
+          <div className="flex items-center space-x-2">
+            <div className={`w-3 h-3 rounded-full ${dashboardData.has_card ? 'bg-green-400' : 'bg-orange-400'} animate-pulse`}></div>
+            <span className="text-white text-sm font-medium">
+              {dashboardData.has_card ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Message Display */}
       {message && (
-        <div className="mb-4 p-3 rounded-lg bg-blue-900/30 border border-blue-500/30">
+        <div className="m-6 p-4 rounded-xl bg-blue-900/30 border border-blue-500/30 backdrop-blur-sm">
           <p className="text-sm text-blue-300">{message}</p>
         </div>
       )}
 
-      {/* No Card State */}
+      {/* Card Opening Section - Modern Design */}
       {!dashboardData.has_card && dashboardData.action_required && (
-        <div id="open-card-section" className="text-center py-8">
-          <div className="mb-6">
-            <CreditCardIcon />
-            <h4 className="text-xl font-semibold text-white mb-2">
-              {dashboardData.action_required.title}
-            </h4>
-            <p className="text-gray-400 mb-4">
-              {dashboardData.action_required.description}
-            </p>
-          </div>
-
-          {/* Benefits */}
-          <div className="bg-[#0D1117] rounded-lg p-4 mb-6">
-            <h5 className="text-white font-medium mb-3">🎁 Quyền lợi đặc biệt:</h5>
-            <div className="space-y-2">
-              {dashboardData.action_required.benefits.map((benefit, index) => (
-                <div key={index} className="flex items-center space-x-2 text-sm">
-                  <CheckIcon />
-                  <span className="text-gray-300">{benefit}</span>
+        <div className="p-6">
+          {/* Main Card Preview */}
+          <div className="relative mb-8">
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-6 shadow-xl transform perspective-1000 hover:rotate-y-5 transition-transform duration-500">
+              {/* Card Background Pattern */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute top-4 right-4 w-16 h-16 border-2 border-white/30 rounded-full"></div>
+                <div className="absolute bottom-4 left-4 w-12 h-12 border border-white/20 rounded-lg"></div>
+              </div>
+              
+              <div className="relative">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h4 className="text-white font-bold text-lg mb-1">HDBank Classic</h4>
+                    <p className="text-blue-100 text-sm opacity-90">Miễn phí thường niên</p>
+                  </div>
+                  <div className="w-12 h-8 bg-white/20 rounded backdrop-blur-sm flex items-center justify-center">
+                    <span className="text-white font-bold text-xs">VISA</span>
+                  </div>
                 </div>
-              ))}
+                
+                <div className="mb-6">
+                  <div className="text-white/80 text-sm mb-1">Card Number</div>
+                  <div className="font-mono text-white text-lg tracking-wider">•••• •••• •••• {String(dashboardData.customer_id).slice(-4)}</div>
+                </div>
+                
+                <div className="flex justify-between items-end">
+                  <div>
+                    <div className="text-white/80 text-xs mb-1">Cardholder</div>
+                    <div className="text-white font-medium text-sm uppercase">{dashboardData.customer_name}</div>
+                  </div>
+                  <div>
+                    <div className="text-white/80 text-xs mb-1">Valid Thru</div>
+                    <div className="text-white font-mono text-sm">12/28</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Open Card Button */}
+          {/* Benefits Grid */}
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            {dashboardData.action_required.benefits.map((benefit, index) => (
+              <div key={index} className="bg-gradient-to-br from-blue-50/5 to-indigo-50/5 border border-blue-500/20 rounded-xl p-4 backdrop-blur-sm hover:border-blue-400/40 transition-colors">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-green-400 to-blue-500 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                    ✓
+                  </div>
+                  <span className="text-gray-300 text-sm flex-1">{benefit}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA Button */}
           <button
             onClick={handleOpenCard}
             disabled={openingCard}
-            className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
+            className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-300 ${
               openingCard
                 ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105'
+                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
             }`}
           >
             {openingCard ? (
-              <span className="flex items-center justify-center space-x-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Đang mở thẻ...</span>
+              <span className="flex items-center justify-center space-x-3">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Đang xử lý...</span>
               </span>
             ) : (
-              dashboardData.action_required.button_text
+              <span className="flex items-center justify-center space-x-2">
+                <span>🎯</span>
+                <span>{dashboardData.action_required.button_text}</span>
+              </span>
             )}
           </button>
+          
+          {/* Trust Indicators */}
+          <div className="mt-6 flex items-center justify-center space-x-6 text-gray-400 text-xs">
+            <span className="flex items-center space-x-1">
+              <span>🔒</span>
+              <span>Bảo mật 256-bit</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span>⚡</span>
+              <span>Duyệt tức thì</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span>🏆</span>
+              <span>Ngân hàng #1</span>
+            </span>
+          </div>
         </div>
       )}
 
-      {/* Has Card State */}
+      {/* Has Card State - Already activated */}
       {dashboardData.has_card && dashboardData.card_info && (
-        <div>
-          {/* Card Info */}
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-4 mb-6 text-white">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-semibold">{dashboardData.card_info.card_name}</h4>
-              <CreditCardIcon />
+        <div className="p-6">
+          {/* Success Card Display */}
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-6 mb-6 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="font-bold text-lg">{dashboardData.card_info.card_name}</h4>
+                <p className="text-green-100 text-sm opacity-90">Đã kích hoạt thành công</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">✅</span>
+              </div>
             </div>
-            <p className="text-lg font-mono tracking-wider">
+            <p className="text-xl font-mono tracking-wider mb-2">
               {dashboardData.card_info.card_number}
             </p>
-            <div className="flex justify-between text-sm mt-3">
+            <div className="flex justify-between text-sm">
               <span>Ngày mở: {dashboardData.card_info.opened_date}</span>
-              <span>✅ Hoạt động</span>
+              {dashboardData.card_info.credit_limit && (
+                <span>Hạn mức: {(dashboardData.card_info.credit_limit / 1000000).toFixed(0)}M VND</span>
+              )}
             </div>
           </div>
 
           {/* Account Summary */}
           {dashboardData.account_summary && (
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-[#0D1117] rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Số dư hiện tại</p>
-                <p className="text-white font-semibold">
+              <div className="bg-gradient-to-br from-blue-50/5 to-indigo-50/5 border border-blue-500/20 rounded-xl p-4">
+                <div className="text-gray-400 text-sm mb-1">Số dư hiện tại</div>
+                <div className="text-white font-bold text-lg">
                   {dashboardData.account_summary.current_balance.toLocaleString()} VND
-                </p>
+                </div>
               </div>
-              <div className="bg-[#0D1117] rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Giao dịch</p>
-                <p className="text-white font-semibold">
+              <div className="bg-gradient-to-br from-purple-50/5 to-pink-50/5 border border-purple-500/20 rounded-xl p-4">
+                <div className="text-gray-400 text-sm mb-1">Giao dịch</div>
+                <div className="text-white font-bold text-lg">
                   {dashboardData.account_summary.total_transactions}
-                </p>
+                </div>
               </div>
             </div>
           )}
@@ -351,29 +433,32 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
           {/* Available Services */}
           {dashboardData.available_services && dashboardData.available_services.length > 0 && (
             <div>
-              <h5 className="text-white font-medium mb-3">Dịch vụ có sẵn:</h5>
+              <h5 className="text-white font-medium mb-4 flex items-center">
+                <span className="mr-2">🚀</span>
+                Dịch vụ khả dụng
+              </h5>
               <div className="space-y-3">
                 {dashboardData.available_services.map((service, index) => (
                   <button
                     key={index}
                     onClick={() => handleServiceAction(service.type, service.endpoint)}
                     disabled={processingService === service.type}
-                    className={`w-full p-4 rounded-lg border border-gray-600 hover:border-blue-500 transition-all text-left ${
+                    className={`w-full p-4 rounded-xl border text-left transition-all ${
                       processingService === service.type
-                        ? 'bg-gray-700 cursor-not-allowed'
-                        : 'bg-[#0D1117] hover:bg-[#1C2128]'
+                        ? 'bg-gray-700 text-gray-400 border-gray-600 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border-indigo-500/30 text-white hover:border-indigo-400 hover:from-indigo-600/30 hover:to-purple-600/30'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <span className="text-2xl">{service.icon}</span>
                         <div>
-                          <h6 className="text-white font-medium">{service.title}</h6>
-                          <p className="text-gray-400 text-sm">{service.description}</p>
+                          <h6 className="font-medium">{service.title}</h6>
+                          <p className="text-sm text-gray-400">{service.description}</p>
                         </div>
                       </div>
                       {processingService === service.type && (
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                       )}
                     </div>
                   </button>
