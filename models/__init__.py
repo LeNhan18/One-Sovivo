@@ -1,28 +1,67 @@
 # models/__init__.py
 """
-Database Models Module
-Chứa tất cả các model để mapping với database tables
+Models package for One-Sovico Platform
+Handles all database models with lazy initialization to avoid circular imports
 """
 
-# Import các models sau khi đã init database
-def import_models():
-    from .user import User
-    from .customer import Customer
-    from .transactions import HDBankTransaction, VietjetFlight, ResortBooking, TokenTransaction
-    from .achievements import Achievement, CustomerAchievement
-    from .missions import CustomerMission, CustomerMissionProgress
-    from .marketplace import MarketplaceItem, P2PListing
+# Global variables for database instances
+db = None
+bcrypt = None
+
+def init_models(database, bcrypt_instance):
+    """Initialize all models with database and bcrypt instances"""
+    global db, bcrypt
+    db = database
+    bcrypt = bcrypt_instance
     
+    # Import models after db is initialized
+    from . import user, customer, transactions, achievements, missions, marketplace
+    
+    # Initialize each model module
+    user.init_db(db, bcrypt)
+    customer.init_db(db)
+    transactions.init_db(db)
+    achievements.init_db(db)
+    missions.init_db(db)
+    marketplace.init_db(db)
+    
+    # Return model classes for convenience
     return {
-        'User': User, 'Customer': Customer,
-        'HDBankTransaction': HDBankTransaction, 'VietjetFlight': VietjetFlight, 
-        'ResortBooking': ResortBooking, 'TokenTransaction': TokenTransaction,
-        'Achievement': Achievement, 'CustomerAchievement': CustomerAchievement,
-        'CustomerMission': CustomerMission, 'CustomerMissionProgress': CustomerMissionProgress,
-        'MarketplaceItem': MarketplaceItem, 'P2PListing': P2PListing
+        'User': user.User,
+        'Customer': customer.Customer,
+        'HDBankTransaction': transactions.HDBankTransaction,
+        'VietjetFlight': transactions.VietjetFlight,
+        'ResortBooking': transactions.ResortBooking,
+        'TokenTransaction': transactions.TokenTransaction,
+        'Achievement': achievements.Achievement,
+        'CustomerAchievement': achievements.CustomerAchievement,
+        'CustomerMission': missions.CustomerMission,
+        'CustomerMissionProgress': missions.CustomerMissionProgress,
+        'MarketplaceItem': marketplace.MarketplaceItem,
+        'P2PListing': marketplace.P2PListing
     }
 
-# Import individual modules for database injection
-from . import user, customer, transactions, achievements, missions, marketplace
+def get_models():
+    """Get all model classes after initialization"""
+    if db is None:
+        raise RuntimeError("Models not initialized. Call init_models() first.")
+    
+    # Import models to get the initialized classes
+    from . import user, customer, transactions, achievements, missions, marketplace
+    
+    return {
+        'User': user.User,
+        'Customer': customer.Customer,
+        'HDBankTransaction': transactions.HDBankTransaction,
+        'VietjetFlight': transactions.VietjetFlight,
+        'ResortBooking': transactions.ResortBooking,
+        'TokenTransaction': transactions.TokenTransaction,
+        'Achievement': achievements.Achievement,
+        'CustomerAchievement': achievements.CustomerAchievement,
+        'CustomerMission': missions.CustomerMission,
+        'CustomerMissionProgress': missions.CustomerMissionProgress,
+        'MarketplaceItem': marketplace.MarketplaceItem,
+        'P2PListing': marketplace.P2PListing
+    }
 
-__all__ = ['import_models', 'user', 'customer', 'transactions', 'achievements', 'missions', 'marketplace']
+__all__ = ['init_models', 'get_models']

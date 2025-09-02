@@ -6,7 +6,6 @@ import { AIInsights } from '../parts/AIInsights'
 import { ActionsPanel } from '../parts/ActionsPanel'
 import { ModelMetrics } from '../parts/ModelMetrics'
 import BlockchainDashboard from '../components/BlockchainDashboard'
-import TransactionHistory from '../components/TransactionHistory'
 
 export type CustomerBasic = {
   customer_id: number
@@ -140,12 +139,37 @@ export const Dashboard: React.FC = () => {
         {showMetrics ? (
           <ModelMetrics onClose={() => setShowMetrics(false)} />
         ) : activeTab === 'blockchain' ? (
-          <TransactionHistory />
+          <BlockchainDashboard 
+            customerId={selectedId || undefined} 
+            onBackToAnalysis={() => setActiveTab('analysis')}
+          />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Column 1: Search & Suggestions */}
             <div className="space-y-6">
               <SearchPanel onPickCustomer={setSelectedId} />
+              
+              {/* Blockchain Navigation Hint */}
+              {selectedId && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-purple-800">
+                        🔗 Khám phá Blockchain Achievements
+                      </h3>
+                      <p className="text-sm text-purple-700 mt-1">
+                        Chuyển sang tab Blockchain để xem NFT Passport và simulation
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('blockchain')}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
+                    >
+                      Xem Blockchain
+                    </button>
+                  </div>
+                </div>
+              )}
               
               {/* Quick Stats Card */}
               <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
