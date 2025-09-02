@@ -59,18 +59,18 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [achievementsCount, setAchievementsCount] = useState(0)
-  
+
   // Welcome Screen state
   const [showWelcome, setShowWelcome] = useState(true)
   const welcomeRef = useRef<HTMLDivElement>(null)
-  
+
   // Debug: Log showWelcome state
   console.log('🎉 SuperApp Debug - showWelcome:', showWelcome)
-  
+
   // Modal states - Tự thao tác (Buffet style)
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
   const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
-  
+
   // AI Agent states - Được phục vụ (Waiter style)
   const [showAIAgent, setShowAIAgent] = useState(false)
 
@@ -80,17 +80,17 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
     const handleScroll = () => {
       if (!welcomeRef.current) return
-      
+
       const scrollY = welcomeRef.current.scrollTop
       const windowHeight = window.innerHeight
       const scrollPercent = Math.min(scrollY / windowHeight, 1)
-      
+
       // Parallax effect for background
       const bgElements = document.querySelectorAll('.parallax-bg')
       bgElements.forEach((el) => {
         ;(el as HTMLElement).style.transform = `translateY(${scrollY * 0.5}px)`
       })
-      
+
       // Fade effect for app preview section
       const appPreview = document.getElementById('app-preview')
       if (appPreview) {
@@ -98,14 +98,14 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         const fadeStart = 0.2
         const fadeEnd = 0.8
         let opacity = 0
-        
+
         if (scrollPercent > fadeStart) {
           opacity = Math.min((scrollPercent - fadeStart) / (fadeEnd - fadeStart), 1)
         }
-        
+
         appPreview.style.opacity = opacity.toString()
         appPreview.style.transform = `translateY(${(1 - opacity) * 50}px)`
-        
+
         // Animate children elements with stagger effect
         const children = appPreview.querySelectorAll('.reveal-item')
         children.forEach((child, index) => {
@@ -115,10 +115,10 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           ;(child as HTMLElement).style.transform = `translateY(${(1 - childOpacity) * 30}px)`
         })
       }
-      
+
       // Auto scroll to next section if user scrolls enough
       if (scrollPercent > 0.9) {
-        document.getElementById('app-preview')?.scrollIntoView({ 
+        document.getElementById('app-preview')?.scrollIntoView({
           behavior: 'smooth',
           block: 'start'
         })
@@ -135,27 +135,27 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
-      
+
       try {
         // Lấy dữ liệu thực từ backend sử dụng customer_id của user
         const customerId = user.customer_id || 1001; // Sử dụng customer_id từ user, fallback 1001
         console.log('🔍 SuperApp Debug - User:', user);
         console.log('🔍 SuperApp Debug - Customer ID:', customerId);
-        
+
         const response = await fetch(`http://127.0.0.1:5000/customer/${customerId}`)
         if (response.ok) {
           const customerData = await response.json()
           console.log('🔍 SuperApp Debug - Customer Data:', customerData);
-          
-          // Lấy dữ liệu token từ blockchain/database  
+
+          // Lấy dữ liệu token từ blockchain/database
           const tokenResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}`)
           const tokenData = tokenResponse.ok ? await tokenResponse.json() : null
-          
+
           // Tính tổng SVT tokens thực từ token_transactions
           const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${customerId}`)
           const tokensInfo = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0 }
           console.log('🔍 SuperApp Debug - Tokens Info:', tokensInfo);
-          
+
           // Tính tier dựa trên SVT balance thực tế
           const calculateTier = (svtBalance: number) => {
             if (svtBalance >= 200000) return 'Diamond';
@@ -193,27 +193,48 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             }
           }
           setUserData(realUserData)
-          
+
+          // Lấy transaction data cho trang chính
+          const transactionResponse = await fetch(`http://127.0.0.1:5000/api/token-transactions/${customerId}`)
+          if (transactionResponse.ok) {
+            const transactionData = await transactionResponse.json()
+            if (transactionData.success) {
+              // Chuyển đổi dữ liệu transaction cho trang chính
+              const recentTransactions = transactionData.transactions.slice(0, 5).map((tx: any) => ({
+                txHash: tx.tx_hash || `0x${Math.random().toString(16).substr(2, 12)}...`,
+                type: tx.transaction_type || 'general',
+                amount: tx.amount > 0 ? `+${tx.amount} SVT` : `${tx.amount} SVT`,
+                time: new Date(tx.created_at).toLocaleDateString('vi-VN')
+              }))
+              
+              // Cập nhật userData với transactions
+              setUserData(prev => ({
+                ...prev,
+                transactions: recentTransactions
+              }))
+            }
+          }
+
           // Lấy mission count từ token transactions thay vì achievements
           const missionResponse = await fetch(`http://127.0.0.1:5000/api/token-transactions/${customerId}`)
           if (missionResponse.ok) {
             const missionData = await missionResponse.json()
             if (missionData.success) {
               // Đếm số mission_reward transactions (missions hoàn thành)
-              const missionCount = missionData.transactions.filter((tx: any) => 
+              const missionCount = missionData.transactions.filter((tx: any) =>
                 tx.transaction_type === 'mission_reward'
               ).length
               setAchievementsCount(missionCount)
             }
           }
-          
+
           // Lấy recommendations từ AI
           const aiResponse = await fetch(`http://127.0.0.1:5000/customer/${customerId}/insights`)
           if (aiResponse.ok) {
             const aiData = await aiResponse.json()
             setRecommendations(aiData.recommendations || [])
           }
-          
+
         } else {
           // Fallback cho user mới (chưa có customer record)
           const newUserData = {
@@ -250,7 +271,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         const fallbackData = {
           customerId: 1001,
           name: user.name,
-          memberTier: "Bronze", 
+          memberTier: "Bronze",
           walletAddress: "0x0000000000000000000000000000000000000000",
           sovicoTokens: 0,
           services: {
@@ -270,10 +291,10 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         }
         setUserData(fallbackData)
       }
-      
+
       setLoading(false)
     }
-    
+
     fetchData()
   }, [user])
 
@@ -290,15 +311,15 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           customer_id: userData?.customerId || 1
         })
       })
-      
+
       const result = await response.json()
-      
+
       if (result.success) {
         alert(`🎉 VIP simulation successful! ${result.achievements_earned} achievements earned, ${result.total_svt_reward} SVT tokens rewarded.`)
-        
+
         // Trigger NFT passport refresh
         setRefreshTrigger(prev => prev + 1)
-        
+
         // Update user data with new SVT tokens
         setUserData(prev => ({
           ...prev,
@@ -347,7 +368,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     return (
       <div className="text-gray-200 font-sans min-h-screen">
         <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
-          <button 
+          <button
             onClick={() => setActiveSection('home')}
             className="text-blue-400 hover:text-blue-300 flex items-center"
           >
@@ -367,7 +388,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     return (
       <div className="text-gray-200 font-sans min-h-screen">
         <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
-          <button 
+          <button
             onClick={() => setActiveSection('home')}
             className="text-blue-400 hover:text-blue-300 flex items-center"
           >
@@ -387,7 +408,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     return (
       <div className="text-gray-200 font-sans min-h-screen">
         <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
-          <button 
+          <button
             onClick={() => setActiveSection('home')}
             className="text-blue-400 hover:text-blue-300 flex items-center"
           >
@@ -407,7 +428,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     return (
       <div className="text-gray-200 font-sans min-h-screen">
         <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
-          <button 
+          <button
             onClick={() => setActiveSection('home')}
             className="text-blue-400 hover:text-blue-300 flex items-center"
           >
@@ -432,13 +453,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             </div>
             <NFTPassport tokenId={userData?.customerId || 1} refreshTrigger={refreshTrigger} />
           </div>
-          
+
           {/* Transaction History Section */}
           <div>
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
               ⛓️ <span className="ml-2">Blockchain Explorer</span>
             </h2>
-            <TransactionHistory />
+            <TransactionHistory customerId={userData?.customerId || 1001} />
           </div>
         </div>
       </div>
@@ -449,15 +470,15 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   if (showWelcome) {
     console.log('🚀 Rendering Welcome Screen...')
     return (
-      <div ref={welcomeRef} className="fixed inset-0 z-[9999] overflow-y-auto scroll-smooth bg-slate-900">
+      <div ref={welcomeRef} className="fixed inset-0 z-[9000] overflow-y-auto scroll-smooth bg-slate-900">
         {/* Welcome Hero Section */}
         <div className="min-h-screen relative flex flex-col" id="welcome-hero">
           {/* Background Image - Thành phố Việt Nam */}
           <div className="absolute inset-0 parallax-bg">
             <div className="w-full h-full bg-gradient-to-br from-blue-900 via-slate-800 to-blue-950"></div>
-            <img 
-              src="./Image/VietNam.jpg" 
-              alt="Việt Nam Beautiful City" 
+            <img
+              src="./Image/VietNam.jpg"
+              alt="Việt Nam Beautiful City"
               className="absolute inset-0 w-full h-full object-cover opacity-80"
               onLoad={() => console.log('✅ VietNam.jpg loaded successfully')}
               onError={(e) => {
@@ -473,7 +494,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             />
             {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-blue-900/40 via-slate-900/60 to-blue-950/80"></div>
-            
+
             {/* Animated Particles */}
             <div className="absolute inset-0">
               <div className="absolute top-20 left-10 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
@@ -488,9 +509,9 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             {/* Logo và Brand */}
             <div className="mb-8 animate-fade-in">
               <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-600 to-slate-700 rounded-3xl flex items-center justify-center shadow-2xl border-4 border-white/20">
-                <img 
-                  src="./Image/sovico.jpg" 
-                  alt="Sovico Group" 
+                <img
+                  src="./Image/sovico.jpg"
+                  alt="Sovico Group"
                   className="w-16 h-16 object-cover rounded-2xl"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -518,7 +539,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 Chào mừng {user.name} đến với hệ sinh thái Sovico
               </h2>
               <p className="text-lg md:text-xl text-blue-100 leading-relaxed drop-shadow-md">
-                Khám phá thế giới đầu tư thông minh và dịch vụ tài chính hiện đại. 
+                Khám phá thế giới đầu tư thông minh và dịch vụ tài chính hiện đại.
                 Nơi công nghệ blockchain gặp gỡ trải nghiệm người dùng tuyệt vời.
               </p>
             </div>
@@ -537,7 +558,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             </button>
 
             {/* Scroll Indicator */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 cursor-pointer scroll-indicator animate-scroll-bounce" 
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 cursor-pointer scroll-indicator animate-scroll-bounce"
                  onClick={() => {
                    // Smooth scroll để trigger reveal effect
                    if (welcomeRef.current) {
@@ -547,52 +568,45 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                      });
                    }
                  }}>
-              <div className="text-white/70 text-center hover:text-white transition-all duration-300 transform hover:scale-110">
-                <div className="text-sm mb-2 animate-pulse">🪄 Kéo xuống để khám phá</div>
-                <div className="w-6 h-10 border-2 border-white/50 rounded-full mx-auto relative hover:border-white/80 transition-all duration-300 hover:shadow-lg hover:shadow-white/20">
-                  <div className="w-1 h-3 bg-white/70 rounded-full absolute top-2 left-1/2 transform -translate-x-1/2 animate-pulse"></div>
-                  <div className="w-1 h-2 bg-gradient-to-b from-white/70 to-transparent rounded-full absolute top-4 left-1/2 transform -translate-x-1/2 animate-bounce delay-200"></div>
-                </div>
-                <div className="text-xs mt-2 opacity-60 animate-bounce">↓ ↓ ↓</div>
-              </div>
+         
             </div>
           </div>
         </div>
 
         {/* Second Section - Preview của App */}
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 relative flex items-center justify-center opacity-0 transform translate-y-12 transition-all duration-1000" 
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 relative flex items-center justify-center opacity-0 transform translate-y-12 transition-all duration-1000"
              id="app-preview" style={{ opacity: 0, transform: 'translateY(50px)' }}>
           <div className="absolute inset-0 opacity-10">
-            <img 
-              src="./Image/VietNam3.jpg" 
-              alt="Vietnam Tech" 
+            <img
+              src="./Image/VietNam3.jpg"
+              alt="Vietnam Tech"
               className="w-full h-full object-cover parallax-bg"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
             />
           </div>
-          
+
           <div className="relative text-center px-6 max-w-4xl mx-auto">
             <h2 className="text-3xl md:text-5xl font-black text-white mb-8 reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
               <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                 Tương lai tài chính trong tầm tay
               </span>
             </h2>
-            
+
             <div className="grid md:grid-cols-3 gap-8 mb-12">
               <div className="bg-blue-900/40 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/30 hover:bg-blue-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
                 <div className="text-4xl mb-4 animate-bounce">💎</div>
                 <h3 className="text-xl font-bold text-white mb-2">Sovico Token</h3>
                 <p className="text-blue-200">Đồng tiền số của hệ sinh thái Sovico Group</p>
               </div>
-              
+
               <div className="bg-purple-900/40 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30 hover:bg-purple-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
                 <div className="text-4xl mb-4 animate-bounce delay-200">🤖</div>
                 <h3 className="text-xl font-bold text-white mb-2">AI Thông minh</h3>
                 <p className="text-purple-200">Trợ lý AI cá nhân cho mọi giao dịch</p>
               </div>
-              
+
               <div className="bg-green-900/40 backdrop-blur-sm rounded-2xl p-6 border border-green-500/30 hover:bg-green-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
                 <div className="text-4xl mb-4 animate-bounce delay-500">⛓️</div>
                 <h3 className="text-xl font-bold text-white mb-2">Blockchain</h3>
@@ -624,9 +638,9 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
       {/* Corporate Hero Background inspired by Sovico Group */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 opacity-15">
-          <img 
-            src="./Image/dragon-hill-sovico-holdings-min.jpg" 
-            alt="Sovico Holdings" 
+          <img
+            src="./Image/dragon-hill-sovico-holdings-min.jpg"
+            alt="Sovico Holdings"
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
@@ -634,18 +648,18 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-950/90 via-slate-900/85 to-blue-900/90"></div>
-        
+
         {/* Corporate Pattern Overlay */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-y-12"></div>
           <div className="absolute bottom-0 right-0 w-full h-full bg-gradient-to-l from-transparent via-blue-300/10 to-transparent transform skew-y-6"></div>
         </div>
-        
+
         {/* Investment Theme Elements */}
         <div className="absolute top-20 right-16 w-48 h-48 opacity-20">
-          <img 
-            src="./Image/inves1.jpg" 
-            alt="Investment" 
+          <img
+            src="./Image/inves1.jpg"
+            alt="Investment"
             className="w-full h-full object-cover rounded-full blur-sm"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
@@ -653,9 +667,9 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           />
         </div>
         <div className="absolute bottom-32 left-16 w-40 h-40 opacity-15">
-          <img 
-            src="./Image/VietNam2.jpg" 
-            alt="Vietnam Development" 
+          <img
+            src="./Image/VietNam2.jpg"
+            alt="Vietnam Development"
             className="w-full h-full object-cover rounded-2xl blur-sm"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
@@ -690,7 +704,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 </div>
               </div>
             </div>
-            
+
             {/* Professional Tier Badge */}
             <div className="bg-gradient-to-r from-slate-800/60 to-blue-800/60 backdrop-blur-sm border border-blue-400/30 rounded-lg px-6 py-4">
               <div className="text-center">
