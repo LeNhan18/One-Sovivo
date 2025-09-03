@@ -22,14 +22,18 @@ interface NFTAchievement {
   unlocked_at: string;
 }
 
-const TransactionHistory: React.FC = () => {
+interface TransactionHistoryProps {
+  customerId?: number;
+}
+
+const TransactionHistory: React.FC<TransactionHistoryProps> = ({ customerId: propCustomerId }) => {
   const [activeTab, setActiveTab] = useState<'transactions' | 'nfts' | 'analytics'>('transactions');
   const [filterPeriod, setFilterPeriod] = useState<'all' | '7d' | '30d' | '90d'>('30d');
   const [filterType, setFilterType] = useState<'all' | 'earn' | 'spend' | 'transfer'>('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [achievements, setAchievements] = useState<NFTAchievement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [customerId, setCustomerId] = useState<number | null>(propCustomerId || null);
   const [totalSVT, setTotalSVT] = useState(0);
 
   // Helper functions
@@ -59,9 +63,16 @@ const TransactionHistory: React.FC = () => {
     }
   };
 
-  // Get customer ID from auth
+  // Get customer ID from props or auth
   useEffect(() => {
     const fetchCustomerId = async () => {
+      // If customerId is provided as prop, use it directly
+      if (propCustomerId) {
+        console.log('🔍 Using provided customer ID:', propCustomerId);
+        setCustomerId(propCustomerId);
+        return;
+      }
+
       try {
         const token = localStorage.getItem('auth_token');
         if (!token) {
@@ -90,7 +101,7 @@ const TransactionHistory: React.FC = () => {
     };
 
     fetchCustomerId();
-  }, []);
+  }, [propCustomerId]);
 
   // Fetch transactions from database
   useEffect(() => {

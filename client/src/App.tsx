@@ -44,56 +44,74 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0D1117]">
-      {/* Top Navigation */}
-      <div className="bg-[#161B22] border-b border-gray-700 p-4 flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <div className="text-white font-bold text-lg">
-            {selectedApp === 'dashboard' ? '🧠 AI Insight Dashboard' : '📱 One-Sovico Super App'}
-          </div>
-          
-          {/* App Switcher for Admin */}
-          {user.role === 'admin' && (
-            <div className="flex bg-[#0D1117] rounded-lg p-1">
+      {/* Enhanced Top Navigation - Chỉ hiển thị khi không phải Welcome Screen */}
+      {!(selectedApp === 'superapp' && user.role === 'customer') && (
+        <div className="relative z-[10000] bg-gradient-to-r from-blue-900 to-slate-800 border-b border-blue-500/30 p-4 flex justify-between items-center shadow-lg">
+          <div className="flex items-center space-x-6">
+            <div className="text-white font-bold text-xl">
+              {selectedApp === 'dashboard' ? '🧠 AI Insight Dashboard' : '📱 One-Sovico Super App'}
+            </div>
+            
+            {/* App Switcher for Admin */}
+            {user.role === 'admin' && (
+              <div className="flex bg-[#0D1117]/50 backdrop-blur rounded-lg p-1 border border-blue-500/30">
+                <button
+                  onClick={() => setSelectedApp('dashboard')}
+                  className={`px-4 py-2 rounded text-sm font-medium transition-all ${
+                    selectedApp === 'dashboard' 
+                      ? 'bg-blue-600 text-white shadow-lg' 
+                      : 'text-blue-200 hover:text-white hover:bg-blue-700/50'
+                  }`}
+                >
+                  📊 Dashboard
+                </button>
+                <button
+                  onClick={() => setSelectedApp('superapp')}
+                  className={`px-4 py-2 rounded text-sm font-medium transition-all ${
+                    selectedApp === 'superapp' 
+                      ? 'bg-blue-600 text-white shadow-lg' 
+                      : 'text-blue-200 hover:text-white hover:bg-blue-700/50'
+                  }`}
+                >
+                  📱 Super App
+                </button>
+              </div>
+            )}
+
+            {/* Customer navigation - show dashboard option */}
+            {user.role === 'customer' && selectedApp === 'superapp' && (
               <button
                 onClick={() => setSelectedApp('dashboard')}
-                className={`px-3 py-1 rounded text-sm ${
-                  selectedApp === 'dashboard' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-400 hover:text-white'
-                }`}
+                className="flex items-center space-x-2 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-200 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
               >
-                Dashboard
+                <span>📊</span>
+                <span>Quay về Dashboard</span>
               </button>
-              <button
-                onClick={() => setSelectedApp('superapp')}
-                className={`px-3 py-1 rounded text-sm ${
-                  selectedApp === 'superapp' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Super App
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <div className="text-gray-300">
-            <span className="text-xs text-gray-500">{user.role === 'admin' ? 'Chuyên viên' : 'Khách hàng'}</span>
-            <div className="font-semibold">{user.name}</div>
+            )}
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-gray-700 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
-          >
-            Đăng xuất
-          </button>
+
+          <div className="flex items-center space-x-6">
+            <div className="text-right">
+              <div className="text-xs text-blue-300 font-medium">
+                {user.role === 'admin' ? '👨‍💼 Chuyên viên' : '👤 Khách hàng'}
+              </div>
+              <div className="font-bold text-white">{user.name}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="group bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
+              <div className="flex items-center space-x-2">
+                <span className="group-hover:rotate-12 transition-transform">🚪</span>
+                <span>Đăng xuất</span>
+              </div>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
-      {selectedApp === 'dashboard' ? <Dashboard /> : <SuperApp user={user} />}
+      {selectedApp === 'dashboard' ? <Dashboard /> : <SuperApp user={user} onLogout={handleLogout} onDashboard={() => setSelectedApp('dashboard')} />}
     </div>
   )
 }
