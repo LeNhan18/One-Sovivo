@@ -3414,17 +3414,14 @@ def resort_book_room():
         }
         total_price = room_prices.get(room_type, 3500000) * nights
         
-        # Thêm resort booking vào database
+        # Thêm resort booking vào database (sử dụng đúng fields của model)
         resort_booking = ResortBooking(
             customer_id=customer_id,
             booking_id=booking_id,
-            resort_name="Sovico Premium Resort",
-            room_type=room_type,
-            check_in_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30)),
-            check_out_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(7, 30) + nights),
+            resort_name=f"Sovico Premium Resort - {room_type.title()} Room",
+            booking_date=datetime.datetime.now(),
             nights_stayed=nights,
-            total_amount=total_price,
-            status="confirmed"
+            booking_value=total_price
         )
         db.session.add(resort_booking)
         
@@ -3490,17 +3487,14 @@ def resort_book_spa():
         }
         spa_price = spa_prices.get(spa_type, 1500000)
         
-        # Thêm spa booking như một resort booking
+        # Thêm spa booking như một resort booking (sử dụng đúng fields của model)
         spa_booking = ResortBooking(
             customer_id=customer_id,
             booking_id=spa_booking_id,
-            resort_name="Sovico Premium Spa",
-            room_type=f"spa_{spa_type}",
-            check_in_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(1, 7)),
-            check_out_date=datetime.datetime.now() + datetime.timedelta(days=random.randint(1, 7)),
+            resort_name=f"Sovico Premium Spa - {spa_type.title()}",
+            booking_date=datetime.datetime.now(),
             nights_stayed=0,  # Spa service, not overnight
-            total_amount=spa_price,
-            status="confirmed"
+            booking_value=spa_price
         )
         db.session.add(spa_booking)
         
