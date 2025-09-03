@@ -1,12 +1,12 @@
 # One-Sovico Platform
 
-🏦 **Hệ thống AI phân tích khách hàng thông minh** cho hệ sinh thái tài chính Sovico
+ **Hệ thống AI phân tích khách hàng thông minh** cho hệ sinh thái tài chính Sovico
 
-## 🎯 Tổng quan
+##  Tổng quan
 
 One-Sovico Platform bao gồm 2 ứng dụng chính:
 
-### 1. 🧠 AI Insight Dashboard (Dành cho Chuyên viên/BGK)
+### 1.  AI Insight Dashboard (Dành cho Chuyên viên/BGK)
 - **Mục đích**: Phòng điều khiển phân tích khách hang với AI
 - **Đối tượng**: Ban Giám khảo, chuyên viên HDBank
 - **Tính năng**:
@@ -15,7 +15,7 @@ One-Sovico Platform bao gồm 2 ứng dụng chính:
   - Đề xuất sản phẩm cá nhân hóa
   - Trực quan hóa hiệu suất Model AI
 
-### 2. 📱 One-Sovico Super App (Dành cho Khách hàng)
+### 2.  One-Sovico Super App (Dành cho Khách hàng)
 - **Mục đích**: Siêu ứng dụng quản lý dịch vụ tài chính
 - **Đối tượng**: Khách hàng cuối
 - **Tính năng**:
@@ -24,7 +24,7 @@ One-Sovico Platform bao gồm 2 ứng dụng chính:
   - Ưu đãi AI cá nhân hóa
   - Lịch sử giao dịch Blockchain minh bạch
 
-## 🛠️ Công nghệ
+##  Công nghệ
 
 ### Backend
 - **Framework**: Flask + SQLAlchemy
@@ -37,7 +37,7 @@ One-Sovico Platform bao gồm 2 ứng dụng chính:
 - **Styling**: Tailwind CSS
 - **Build Tool**: Vite
 
-## 🚀 Cài đặt và Chạy
+##  Cài đặt và Chạy
 
 ### Bước 1: Cài đặt MySQL
 ```bash
@@ -67,7 +67,7 @@ npm run dev
 - **Backend API**: http://127.0.0.1:5000
 - **Frontend**: http://localhost:5173
 
-## 🔐 Demo Accounts
+##  Demo Accounts
 
 ### Chuyên viên (Dashboard)
 - **Email**: `admin@hdbank.com.vn`
@@ -77,7 +77,7 @@ npm run dev
 - **Email**: `khachhang@gmail.com`
 - **Password**: `123456`
 
-## 📊 API Endpoints
+##  API Endpoints
 
 - `POST /auth/login` - Đăng nhập
 - `GET /customer/{id}` - Hồ sơ 360°
@@ -85,7 +85,7 @@ npm run dev
 - `POST /predict` - Dự đoán persona
 - `GET /customers/search?q=...` - Tìm kiếm
 
-## 🧠 AI Model
+##  AI Model
 
 ### Features
 - Tuổi, số dư HDBank, chuyến bay Vietjet, nghỉ dưỡng resort
