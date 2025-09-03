@@ -64,9 +64,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [showWelcome, setShowWelcome] = useState(true)
   const welcomeRef = useRef<HTMLDivElement>(null)
 
-  // Debug: Log showWelcome state
-  console.log('🎉 SuperApp Debug - showWelcome:', showWelcome)
-
   // Modal states - Tự thao tác (Buffet style)
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
   const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
@@ -91,33 +88,8 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         ;(el as HTMLElement).style.transform = `translateY(${scrollY * 0.5}px)`
       })
 
-      // Fade effect for app preview section
-      const appPreview = document.getElementById('app-preview')
-      if (appPreview) {
-        // Bắt đầu fade in khi scroll 20% và hoàn thành ở 80%
-        const fadeStart = 0.2
-        const fadeEnd = 0.8
-        let opacity = 0
-
-        if (scrollPercent > fadeStart) {
-          opacity = Math.min((scrollPercent - fadeStart) / (fadeEnd - fadeStart), 1)
-        }
-
-        appPreview.style.opacity = opacity.toString()
-        appPreview.style.transform = `translateY(${(1 - opacity) * 50}px)`
-
-        // Animate children elements with stagger effect
-        const children = appPreview.querySelectorAll('.reveal-item')
-        children.forEach((child, index) => {
-          const delay = index * 0.1
-          const childOpacity = Math.max(0, Math.min(1, (opacity - delay)))
-          ;(child as HTMLElement).style.opacity = childOpacity.toString()
-          ;(child as HTMLElement).style.transform = `translateY(${(1 - childOpacity) * 30}px)`
-        })
-      }
-
       // Auto scroll to next section if user scrolls enough
-      if (scrollPercent > 0.9) {
+      if (scrollPercent > 0.3) {
         document.getElementById('app-preview')?.scrollIntoView({
           behavior: 'smooth',
           block: 'start'
@@ -132,7 +104,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     }
   }, [showWelcome])
 
-  useEffect(() => {
+ useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
 
@@ -206,7 +178,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 amount: tx.amount > 0 ? `+${tx.amount} SVT` : `${tx.amount} SVT`,
                 time: new Date(tx.created_at).toLocaleDateString('vi-VN')
               }))
-              
+
               // Cập nhật userData với transactions
               setUserData(prev => ({
                 ...prev,
@@ -459,7 +431,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
               ⛓️ <span className="ml-2">Blockchain Explorer</span>
             </h2>
-            <TransactionHistory customerId={userData?.customerId || 1001} />
+            <TransactionHistory />
           </div>
         </div>
       </div>
@@ -468,25 +440,20 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
   // Welcome Screen với hình ảnh Việt Nam đẹp
   if (showWelcome) {
-    console.log('🚀 Rendering Welcome Screen...')
     return (
-      <div ref={welcomeRef} className="fixed inset-0 z-[9000] overflow-y-auto scroll-smooth bg-slate-900">
+      <div ref={welcomeRef} className="fixed inset-0 z-50 overflow-y-auto scroll-smooth">
         {/* Welcome Hero Section */}
         <div className="min-h-screen relative flex flex-col" id="welcome-hero">
           {/* Background Image - Thành phố Việt Nam */}
           <div className="absolute inset-0 parallax-bg">
-            <div className="w-full h-full bg-gradient-to-br from-blue-900 via-slate-800 to-blue-950"></div>
             <img
               src="./Image/VietNam.jpg"
               alt="Việt Nam Beautiful City"
-              className="absolute inset-0 w-full h-full object-cover opacity-80"
-              onLoad={() => console.log('✅ VietNam.jpg loaded successfully')}
+              className="w-full h-full object-cover"
               onError={(e) => {
-                console.log('❌ VietNam.jpg failed, trying VietNam2.jpg...')
                 // Fallback to VietNam2 if VietNam.jpg fails
                 e.currentTarget.src = "./Image/VietNam2.jpg";
                 e.currentTarget.onerror = () => {
-                  console.log('❌ VietNam2.jpg also failed, using gradient only')
                   // Final fallback to solid gradient
                   e.currentTarget.style.display = 'none';
                 };
@@ -556,26 +523,12 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 <span className="group-hover:translate-x-1 transition-transform">→</span>
               </div>
             </button>
-
-            {/* Scroll Indicator */}
-            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 cursor-pointer scroll-indicator animate-scroll-bounce"
-                 onClick={() => {
-                   // Smooth scroll để trigger reveal effect
-                   if (welcomeRef.current) {
-                     welcomeRef.current.scrollTo({
-                       top: window.innerHeight * 0.5,
-                       behavior: 'smooth'
-                     });
-                   }
-                 }}>
-         
-            </div>
           </div>
         </div>
 
         {/* Second Section - Preview của App */}
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 relative flex items-center justify-center opacity-0 transform translate-y-12 transition-all duration-1000"
-             id="app-preview" style={{ opacity: 0, transform: 'translateY(50px)' }}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 relative flex items-center justify-center"
+             id="app-preview">
           <div className="absolute inset-0 opacity-10">
             <img
               src="./Image/VietNam3.jpg"
@@ -587,27 +540,27 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             />
           </div>
 
-          <div className="relative text-center px-6 max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-8 reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
+          <div className="relative text-center px-6 max-w-4xl mx-auto animate-slide-up">
+            <h2 className="text-3xl md:text-5xl font-black text-white mb-8 animate-fade-in">
               <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                 Tương lai tài chính trong tầm tay
               </span>
             </h2>
 
             <div className="grid md:grid-cols-3 gap-8 mb-12">
-              <div className="bg-blue-900/40 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/30 hover:bg-blue-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
+              <div className="bg-blue-900/40 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/30 hover:bg-blue-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl animate-float">
                 <div className="text-4xl mb-4 animate-bounce">💎</div>
                 <h3 className="text-xl font-bold text-white mb-2">Sovico Token</h3>
                 <p className="text-blue-200">Đồng tiền số của hệ sinh thái Sovico Group</p>
               </div>
 
-              <div className="bg-purple-900/40 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30 hover:bg-purple-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
+              <div className="bg-purple-900/40 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30 hover:bg-purple-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl animate-float delay-200">
                 <div className="text-4xl mb-4 animate-bounce delay-200">🤖</div>
                 <h3 className="text-xl font-bold text-white mb-2">AI Thông minh</h3>
                 <p className="text-purple-200">Trợ lý AI cá nhân cho mọi giao dịch</p>
               </div>
 
-              <div className="bg-green-900/40 backdrop-blur-sm rounded-2xl p-6 border border-green-500/30 hover:bg-green-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl reveal-item" style={{ opacity: 0, transform: 'translateY(30px)' }}>
+              <div className="bg-green-900/40 backdrop-blur-sm rounded-2xl p-6 border border-green-500/30 hover:bg-green-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl animate-float delay-500">
                 <div className="text-4xl mb-4 animate-bounce delay-500">⛓️</div>
                 <h3 className="text-xl font-bold text-white mb-2">Blockchain</h3>
                 <p className="text-green-200">Bảo mật tuyệt đối với công nghệ blockchain</p>
@@ -616,8 +569,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
             <button
               onClick={() => setShowWelcome(false)}
-              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-16 py-5 rounded-2xl font-black text-xl transition-all duration-300 transform hover:scale-110 shadow-2xl hover:shadow-yellow-500/25 animate-glow reveal-item"
-              style={{ opacity: 0, transform: 'translateY(30px)' }}
+              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-16 py-5 rounded-2xl font-black text-xl transition-all duration-300 transform hover:scale-110 shadow-2xl hover:shadow-yellow-500/25 animate-glow"
             >
               <span className="flex items-center space-x-3">
                 <span>🚀</span>
@@ -632,7 +584,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   }
 
   // Home page
-  console.log('🏠 Rendering Home page...')
   return (
     <div className="text-gray-200 font-sans min-h-screen bg-gradient-to-br from-[#0C1B2E] via-[#1A2B42] to-[#0F1A2E] relative overflow-hidden">
       {/* Corporate Hero Background inspired by Sovico Group */}
@@ -963,32 +914,23 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           </div>
         </div>
 
-        {/* Enhanced Recent SVT Activity */}
+         {/* Recent SVT Activity */}
         <div>
-          <h2 className="text-2xl font-bold mb-6 text-white flex items-center space-x-3">
-            <span className="text-3xl">⛓️</span>
-            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Hoạt động SVT gần đây
-            </span>
+          <h2 className="text-xl font-bold mb-4 text-white flex items-center space-x-2">
+            <span>⛓️</span>
+            <span>Hoạt động SVT gần đây</span>
             <button 
               onClick={() => setActiveSection('history')}
-              className="ml-auto text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 px-4 py-2 rounded-xl font-medium transition-all duration-300 transform hover:scale-105"
+              className="ml-auto text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
             >
               Xem tất cả
             </button>
           </h2>
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6 shadow-xl">
-            <div className="space-y-4">
+          <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
+            <div className="space-y-3">
               {userData?.transactions?.slice(0, 3).map((tx: any, index: number) => (
                 <TransactionRow key={tx.txHash || index} tx={tx} />
               ))}
-              {(!userData?.transactions || userData.transactions.length === 0) && (
-                <div className="text-center py-8">
-                  <div className="text-6xl mb-4 opacity-50">⛓️</div>
-                  <p className="text-gray-400">Chưa có giao dịch nào</p>
-                  <p className="text-gray-500 text-sm mt-2">Hoàn thành nhiệm vụ để có giao dịch đầu tiên!</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
