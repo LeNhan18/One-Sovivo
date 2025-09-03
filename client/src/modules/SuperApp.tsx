@@ -307,10 +307,31 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   }
 
   const quickActions = [
-    { id: 'wallet', label: 'Portfolio', icon: '📊', description: 'Quản lý danh mục đầu tư' },
-    { id: 'marketplace', label: 'Investments', icon: '�', description: 'Cơ hội đầu tư mới' },
-    { id: 'ai-assistant', label: 'AI Advisor', icon: '🤖', description: 'Tư vấn đầu tư thông minh' },
-    { id: 'history', label: 'Blockchain', icon: '⛓️', description: 'Lịch sử giao dịch' }
+    { 
+      id: 'wallet', 
+      label: 'Wallet SVT', 
+      description: 'Quản lí ví SVT',
+      bgImage: './Image/vÍ.jpg',
+    },
+    { 
+      id: 'marketplace', 
+      label: 'Marketplace', 
+      description: 'Trao đổi',
+      bgImage: './Image/CUAHANG.jpg',
+    },
+    { 
+      id: 'ai-assistant', 
+      label: 'AI Advisor', 
+      description: 'Tư vấn đầu tư thông minh',
+      bgImage: './Image/AI.jpg',
+    },
+    { 
+      id: 'history', 
+      label: 'Blockchain', 
+      description: 'Lịch sử giao dịch',
+      bgImage: './Image/blockchain.webp',
+      icon: '⛓️'
+    }
   ]
 
   // Service modal handlers
@@ -656,17 +677,41 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               </div>
             </div>
 
-            {/* Professional Tier Badge */}
-            <div className="bg-gradient-to-r from-slate-800/60 to-blue-800/60 backdrop-blur-sm border border-blue-400/30 rounded-lg px-6 py-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-2 mb-1">
-                  <div className="text-yellow-400">
-                    <StarIcon />
+            {/* Right side with Tier Badge and Logout Button */}
+            <div className="flex items-center space-x-4">
+              {/* Professional Tier Badge */}
+              <div className="bg-gradient-to-r from-slate-800/60 to-blue-800/60 backdrop-blur-sm border border-blue-400/30 rounded-lg px-6 py-4">
+                <div className="text-center">
+                  <div className="flex items-center justify-center space-x-2 mb-1">
+                    <div className="text-yellow-400">
+                      <StarIcon />
+                    </div>
+                    <span className="text-white font-bold text-lg">{userData?.memberTier}</span>
                   </div>
-                  <span className="text-white font-bold text-lg">{userData?.memberTier}</span>
+                  <span className="text-xs text-blue-300 font-medium">Investment Tier</span>
                 </div>
-                <span className="text-xs text-blue-300 font-medium">Investment Tier</span>
               </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={onLogout}
+                className="group relative bg-gradient-to-r from-red-600/80 to-red-700/80 hover:from-red-500/90 hover:to-red-600/90 backdrop-blur-sm border border-red-400/40 rounded-lg px-6 py-4 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="text-white group-hover:scale-110 transition-transform duration-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-white font-bold text-sm">Đăng xuất</div>
+                    <div className="text-red-200 text-xs">Logout</div>
+                  </div>
+                </div>
+
+                {/* Hover Glow Effect */}
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-red-500/20 to-red-600/20 opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
+              </button>
             </div>
           </div>
         </div>
@@ -727,7 +772,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                   <p className="text-4xl font-black mb-2 bg-gradient-to-r from-white via-blue-100 to-slate-200 bg-clip-text text-transparent">
                     {userData?.sovicoTokens?.toLocaleString('vi-VN')}
                   </p>
-                  <p className="text-blue-200 text-lg font-medium">≈ {(userData?.sovicoTokens * 1000)?.toLocaleString('vi-VN')} VND</p>
                 </div>
                 <div className="text-6xl opacity-70">🏢</div>
               </div>
@@ -748,27 +792,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 </div>
               </div>
 
-              {/* Corporate Action Buttons */}
-              <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => setActiveSection('wallet')}
-                  className="group bg-gradient-to-r from-blue-700/60 to-slate-700/60 hover:from-blue-600/70 hover:to-slate-600/70 backdrop-blur-sm border border-blue-400/40 px-6 py-4 rounded-lg text-sm font-bold transition-all duration-300 transform hover:scale-105"
-                >
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="text-lg group-hover:scale-110 transition-transform">📊</span>
-                    <span>Portfolio</span>
-                  </div>
-                </button>
-                <button 
-                  onClick={() => setActiveSection('marketplace')}
-                  className="group bg-gradient-to-r from-slate-700/60 to-blue-700/60 hover:from-slate-600/70 hover:to-blue-600/70 backdrop-blur-sm border border-blue-400/40 px-6 py-4 rounded-lg text-sm font-bold transition-all duration-300 transform hover:scale-105"
-                >
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="text-lg group-hover:scale-110 transition-transform">�</span>
-                    <span>Investments</span>
-                  </div>
-                </button>
-              </div>
+
             </div>
           </div>
         </div>
@@ -786,21 +810,42 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               <div
                 key={action.id}
                 onClick={() => setActiveSection(action.id as any)}
-                className="group relative bg-gradient-to-br from-slate-800/60 to-blue-900/50 backdrop-blur-sm border border-slate-600/50 rounded-xl p-6 cursor-pointer hover:border-blue-400/60 hover:from-slate-700/70 hover:to-blue-800/60 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
+                className="group relative bg-gradient-to-br from-slate-800/60 to-blue-900/50 backdrop-blur-sm border border-slate-600/50 rounded-xl overflow-hidden cursor-pointer hover:border-blue-400/60 hover:from-slate-700/70 hover:to-blue-800/60 transition-all duration-300 transform hover:scale-105 hover:shadow-xl"
               >
+                {/* Background Image with Overlay */}
+                <div className="absolute inset-0 opacity-30 group-hover:opacity-40 transition-opacity">
+                  <img 
+                    src={action.bgImage} 
+                    alt={action.label}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/60 to-slate-900/30"></div>
+                </div>
+                
                 {/* Corporate Glow Effect */}
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600/10 to-slate-600/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
                 
-                <div className="relative text-center">
+                <div className="relative text-center p-6 h-full flex flex-col justify-center">
                   <div className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300 filter drop-shadow-lg">
                     {action.icon}
                   </div>
-                  <h3 className="font-bold text-white text-lg mb-2">{action.label}</h3>
-                  <p className="text-slate-300 text-sm leading-relaxed">{action.description}</p>
+                  <h3 className="font-bold text-white text-lg mb-2 drop-shadow-md">{action.label}</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed drop-shadow-sm">{action.description}</p>
+                  
+                  {/* Hover Effect Indicator */}
+                  <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="w-8 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto rounded-full"></div>
+                  </div>
                 </div>
                 
                 {/* Professional Shine Effect */}
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-blue-300/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                
+                {/* Corner Accent */}
+                <div className="absolute top-3 right-3 w-3 h-3 bg-gradient-to-br from-blue-400/50 to-cyan-400/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -810,7 +855,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         <div>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-white flex items-center space-x-3">
-              <span className="text-3xl">💎</span>
+              <span className="text-3xl"></span>
               <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                 Dịch vụ của bạn
               </span>
@@ -835,7 +880,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               color="from-red-500 to-orange-500"
               bgImage="./Image/Vietjet.jpg"
               onClick={() => openServiceModal('vietjet')}
-              subtitle="👨‍🍳 Tự thao tác"
+              subtitle=" Tự thao tác"
             />
             <ModernServiceCard 
               icon={<BankIcon />} 
@@ -846,7 +891,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               color="from-blue-500 to-cyan-500"
               bgImage="./Image/hdbank.jpg"
               onClick={() => openServiceModal('hdbank')}
-              subtitle="👨‍🍳 Tự thao tác"
+              subtitle=" Tự thao tác"
             />
             <ModernServiceCard 
               icon={<BuildingIcon />} 
@@ -856,7 +901,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               color="from-green-500 to-emerald-500"
               bgImage="./Image/resort.jpg"
               onClick={() => openServiceModal('resort')}
-              subtitle="👨‍🍳 Tự thao tác"
+              subtitle=" Tự thao tác"
             />
           </div>
           
@@ -873,23 +918,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               />
               <div className="absolute inset-0 bg-gradient-to-r from-purple-900/80 via-blue-900/70 to-indigo-900/80"></div>
             </div>
-            <div className="relative bg-gradient-to-r from-purple-900/40 via-blue-900/40 to-indigo-900/40 border border-purple-500/30 rounded-2xl p-8 backdrop-blur-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-6">
-                  <div className="text-6xl drop-shadow-2xl">🤵</div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-white mb-3 drop-shadow-lg">AI Agent - Trợ lý thông minh</h3>
-                    <p className="text-purple-100 text-lg">Giao việc cho AI và thư giãn. Chỉ cần nói, AI sẽ làm!</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowAIAgent(true)}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-10 py-5 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-2xl border border-white/20"
-                >
-                  Bắt đầu
-                </button>
-              </div>
-            </div>
+
           </div>
         </div>
         
