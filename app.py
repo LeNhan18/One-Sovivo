@@ -54,7 +54,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 # Initialize detailed mission system
-# detailed_mission_system = DetailedMissionSystem()
+detailed_mission_system = DetailedMissionSystem()
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -556,6 +556,697 @@ def get_customer_achievements_api(customer_id):
         
     except Exception as e:
         return jsonify({'error': f'Lỗi khi lấy thành tựu: {str(e)}'}), 500
+
+
+@app.route('/api/admin/assign-achievement', methods=['POST'])
+@require_auth
+def assign_achievement_to_customer():
+    """API cho Admin/Chuyên viên để gán achievement cho khách hàng"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền gán thành tựu'}), 403
+        
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        achievement_id = data.get('achievement_id')
+        admin_note = data.get('admin_note', '')
+        
+        if not customer_id or not achievement_id:
+            return jsonify({'error': 'Thiếu customer_id hoặc achievement_id'}), 400
+        
+        # Kiểm tra customer tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Kiểm tra achievement tồn tại
+        achievement = Achievement.query.get(achievement_id)
+        if not achievement:
+            return jsonify({'error': f'Achievement {achievement_id} không tồn tại'}), 404
+        
+        # Kiểm tra đã có achievement này chưa
+        existing = CustomerAchievement.query.filter_by(
+            customer_id=customer_id,
+            achievement_id=achievement_id
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'error': f'Khách hàng đã có achievement "{achievement.name}" rồi',
+                'unlocked_at': existing.unlocked_at.isoformat() if existing.unlocked_at else None
+            }), 400
+        
+        # Gán achievement cho customer
+        customer_achievement = CustomerAchievement(
+            customer_id=customer_id,
+            achievement_id=achievement_id,
+            unlocked_at=datetime.datetime.utcnow()
+        )
+        db.session.add(customer_achievement)
+        
+        # Thêm SVT token reward nếu có
+        svt_reward = 0
+        if 'Phi công Vàng' in achievement.name:
+            svt_reward = 2000
+        elif 'Phi công Bạc' in achievement.name:
+            svt_reward = 1500
+        elif 'Phi công Đồng' in achievement.name:
+            svt_reward = 1000
+        elif 'VIP' in achievement.name:
+            svt_reward = 1500
+        elif 'du lịch' in achievement.name.lower():
+            svt_reward = 800
+        else:
+            svt_reward = 500  # Default reward
+        
+        # Tạo token transaction
+        if svt_reward > 0:
+            token_tx = TokenTransaction(
+                customer_id=customer_id,
+                transaction_type="achievement_reward",
+                amount=svt_reward,
+                description=f"Admin gán thành tựu: {achievement.name}",
+                tx_hash=f"0x{uuid.uuid4().hex}",
+                block_number=random.randint(1000000, 2000000)
+            )
+            db.session.add(token_tx)
+        
+        # Log admin action
+        admin_log = f"Admin {user.email} gán achievement '{achievement.name}' cho customer {customer_id}"
+        if admin_note:
+            admin_log += f" - Ghi chú: {admin_note}"
+        print(f"🔧 {admin_log}")
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã gán thành tựu "{achievement.name}" cho {customer.name}',
+            'customer_id': customer_id,
+            'customer_name': customer.name,
+            'achievement': {
+                'id': achievement.id,
+                'name': achievement.name,
+                'description': achievement.description,
+                'badge_image_url': achievement.badge_image_url
+            },
+            'svt_reward': svt_reward,
+            'assigned_by': user.email,
+            'assigned_at': customer_achievement.unlocked_at.isoformat()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Lỗi gán thành tựu: {str(e)}'}), 500
+
+
+@app.route('/api/admin/achievements', methods=['GET'])
+@require_auth
+def get_all_achievements():
+    """API để lấy danh sách tất cả achievements có sẵn (cho admin)"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền xem danh sách achievements'}), 403
+        
+        achievements = Achievement.query.all()
+        
+        achievement_list = []
+        for achievement in achievements:
+            # Đếm số customer đã có achievement này
+            customer_count = CustomerAchievement.query.filter_by(
+                achievement_id=achievement.id
+            ).count()
+            
+            achievement_list.append({
+                'id': achievement.id,
+                'name': achievement.name,
+                'description': achievement.description,
+                'badge_image_url': achievement.badge_image_url,
+                'customer_count': customer_count,
+                'created_at': achievement.created_at.isoformat() if achievement.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'achievements': achievement_list,
+            'total': len(achievement_list)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi lấy danh sách achievements: {str(e)}'}), 500
+
+
+@app.route('/api/admin/create-achievement', methods=['POST'])
+@require_auth
+def create_new_achievement():
+    """API cho Admin tạo achievement mới"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền tạo achievement'}), 403
+        
+        data = request.get_json()
+        name = data.get('name')
+        description = data.get('description')
+        badge_image_url = data.get('badge_image_url', '/static/badges/default.png')
+        
+        if not name or not description:
+            return jsonify({'error': 'Thiếu tên hoặc mô tả achievement'}), 400
+        
+        # Kiểm tra tên đã tồn tại chưa
+        existing = Achievement.query.filter_by(name=name).first()
+        if existing:
+            return jsonify({'error': f'Achievement "{name}" đã tồn tại'}), 400
+        
+        # Tạo achievement mới
+        new_achievement = Achievement(
+            name=name,
+            description=description,
+            badge_image_url=badge_image_url
+        )
+        db.session.add(new_achievement)
+        db.session.commit()
+        
+        print(f"🏆 Admin {user.email} tạo achievement mới: {name}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã tạo achievement "{name}" thành công',
+            'achievement': {
+                'id': new_achievement.id,
+                'name': new_achievement.name,
+                'description': new_achievement.description,
+                'badge_image_url': new_achievement.badge_image_url,
+                'created_at': new_achievement.created_at.isoformat()
+            },
+            'created_by': user.email
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Lỗi tạo achievement: {str(e)}'}), 500
+
+
+@app.route('/api/admin/customer/<int:customer_id>/achievements', methods=['GET'])
+@require_auth
+def get_customer_achievements_for_admin(customer_id):
+    """API cho Admin xem tất cả achievements của khách hàng cụ thể"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền xem'}), 403
+        
+        # Kiểm tra customer tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Lấy tất cả achievements có sẵn
+        all_achievements = Achievement.query.all()
+        
+        # Lấy achievements đã có của customer
+        customer_achievements = db.session.query(CustomerAchievement).filter_by(
+            customer_id=customer_id
+        ).all()
+        
+        achieved_ids = {ca.achievement_id for ca in customer_achievements}
+        
+        # Phân loại achievements
+        achieved_list = []
+        available_list = []
+        
+        for achievement in all_achievements:
+            achievement_data = {
+                'id': achievement.id,
+                'name': achievement.name,
+                'description': achievement.description,
+                'badge_image_url': achievement.badge_image_url
+            }
+            
+            if achievement.id in achieved_ids:
+                # Tìm thông tin unlock
+                ca = next(ca for ca in customer_achievements if ca.achievement_id == achievement.id)
+                achievement_data['unlocked_at'] = ca.unlocked_at.isoformat() if ca.unlocked_at else None
+                achieved_list.append(achievement_data)
+            else:
+                available_list.append(achievement_data)
+        
+        # Thống kê hoạt động của customer
+        total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
+        
+        return jsonify({
+            'success': True,
+            'customer': {
+                'customer_id': customer_id,
+                'name': customer.name,
+                'age': customer.age,
+                'city': customer.city,
+                'persona_type': customer.persona_type
+            },
+            'achievements': {
+                'achieved': achieved_list,
+                'available_to_assign': available_list,
+                'total_achieved': len(achieved_list),
+                'total_available': len(available_list)
+            },
+            'customer_stats': {
+                'total_flights': total_flights,
+                'total_resort_nights': int(total_resort_nights),
+                'avg_balance': float(avg_balance),
+                'member_since': customer.created_at.strftime('%Y-%m-%d') if customer.created_at else None
+            },
+            'suggested_achievements': get_suggested_achievements_for_customer(customer_id, total_flights, total_resort_nights, avg_balance)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi lấy thông tin: {str(e)}'}), 500
+
+
+def get_suggested_achievements_for_customer(customer_id, total_flights, total_resort_nights, avg_balance):
+    """Gợi ý achievements phù hợp cho khách hàng dựa trên hoạt động"""
+    suggestions = []
+    
+    # Kiểm tra các achievements đã có
+    existing_achievements = db.session.query(CustomerAchievement.achievement_id).filter_by(
+        customer_id=customer_id
+    ).all()
+    existing_ids = {ea.achievement_id for ea in existing_achievements}
+    
+    # Logic gợi ý dựa trên hoạt động
+    if total_flights >= 20:
+        # Gợi ý Phi công Vàng nếu chưa có
+        gold_pilot = Achievement.query.filter_by(name='Phi công Vàng').first()
+        if gold_pilot and gold_pilot.id not in existing_ids:
+            suggestions.append({
+                'achievement_id': gold_pilot.id,
+                'achievement_name': gold_pilot.name,
+                'reason': f'Khách hàng đã bay {total_flights} chuyến (≥20 chuyến)',
+                'confidence': 'high'
+            })
+    elif total_flights >= 10:
+        # Gợi ý Phi công Bạc
+        silver_pilot = Achievement.query.filter_by(name='Phi công Bạc').first()
+        if silver_pilot and silver_pilot.id not in existing_ids:
+            suggestions.append({
+                'achievement_id': silver_pilot.id,
+                'achievement_name': silver_pilot.name,
+                'reason': f'Khách hàng đã bay {total_flights} chuyến (≥10 chuyến)',
+                'confidence': 'high'
+            })
+    elif total_flights >= 5:
+        # Gợi ý Phi công Đồng
+        bronze_pilot = Achievement.query.filter_by(name='Phi công Đồng').first()
+        if bronze_pilot and bronze_pilot.id not in existing_ids:
+            suggestions.append({
+                'achievement_id': bronze_pilot.id,
+                'achievement_name': bronze_pilot.name,
+                'reason': f'Khách hàng đã bay {total_flights} chuyến (≥5 chuyến)',
+                'confidence': 'high'
+            })
+    
+    # Gợi ý dựa trên số dư
+    if avg_balance >= 100000000:  # ≥ 100 triệu
+        vip_achievement = Achievement.query.filter_by(name='Khách hàng VIP').first()
+        if vip_achievement and vip_achievement.id not in existing_ids:
+            suggestions.append({
+                'achievement_id': vip_achievement.id,
+                'achievement_name': vip_achievement.name,
+                'reason': f'Số dư trung bình {avg_balance:,.0f} VNĐ (≥100 triệu)',
+                'confidence': 'high'
+            })
+    
+    # Gợi ý dựa trên nghỉ dưỡng
+    if total_resort_nights >= 10:
+        traveler_achievement = Achievement.query.filter_by(name='Người du lịch').first()
+        if traveler_achievement and traveler_achievement.id not in existing_ids:
+            suggestions.append({
+                'achievement_id': traveler_achievement.id,
+                'achievement_name': traveler_achievement.name,
+                'reason': f'Đã nghỉ dưỡng {total_resort_nights} đêm (≥10 đêm)',
+                'confidence': 'medium'
+            })
+    
+    return suggestions[:5]  # Giới hạn 5 gợi ý
+
+
+@app.route('/api/admin/bulk-assign-achievements', methods=['POST'])
+@require_auth
+def bulk_assign_achievements():
+    """API gán achievements hàng loạt cho nhiều khách hàng"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền gán hàng loạt'}), 403
+        
+        data = request.get_json()
+        customer_ids = data.get('customer_ids', [])
+        achievement_id = data.get('achievement_id')
+        admin_note = data.get('admin_note', 'Bulk assignment')
+        
+        if not customer_ids or not achievement_id:
+            return jsonify({'error': 'Thiếu customer_ids hoặc achievement_id'}), 400
+        
+        # Kiểm tra achievement tồn tại
+        achievement = Achievement.query.get(achievement_id)
+        if not achievement:
+            return jsonify({'error': f'Achievement {achievement_id} không tồn tại'}), 404
+        
+        success_count = 0
+        errors = []
+        
+        for customer_id in customer_ids:
+            try:
+                # Kiểm tra customer tồn tại
+                customer = Customer.query.filter_by(customer_id=customer_id).first()
+                if not customer:
+                    errors.append(f'Customer {customer_id}: không tồn tại')
+                    continue
+                
+                # Kiểm tra đã có achievement chưa
+                existing = CustomerAchievement.query.filter_by(
+                    customer_id=customer_id,
+                    achievement_id=achievement_id
+                ).first()
+                
+                if existing:
+                    errors.append(f'Customer {customer_id}: đã có achievement này')
+                    continue
+                
+                # Gán achievement
+                customer_achievement = CustomerAchievement(
+                    customer_id=customer_id,
+                    achievement_id=achievement_id,
+                    unlocked_at=datetime.datetime.utcnow()
+                )
+                db.session.add(customer_achievement)
+                
+                # Thêm SVT reward
+                svt_reward = 500  # Default reward for bulk assignment
+                token_tx = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="achievement_reward",
+                    amount=svt_reward,
+                    description=f"Bulk assignment: {achievement.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=random.randint(1000000, 2000000)
+                )
+                db.session.add(token_tx)
+                
+                success_count += 1
+                
+            except Exception as e:
+                errors.append(f'Customer {customer_id}: {str(e)}')
+        
+        db.session.commit()
+        
+        print(f"🔧 Admin {user.email} bulk assigned '{achievement.name}' to {success_count} customers")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã gán "{achievement.name}" cho {success_count} khách hàng',
+            'achievement_name': achievement.name,
+            'success_count': success_count,
+            'total_requested': len(customer_ids),
+            'errors': errors,
+            'assigned_by': user.email
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Lỗi gán hàng loạt: {str(e)}'}), 500
+
+
+@app.route('/api/admin/auto-assign-achievements/<int:customer_id>', methods=['POST'])
+@require_auth
+def auto_assign_achievements(customer_id):
+    """API tự động phân tích và gán achievements cho khách hàng dựa trên dữ liệu thực tế"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền tự động gán achievements'}), 403
+        
+        # Kiểm tra customer tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Thu thập dữ liệu thực tế của khách hàng
+        total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
+        business_flights = VietjetFlight.query.filter_by(customer_id=customer_id, ticket_class='business').count()
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
+        total_resort_spending = db.session.query(db.func.sum(ResortBooking.booking_value)).filter_by(customer_id=customer_id).scalar() or 0
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
+        total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
+        
+        # Lấy achievements đã có
+        existing_achievements = db.session.query(CustomerAchievement.achievement_id).filter_by(
+            customer_id=customer_id
+        ).all()
+        existing_ids = {ea.achievement_id for ea in existing_achievements}
+        
+        # Logic tự động gán achievements
+        assigned_achievements = []
+        total_svt_reward = 0
+        
+        # 1. Achievements bay chở
+        if total_flights >= 20:
+            gold_pilot = Achievement.query.filter_by(name='Phi công Vàng').first()
+            if gold_pilot and gold_pilot.id not in existing_ids:
+                assign_achievement_automatically(customer_id, gold_pilot.id, "Tự động: ≥20 chuyến bay")
+                assigned_achievements.append(gold_pilot.name)
+                total_svt_reward += 2000
+        
+        elif total_flights >= 10:
+            silver_pilot = Achievement.query.filter_by(name='Phi công Bạc').first()
+            if silver_pilot and silver_pilot.id not in existing_ids:
+                assign_achievement_automatically(customer_id, silver_pilot.id, "Tự động: ≥10 chuyến bay")
+                assigned_achievements.append(silver_pilot.name)
+                total_svt_reward += 1500
+        
+        elif total_flights >= 5:
+            bronze_pilot = Achievement.query.filter_by(name='Phi công Đồng').first()
+            if bronze_pilot and bronze_pilot.id not in existing_ids:
+                assign_achievement_automatically(customer_id, bronze_pilot.id, "Tự động: ≥5 chuyến bay")
+                assigned_achievements.append(bronze_pilot.name)
+                total_svt_reward += 1000
+        
+        # 2. VIP based on balance
+        if avg_balance >= 100000000:  # ≥ 100 triệu
+            vip_achievement = Achievement.query.filter_by(name='Khách hàng VIP').first()
+            if vip_achievement and vip_achievement.id not in existing_ids:
+                assign_achievement_automatically(customer_id, vip_achievement.id, f"Tự động: Số dư TB {avg_balance:,.0f} VNĐ")
+                assigned_achievements.append(vip_achievement.name)
+                total_svt_reward += 1500
+        
+        # 3. Du lịch resort
+        if total_resort_nights >= 10:
+            traveler_achievement = Achievement.query.filter_by(name='Người du lịch').first()
+            if traveler_achievement and traveler_achievement.id not in existing_ids:
+                assign_achievement_automatically(customer_id, traveler_achievement.id, f"Tự động: {total_resort_nights} đêm nghỉ dưỡng")
+                assigned_achievements.append(traveler_achievement.name)
+                total_svt_reward += 800
+        
+        # 4. Đầu tư thông minh (có hơn 1000 SVT tokens)
+        current_svt = db.session.execute(
+            db.text("SELECT COALESCE(SUM(amount), 0) FROM token_transactions WHERE customer_id = :customer_id"),
+            {"customer_id": customer_id}
+        ).fetchone()[0] or 0
+        
+        if current_svt >= 1000:
+            investor_achievement = Achievement.query.filter_by(name='Nhà đầu tư thông minh').first()
+            if investor_achievement and investor_achievement.id not in existing_ids:
+                assign_achievement_automatically(customer_id, investor_achievement.id, f"Tự động: Có {current_svt:,.0f} SVT tokens")
+                assigned_achievements.append(investor_achievement.name)
+                total_svt_reward += 500
+        
+        # 5. Người tiên phong (nhiều giao dịch)
+        if total_transactions >= 100:
+            pioneer_achievement = Achievement.query.filter_by(name='Người tiên phong').first()
+            if pioneer_achievement and pioneer_achievement.id not in existing_ids:
+                assign_achievement_automatically(customer_id, pioneer_achievement.id, f"Tự động: {total_transactions} giao dịch")
+                assigned_achievements.append(pioneer_achievement.name)
+                total_svt_reward += 600
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã tự động phân tích và gán {len(assigned_achievements)} achievements cho {customer.name}',
+            'customer': {
+                'customer_id': customer_id,
+                'name': customer.name
+            },
+            'assigned_achievements': assigned_achievements,
+            'total_svt_reward': total_svt_reward,
+            'analysis_data': {
+                'total_flights': total_flights,
+                'business_flights': business_flights,
+                'total_resort_nights': int(total_resort_nights),
+                'total_resort_spending': float(total_resort_spending),
+                'avg_balance': float(avg_balance),
+                'current_svt_tokens': float(current_svt),
+                'total_transactions': total_transactions
+            },
+            'assigned_by': f"Auto-analysis by {user.email}"
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Lỗi tự động gán achievements: {str(e)}'}), 500
+
+
+def assign_achievement_automatically(customer_id, achievement_id, reason):
+    """Helper function để gán achievement tự động"""
+    try:
+        # Gán achievement
+        customer_achievement = CustomerAchievement(
+            customer_id=customer_id,
+            achievement_id=achievement_id,
+            unlocked_at=datetime.datetime.utcnow()
+        )
+        db.session.add(customer_achievement)
+        
+        # Lấy thông tin achievement để tính reward
+        achievement = Achievement.query.get(achievement_id)
+        
+        # Tính SVT reward
+        svt_reward = 500  # Default
+        if 'Phi công Vàng' in achievement.name:
+            svt_reward = 2000
+        elif 'Phi công Bạc' in achievement.name:
+            svt_reward = 1500
+        elif 'Phi công Đồng' in achievement.name:
+            svt_reward = 1000
+        elif 'VIP' in achievement.name:
+            svt_reward = 1500
+        elif 'du lịch' in achievement.name.lower():
+            svt_reward = 800
+        elif 'đầu tư' in achievement.name.lower():
+            svt_reward = 500
+        elif 'tiên phong' in achievement.name.lower():
+            svt_reward = 600
+        
+        # Thêm SVT token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="auto_achievement_reward",
+            amount=svt_reward,
+            description=f"Tự động gán: {achievement.name} - {reason}",
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
+        )
+        db.session.add(token_tx)
+        
+        print(f"🤖 Auto-assigned '{achievement.name}' to customer {customer_id}: {reason}")
+        
+    except Exception as e:
+        print(f"❌ Error auto-assigning achievement: {e}")
+        raise e
+
+
+@app.route('/api/admin/customers/search', methods=['GET'])
+@require_auth
+def search_customers_for_admin():
+    """API cho Admin tìm kiếm khách hàng"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền tìm kiếm khách hàng'}), 403
+        
+        query_param = request.args.get('q', '').strip()
+        limit = int(request.args.get('limit', 20))
+        
+        if not query_param:
+            return jsonify({'error': 'Thiếu từ khóa tìm kiếm'}), 400
+        
+        # Tìm kiếm theo customer_id hoặc tên
+        customers = []
+        
+        # Tìm theo customer_id nếu là số
+        if query_param.isdigit():
+            customer_id = int(query_param)
+            customer = Customer.query.filter_by(customer_id=customer_id).first()
+            if customer:
+                customers.append(customer)
+        
+        # Tìm theo tên (nếu chưa tìm thấy hoặc không phải số)
+        if not customers:
+            customers = Customer.query.filter(
+                Customer.name.contains(query_param)
+            ).limit(limit).all()
+        
+        # Chuẩn bị dữ liệu trả về với thống kê
+        customer_data = []
+        for customer in customers:
+            # Lấy thống kê hoạt động
+            total_flights = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
+            total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            total_transactions = HDBankTransaction.query.filter_by(customer_id=customer.customer_id).count()
+            
+            # Đếm achievements hiện có
+            achievement_count = CustomerAchievement.query.filter_by(customer_id=customer.customer_id).count()
+            
+            customer_data.append({
+                'customer_id': customer.customer_id,
+                'name': customer.name,
+                'age': customer.age,
+                'gender': customer.gender,
+                'city': customer.city,
+                'persona_type': customer.persona_type,
+                'member_since': customer.created_at.strftime('%Y-%m-%d') if customer.created_at else None,
+                'stats': {
+                    'flight_count': total_flights,
+                    'resort_nights': int(total_resort_nights),
+                    'avg_balance': float(avg_balance),
+                    'total_transactions': total_transactions,
+                    'achievement_count': achievement_count
+                }
+            })
+        
+        return jsonify({
+            'success': True,
+            'customers': customer_data,
+            'total_found': len(customer_data),
+            'search_query': query_param
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi tìm kiếm: {str(e)}'}), 500
+
+
+@app.route('/api/admin/auto-assign-achievements', methods=['POST'])
+@require_auth
+def auto_assign_achievements_simple():
+    """API tự động gán achievements cho một khách hàng"""
+    try:
+        # Kiểm tra quyền admin
+        user = request.current_user
+        if user.role != 'admin':
+            return jsonify({'error': 'Chỉ admin mới có quyền tự động gán achievements'}), 403
+        
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        
+        if not customer_id:
+            return jsonify({'error': 'Thiếu customer_id'}), 400
+        
+        # Gọi API auto-assign đã có
+        return auto_assign_achievements(customer_id)
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi tự động gán: {str(e)}'}), 500
 
 
 @app.route('/api/marketplace/items', methods=['GET'])
@@ -3556,6 +4247,539 @@ def init_app():
             print(f"❌ Lỗi khởi tạo: {e}")
             print("💡 Hãy đảm bảo MySQL đang chạy và cấu hình đúng trong config.py")
 
+
+# =============================================================================
+# STATIC ROUTES
+# =============================================================================
+@app.route('/admin/achievements')
+def admin_achievements_page():
+    """Serve admin achievements HTML page"""
+    return send_from_directory('.', 'admin_achievements.html')
+
+@app.route('/admin/achievements/list', methods=['GET'])
+def get_achievements_list():
+    """API lấy danh sách achievements cho React component"""
+    try:
+        achievements = Achievement.query.all()
+        
+        achievement_list = []
+        for achievement in achievements:
+            # Đếm số customer đã có achievement này
+            customer_count = CustomerAchievement.query.filter_by(
+                achievement_id=achievement.id
+            ).count()
+            
+            # Xác định criteria dựa trên tên achievement
+            criteria = {}
+            if 'Phi công Đồng' in achievement.name:
+                criteria = {'flights_required': 5}
+            elif 'Phi công Bạc' in achievement.name:
+                criteria = {'flights_required': 10}
+            elif 'Phi công Vàng' in achievement.name:
+                criteria = {'flights_required': 20}
+            elif 'Khách hàng VIP' in achievement.name:
+                criteria = {'balance_required': 200000000}  # 200M VND
+            elif 'Nhà đầu tư thông minh' in achievement.name:
+                criteria = {'balance_required': 500000000}  # 500M VND
+            elif 'Người du lịch' in achievement.name:
+                criteria = {'resort_nights_required': 10}
+            elif 'Người tiên phong' in achievement.name:
+                criteria = {'svt_balance_required': 1000}
+            
+            achievement_list.append({
+                'id': achievement.id,
+                'name': achievement.name,
+                'description': achievement.description,
+                'badge_image_url': achievement.badge_image_url,
+                'customer_count': customer_count,
+                'created_at': achievement.created_at.isoformat() if achievement.created_at else None,
+                'criteria': criteria if criteria else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'achievements': achievement_list,
+            'total': len(achievement_list)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi lấy danh sách achievements: {str(e)}'}), 500
+
+@app.route('/debug/customer')
+def debug_customer_page():
+    """Serve debug customer HTML page"""
+    return send_from_directory('.', 'debug_customer.html')
+
+@app.route('/admin/customers/search', methods=['GET'])
+def search_customers_for_admin_simple():
+    """API cho Admin tìm kiếm khách hàng (không cần auth)"""
+    try:
+        query_param = request.args.get('q', '').strip()
+        limit = int(request.args.get('limit', 20))
+        
+        if not query_param:
+            return jsonify({'error': 'Thiếu từ khóa tìm kiếm'}), 400
+        
+        # Tìm kiếm theo customer_id hoặc tên
+        customers = []
+        
+        # Tìm theo customer_id nếu là số
+        if query_param.isdigit():
+            customer_id = int(query_param)
+            customer = Customer.query.filter_by(customer_id=customer_id).first()
+            if customer:
+                customers.append(customer)
+        
+        # Tìm theo tên (nếu chưa tìm thấy hoặc không phải số)
+        if not customers:
+            customers = Customer.query.filter(
+                Customer.name.contains(query_param)
+            ).limit(limit).all()
+        
+        # Chuẩn bị dữ liệu trả về với thống kê
+        customer_data = []
+        for customer in customers:
+            # Lấy thống kê hoạt động
+            total_flights = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
+            total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            total_transactions = HDBankTransaction.query.filter_by(customer_id=customer.customer_id).count()
+            
+            # Đếm achievements hiện có
+            achievement_count = CustomerAchievement.query.filter_by(customer_id=customer.customer_id).count()
+            
+            customer_data.append({
+                'customer_id': customer.customer_id,
+                'name': customer.name,
+                'age': customer.age,
+                'gender': customer.gender,
+                'city': customer.city,
+                'persona_type': customer.persona_type,
+                'member_since': customer.created_at.strftime('%Y-%m-%d') if customer.created_at else None,
+                'stats': {
+                    'flight_count': total_flights,
+                    'resort_nights': int(total_resort_nights),
+                    'avg_balance': float(avg_balance),
+                    'total_transactions': total_transactions,
+                    'achievement_count': achievement_count
+                }
+            })
+        
+        return jsonify({
+            'success': True,
+            'customers': customer_data,
+            'total_found': len(customer_data),
+            'search_query': query_param
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi tìm kiếm: {str(e)}'}), 500
+
+@app.route('/debug/customers', methods=['GET'])
+def debug_customers():
+    """Debug endpoint để xem tất cả customers"""
+    try:
+        customers = Customer.query.limit(10).all()
+        customer_list = []
+        for c in customers:
+            flights = VietjetFlight.query.filter_by(customer_id=c.customer_id).count()
+            achievements = CustomerAchievement.query.filter_by(customer_id=c.customer_id).count()
+            customer_list.append({
+                'customer_id': c.customer_id,
+                'name': c.name,
+                'age': c.age,
+                'city': c.city,
+                'flights': flights,
+                'achievements': achievements
+            })
+        
+        return jsonify({
+            'total_customers': Customer.query.count(),
+            'sample_customers': customer_list
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/admin/customer/<int:customer_id>/achievements', methods=['GET'])
+def get_customer_achievements_for_admin_simple(customer_id):
+    """API cho Admin xem achievements của khách hàng (không cần auth)"""
+    try:
+        # Kiểm tra customer tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Lấy tất cả achievements có sẵn
+        all_achievements = Achievement.query.all()
+        
+        # Lấy achievements đã có của customer
+        customer_achievements = db.session.query(CustomerAchievement).filter_by(
+            customer_id=customer_id
+        ).all()
+        
+        achieved_ids = {ca.achievement_id for ca in customer_achievements}
+        
+        # Phân loại achievements
+        achieved_list = []
+        available_list = []
+        
+        for achievement in all_achievements:
+            achievement_data = {
+                'id': achievement.id,
+                'name': achievement.name,
+                'description': achievement.description,
+                'badge_image_url': achievement.badge_image_url
+            }
+            
+            if achievement.id in achieved_ids:
+                # Tìm thông tin unlock
+                ca = next(ca for ca in customer_achievements if ca.achievement_id == achievement.id)
+                achievement_data['unlocked_at'] = ca.unlocked_at.isoformat() if ca.unlocked_at else None
+                achieved_list.append(achievement_data)
+            else:
+                available_list.append(achievement_data)
+        
+        # Thống kê hoạt động của customer
+        total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
+        
+        return jsonify({
+            'success': True,
+            'customer': {
+                'customer_id': customer_id,
+                'name': customer.name,
+                'age': customer.age,
+                'city': customer.city,
+                'persona_type': customer.persona_type
+            },
+            'achievements': achieved_list,
+            'available_achievements': available_list,
+            'customer_stats': {
+                'total_flights': total_flights,
+                'total_resort_nights': int(total_resort_nights),
+                'avg_balance': float(avg_balance)
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi lấy thông tin: {str(e)}'}), 500
+
+@app.route('/admin/assign-achievement', methods=['POST'])
+def assign_achievement_simple():
+    """API gán achievement đơn giản (không cần auth)"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        achievement_id = data.get('achievement_id')
+        
+        if not customer_id or not achievement_id:
+            return jsonify({'error': 'Thiếu customer_id hoặc achievement_id'}), 400
+        
+        # Kiểm tra customer tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Kiểm tra achievement tồn tại
+        achievement = Achievement.query.get(achievement_id)
+        if not achievement:
+            return jsonify({'error': f'Achievement {achievement_id} không tồn tại'}), 404
+
+        # Kiểm tra điều kiện đạt achievement
+        def check_eligibility(achievement, customer):
+            # Lấy số chuyến bay thực tế
+            flight_count = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
+            # Lấy số dư trung bình thực tế
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            # Lấy số đêm resort
+            resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            
+            if 'Phi công Đồng' in achievement.name:
+                return flight_count >= 5
+            elif 'Phi công Bạc' in achievement.name:
+                return flight_count >= 10
+            elif 'Phi công Vàng' in achievement.name:
+                return flight_count >= 20
+            elif 'Khách hàng VIP' in achievement.name:
+                return avg_balance >= 200000000
+            elif 'Nhà đầu tư thông minh' in achievement.name:
+                return avg_balance >= 500000000
+            elif 'Người du lịch' in achievement.name:
+                return resort_nights >= 10
+            elif 'Người tiên phong' in achievement.name:
+                return False  # SVT balance chưa implement
+            return True  # Cho các achievement khác
+        
+        if not check_eligibility(achievement, customer):
+            # Lấy thông tin hiện tại để hiển thị trong lỗi
+            flight_count = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            return jsonify({
+                'error': f'Khách hàng chưa đủ điều kiện cho "{achievement.name}". Hiện tại: {flight_count} chuyến bay, {avg_balance:,.0f} VND'
+            }), 400
+        
+        # Kiểm tra đã có achievement này chưa
+        existing = CustomerAchievement.query.filter_by(
+            customer_id=customer_id,
+            achievement_id=achievement_id
+        ).first()
+        
+        if existing:
+            return jsonify({
+                'error': f'Khách hàng đã có achievement "{achievement.name}" rồi'
+            }), 400
+        
+        # Gán achievement cho customer
+        customer_achievement = CustomerAchievement(
+            customer_id=customer_id,
+            achievement_id=achievement_id,
+            unlocked_at=datetime.datetime.utcnow()
+        )
+        db.session.add(customer_achievement)
+        
+        # Thêm SVT token reward
+        svt_reward = 1000  # Default reward
+        if 'Phi công Vàng' in achievement.name:
+            svt_reward = 2000
+        elif 'Phi công Bạc' in achievement.name:
+            svt_reward = 1500
+        elif 'VIP' in achievement.name:
+            svt_reward = 1500
+        
+        # Tạo token transaction
+        token_tx = TokenTransaction(
+            customer_id=customer_id,
+            transaction_type="achievement_reward",
+            amount=svt_reward,
+            description=f"Admin gán thành tựu: {achievement.name}",
+            tx_hash=f"0x{uuid.uuid4().hex}",
+            block_number=random.randint(1000000, 2000000)
+        )
+        db.session.add(token_tx)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã gán thành tựu "{achievement.name}" cho {customer.name}',
+            'svt_reward': svt_reward
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Lỗi gán thành tựu: {str(e)}'}), 500
+
+@app.route('/admin/auto-assign-achievements', methods=['POST'])
+def admin_auto_assign_achievements():
+    """API tự động gán achievements (không cần auth)"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id')
+        
+        if not customer_id:
+            return jsonify({'error': 'Thiếu customer_id'}), 400
+        
+        # Kiểm tra customer tồn tại
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
+        
+        # Thu thập dữ liệu thực tế của khách hàng
+        total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
+        
+        # Lấy achievements đã có
+        existing_achievements = db.session.query(CustomerAchievement.achievement_id).filter_by(
+            customer_id=customer_id
+        ).all()
+        existing_ids = {ea.achievement_id for ea in existing_achievements}
+        
+        # Logic tự động gán achievements
+        assigned_achievements = []
+        total_svt_reward = 0
+        
+        # 1. Achievements bay
+        if total_flights >= 20:
+            gold_pilot = Achievement.query.filter_by(name='Phi công Vàng').first()
+            if gold_pilot and gold_pilot.id not in existing_ids:
+                # Gán achievement
+                ca = CustomerAchievement(
+                    customer_id=customer_id,
+                    achievement_id=gold_pilot.id,
+                    unlocked_at=datetime.datetime.utcnow()
+                )
+                db.session.add(ca)
+                
+                # Thêm SVT reward
+                token_tx = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="auto_achievement_reward",
+                    amount=2000,
+                    description=f"Tự động gán: {gold_pilot.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=random.randint(1000000, 2000000)
+                )
+                db.session.add(token_tx)
+                
+                assigned_achievements.append(gold_pilot.name)
+                total_svt_reward += 2000
+        
+        elif total_flights >= 10:
+            silver_pilot = Achievement.query.filter_by(name='Phi công Bạc').first()
+            if silver_pilot and silver_pilot.id not in existing_ids:
+                # Gán achievement
+                ca = CustomerAchievement(
+                    customer_id=customer_id,
+                    achievement_id=silver_pilot.id,
+                    unlocked_at=datetime.datetime.utcnow()
+                )
+                db.session.add(ca)
+                
+                # Thêm SVT reward
+                token_tx = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="auto_achievement_reward",
+                    amount=1500,
+                    description=f"Tự động gán: {silver_pilot.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=random.randint(1000000, 2000000)
+                )
+                db.session.add(token_tx)
+                
+                assigned_achievements.append(silver_pilot.name)
+                total_svt_reward += 1500
+        
+        elif total_flights >= 5:
+            bronze_pilot = Achievement.query.filter_by(name='Phi công Đồng').first()
+            if bronze_pilot and bronze_pilot.id not in existing_ids:
+                # Gán achievement
+                ca = CustomerAchievement(
+                    customer_id=customer_id,
+                    achievement_id=bronze_pilot.id,
+                    unlocked_at=datetime.datetime.utcnow()
+                )
+                db.session.add(ca)
+                
+                # Thêm SVT reward
+                token_tx = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="auto_achievement_reward",
+                    amount=1000,
+                    description=f"Tự động gán: {bronze_pilot.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=random.randint(1000000, 2000000)
+                )
+                db.session.add(token_tx)
+                
+                assigned_achievements.append(bronze_pilot.name)
+                total_svt_reward += 1000
+        
+        # 2. VIP achievement
+        if avg_balance >= 100000000:  # ≥ 100 triệu
+            vip_achievement = Achievement.query.filter_by(name='Khách hàng VIP').first()
+            if vip_achievement and vip_achievement.id not in existing_ids:
+                # Gán achievement
+                ca = CustomerAchievement(
+                    customer_id=customer_id,
+                    achievement_id=vip_achievement.id,
+                    unlocked_at=datetime.datetime.utcnow()
+                )
+                db.session.add(ca)
+                
+                # Thêm SVT reward
+                token_tx = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="auto_achievement_reward",
+                    amount=1500,
+                    description=f"Tự động gán: {vip_achievement.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=random.randint(1000000, 2000000)
+                )
+                db.session.add(token_tx)
+                
+                assigned_achievements.append(vip_achievement.name)
+                total_svt_reward += 1500
+        
+        # 3. Du lịch achievement
+        if total_resort_nights >= 10:
+            traveler_achievement = Achievement.query.filter_by(name='Người du lịch').first()
+            if traveler_achievement and traveler_achievement.id not in existing_ids:
+                # Gán achievement
+                ca = CustomerAchievement(
+                    customer_id=customer_id,
+                    achievement_id=traveler_achievement.id,
+                    unlocked_at=datetime.datetime.utcnow()
+                )
+                db.session.add(ca)
+                
+                # Thêm SVT reward
+                token_tx = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="auto_achievement_reward",
+                    amount=800,
+                    description=f"Tự động gán: {traveler_achievement.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=random.randint(1000000, 2000000)
+                )
+                db.session.add(token_tx)
+                
+                assigned_achievements.append(traveler_achievement.name)
+                total_svt_reward += 800
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã tự động gán {len(assigned_achievements)} achievements cho {customer.name}',
+            'customer': {
+                'customer_id': customer_id,
+                'name': customer.name
+            },
+            'assigned_achievements': assigned_achievements,
+            'total_svt_reward': total_svt_reward,
+            'analysis_data': {
+                'total_flights': total_flights,
+                'avg_balance': float(avg_balance),
+                'total_resort_nights': int(total_resort_nights)
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Lỗi tự động gán achievements: {str(e)}'}), 500
+
+@app.route('/admin/achievements', methods=['GET'])
+def get_all_achievements_simple():
+    """API lấy tất cả achievements (không cần auth)"""
+    try:
+        achievements = Achievement.query.all()
+        
+        achievement_list = []
+        for achievement in achievements:
+            # Đếm số customer đã có achievement này
+            customer_count = CustomerAchievement.query.filter_by(
+                achievement_id=achievement.id
+            ).count()
+            
+            achievement_list.append({
+                'id': achievement.id,
+                'name': achievement.name,
+                'description': achievement.description,
+                'badge_image_url': achievement.badge_image_url,
+                'customer_count': customer_count,
+                'created_at': achievement.created_at.isoformat() if achievement.created_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'achievements': achievement_list,
+            'total': len(achievement_list)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Lỗi lấy danh sách achievements: {str(e)}'}), 500
 
 # =============================================================================
 # MAIN
