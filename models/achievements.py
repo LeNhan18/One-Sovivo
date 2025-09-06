@@ -110,8 +110,8 @@ def create_default_achievements():
             db.session.add(achievement)
         
         db.session.commit()
-        print(f"✅ Created {len(default_achievements)} default achievements")
+        print(f"Created {len(default_achievements)} default achievements")
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Error creating default achievements: {e}")
+        print(f"Error creating default achievements: {e}")

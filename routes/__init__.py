@@ -42,47 +42,47 @@ def register_blueprints(app):
         # Import and register route blueprints
         from .auth_routes import auth_bp
         app.register_blueprint(auth_bp, url_prefix='/auth')
-        print("✅ Auth routes registered")
+        print(" Auth routes registered")
         
         # Register other blueprints if they exist
         try:
             from .customer_routes import customer_bp
             app.register_blueprint(customer_bp, url_prefix='/customer')
-            print("✅ Customer routes registered")
+            print(" Customer routes registered")
         except ImportError:
-            print("⚠️ Customer routes not available")
+            print(" Customer routes not available")
             
         try:
             from .ai_routes import ai_bp
             app.register_blueprint(ai_bp, url_prefix='/ai')
-            print("✅ AI routes registered")
+            print("AI routes registered")
         except ImportError:
-            print("⚠️ AI routes not available")
+            print("️ AI routes not available")
             
         try:
             from .token_routes import token_bp
             app.register_blueprint(token_bp, url_prefix='/api/tokens')
-            print("✅ Token routes registered")
+            print(" Token routes registered")
         except ImportError:
-            print("⚠️ Token routes not available")
+            print(" Token routes not available")
             
         try:
             from .mission_routes import mission_bp
             app.register_blueprint(mission_bp, url_prefix='/api/missions')
-            print("✅ Mission routes registered")
+            print(" Mission routes registered")
         except ImportError:
-            print("⚠️ Mission routes not available")
+            print(" Mission routes not available")
             
         try:
             from .service_routes import service_bp
             app.register_blueprint(service_bp, url_prefix='/api/service')
-            print("✅ Service routes registered")
+            print(" Service routes registered")
         except ImportError:
-            print("⚠️ Service routes not available")
+            print(" Service routes not available")
         
         return True
     except Exception as e:
-        print(f"❌ Error registering blueprints: {e}")
+        print(f"Error registering blueprints: {e}")
         return False
 
 def register_routes(app):

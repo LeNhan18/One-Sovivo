@@ -28,18 +28,18 @@ try:
         ACHIEVEMENT_CONFIG
     )
     BLOCKCHAIN_ENABLED = True
-    print("✅ Blockchain integration loaded successfully")
+    print(" Blockchain integration loaded successfully")
 except ImportError as e:
-    print(f"⚠️ Blockchain integration not available: {e}")
+    print(f"Blockchain integration not available: {e}")
     BLOCKCHAIN_ENABLED = False
 
 try:
     from mission_progression import mission_system, get_missions_for_customer
     from detailed_missions import DetailedMissionSystem
     MISSION_SYSTEM_ENABLED = True
-    print("✅ Mission progression system loaded successfully")
+    print(" Mission progression system loaded successfully")
 except ImportError as e:
-    print(f"⚠️ Mission progression system not available: {e}")
+    print(f"️ Mission progression system not available: {e}")
     MISSION_SYSTEM_ENABLED = False
 
 # =============================================================================
@@ -239,47 +239,47 @@ def init_app_data():
     """Initialize application data and services"""
     with app.app_context():
         try:
-            print("🚀 Initializing One-Sovico Platform (Modular)...")
+            print(" Initializing One-Sovico Platform (Modular)...")
             
             # Initialize AI service
             try:
                 from services.ai_service import AIService
                 ai_service = AIService()
                 ai_service.load_or_train_model()
-                print("✅ AI service initialized")
+                print(" AI service initialized")
             except Exception as e:
-                print(f"⚠️ AI service initialization failed: {e}")
+                print(f" AI service initialization failed: {e}")
             
             # Initialize default marketplace items
             try:
                 from services.marketplace_service import MarketplaceService
                 marketplace_service = MarketplaceService()
                 # Add any default marketplace setup here
-                print("✅ Marketplace service initialized")
+                print(" Marketplace service initialized")
             except Exception as e:
-                print(f"⚠️ Marketplace service initialization failed: {e}")
+                print(f" Marketplace service initialization failed: {e}")
             
-            print("✅ Application initialization completed")
+            print(" Application initialization completed")
             
         except Exception as e:
-            print(f"❌ Application initialization failed: {e}")
+            print(f" Application initialization failed: {e}")
             raise e
 
 if __name__ == '__main__':
     print("="*80)
-    print("🏢 One-Sovico Platform - Modular Architecture")
+    print(" One-Sovico Platform - Modular Architecture")
     print("="*80)
-    print(f"📊 Database: {Config.get_database_url()}")
-    print(f"🔗 Blockchain: {'Enabled' if BLOCKCHAIN_ENABLED else 'Disabled'}")
-    print(f"🎯 Missions: {'Enabled' if MISSION_SYSTEM_ENABLED else 'Disabled'}")
+    print(f" Database: {Config.get_database_url()}")
+    print(f" Blockchain: {'Enabled' if BLOCKCHAIN_ENABLED else 'Disabled'}")
+    print(f" Missions: {'Enabled' if MISSION_SYSTEM_ENABLED else 'Disabled'}")
     print("="*80)
     
     # Initialize app data
     init_app_data()
     
-    print("🌐 Server starting at: http://127.0.0.1:5000")
-    print("📚 API Documentation available at: /health")
-    print("🔧 Admin Panel: /admin/achievements")
+    print(" Server starting at: http://127.0.0.1:5000")
+    print(" API Documentation available at: /health")
+    print(" Admin Panel: /admin/achievements")
     print("="*80)
     
     # Run the application
