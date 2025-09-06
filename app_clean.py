@@ -332,7 +332,7 @@ def get_user_tokens(user_id):
         })
 
     except Exception as e:
-        print(f"❌ Error getting tokens for user {user_id}: {e}")
+        print(f" Error getting tokens for user {user_id}: {e}")
         return jsonify({
             "success": False,
             "error": str(e),
@@ -423,7 +423,7 @@ def add_svt_tokens():
 
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Error adding SVT tokens: {e}")
+        print(f" Error adding SVT tokens: {e}")
         return jsonify({
             "success": False,
             "error": str(e)

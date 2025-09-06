@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NFTPassport from './NFTPassport';
 import VIPSimulation from './VIPSimulation';
+import AdminAchievements from './AdminAchievements';
 
 interface BlockchainDashboardProps {
   customerId?: number;
@@ -21,6 +22,7 @@ const BlockchainDashboard: React.FC<BlockchainDashboardProps> = ({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number>(1001); // Default to 1001
   const [loading, setLoading] = useState(true);
+  const [showAdminAchievements, setShowAdminAchievements] = useState(false);
 
   // Fetch available customers
   useEffect(() => {
@@ -52,6 +54,15 @@ const BlockchainDashboard: React.FC<BlockchainDashboardProps> = ({
 
   // Use prop customerId if provided, otherwise use selected
   const currentCustomerId = propCustomerId || selectedCustomerId;
+
+  // Show admin achievements panel
+  if (showAdminAchievements) {
+    return (
+      <AdminAchievements 
+        onBackToDashboard={() => setShowAdminAchievements(false)}
+      />
+    );
+  }
 
   // Handle simulation completion
   const handleSimulationComplete = (result: any) => {
@@ -90,14 +101,22 @@ const BlockchainDashboard: React.FC<BlockchainDashboardProps> = ({
               Simulate customer achievements and watch the NFT Passport update in real-time
             </p>
           </div>
-          {onBackToAnalysis && (
+          <div className="flex space-x-3">
             <button
-              onClick={onBackToAnalysis}
+              onClick={() => setShowAdminAchievements(true)}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
             >
-              ← Quay lại Customer Analysis
+              🏆 Admin Achievements
             </button>
-          )}
+            {onBackToAnalysis && (
+              <button
+                onClick={onBackToAnalysis}
+                className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              >
+                ← Quay lại Customer Analysis
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
