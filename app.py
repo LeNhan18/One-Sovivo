@@ -3526,11 +3526,11 @@ def hdbank_dashboard(customer_id):
                     "title": "🏦 Mở thẻ HDBank miễn phí",
                     "description": "Nhận ngay 1 triệu VND + 500 SVT Token",
                     "benefits": [
-                        "✅ Miễn phí thường niên trọn đời",
-                        "🎁 Thưởng chào mừng 1 triệu VND",
-                        "🪙 Tặng 500 SVT Token",
-                        "💳 Hạn mức tín dụng 10 triệu VND",
-                        "🏧 Sử dụng dịch vụ chuyển khoản, vay vốn"
+                        " Miễn phí thường niên trọn đời",
+                        " Thưởng chào mừng 1 triệu VND",
+                        " Tặng 500 SVT Token",
+                        " Hạn mức tín dụng 10 triệu VND",
+                        " Sử dụng dịch vụ chuyển khoản, vay vốn"
                     ],
                     "button_text": "Mở thẻ ngay",
                     "endpoint": "/api/service/hdbank/open-card"
