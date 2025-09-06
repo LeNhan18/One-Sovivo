@@ -8,9 +8,9 @@ def update_nft_on_blockchain(user_id, achievements, persona_data):
     Returns success/failure status
     """
     try:
-        print(f"📦 Mock NFT Update for User {user_id}")
-        print(f"🏆 Achievements: {achievements}")
-        print(f"👤 Persona: {persona_data.get('predicted_persona', 'Unknown')}")
+        print(f"Mock NFT Update for User {user_id}")
+        print(f"Achievements: {achievements}")
+        print(f" Persona: {persona_data.get('predicted_persona', 'Unknown')}")
         
         # Mock blockchain transaction
         return {
@@ -21,7 +21,7 @@ def update_nft_on_blockchain(user_id, achievements, persona_data):
         }
         
     except Exception as e:
-        print(f"❌ Blockchain error: {str(e)}")
+        print(f" Blockchain error: {str(e)}")
         return {
             "success": False,
             "error": str(e),
