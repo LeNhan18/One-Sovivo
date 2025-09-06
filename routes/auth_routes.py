@@ -1,41 +1,87 @@
 # routes/auth_routes.py
+# -*- coding: utf-8 -*-
+"""
+Authentication routes
+"""
+
 from flask import Blueprint, request, jsonify
-from services import AuthService
+from services.auth_service import AuthService
 
-auth_bp = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
-# Service instance will be injected by main app
-auth_service = None
+# Initialize service
+auth_service = AuthService()
 
-def init_auth_routes(service):
-    global auth_service
-    auth_service = service
 
 @auth_bp.route('/register', methods=['POST'])
-def register_api():
-    data = request.get_json(force=True) or {}
-    email = (data.get('email') or '').strip().lower()
-    password = (data.get('password') or '').strip()
-    name = (data.get('name') or '').strip() or email.split('@')[0]
+def register():
+    """User registration endpoint"""
+    try:
+        data = request.get_json(force=True) or {}
+        email = (data.get('email') or '').strip()
+        password = (data.get('password') or '').strip()
+        name = (data.get('name') or '').strip()
 
-    if not email or not password:
-        return jsonify({'error': 'Thiếu email hoặc mật khẩu'}), 400
+        result = auth_service.register(email, password, name)
 
-    result, status_code = auth_service.register(email, password, name)
-    return jsonify(result), status_code
+        if result.get('success'):
+            return jsonify(result)
+        else:
+            return jsonify(result), 400
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Registration error: {str(e)}'
+        }), 500
+
 
 @auth_bp.route('/login', methods=['POST'])
-def login_api():
-    data = request.get_json(force=True) or {}
-    email = (data.get('email') or '').strip().lower()
-    password = (data.get('password') or '').strip()
+def login():
+    """User login endpoint"""
+    try:
+        data = request.get_json(force=True) or {}
+        email = (data.get('email') or '').strip()
+        password = (data.get('password') or '').strip()
 
-    result, status_code = auth_service.login(email, password)
-    return jsonify(result), status_code
+        result = auth_service.login(email, password)
+
+        if result.get('success'):
+            return jsonify(result)
+        else:
+            return jsonify(result), 401
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Login error: {str(e)}'
+        }), 500
+
 
 @auth_bp.route('/me', methods=['GET'])
-@auth_service.require_auth
-def me_api():
-    user = request.current_user
-    result = auth_service.get_current_user(user)
-    return jsonify(result)
+def get_current_user():
+    """Get current user info endpoint"""
+    try:
+        from services.auth_service import verify_token
+
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Token required'}), 401
+
+        token = auth_header.split(' ', 1)[1]
+        user_id = verify_token(token)
+        if not user_id:
+            return jsonify({'error': 'Invalid token'}), 401
+
+        result = auth_service.get_current_user(user_id)
+
+        if result.get('success'):
+            return jsonify(result['user'])
+        else:
+            return jsonify(result), 401
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Get user error: {str(e)}'
+        }), 500

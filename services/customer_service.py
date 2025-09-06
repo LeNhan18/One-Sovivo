@@ -1,24 +1,31 @@
 # services/customer_service.py
-from models import get_models
 
 class CustomerService:
-    def __init__(self, db):
+    def __init__(self, db, config):
         self.db = db
-        # Get model classes after initialization
-        self.models = get_models()
-        self.Customer = self.models['Customer']
-        self.HDBankTransaction = self.models['HDBankTransaction']
-        self.VietjetFlight = self.models['VietjetFlight']
-        self.ResortBooking = self.models['ResortBooking']
+        self.config = config
+        self.models = {}
+
+    def set_models(self, model_classes):
+        """Set model classes after initialization"""
+        self.models = model_classes
 
     def get_customer_360_profile(self, customer_id):
         """Lấy hồ sơ 360° từ MySQL."""
-        customer = self.Customer.query.filter_by(customer_id=customer_id).first()
+        Customer = self.models.get('Customer')
+        HDBankTransaction = self.models.get('HDBankTransaction')
+        VietjetFlight = self.models.get('VietjetFlight')
+        ResortBooking = self.models.get('ResortBooking')
+        
+        if not Customer:
+            return None
+            
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return None
 
         # HDBank summary
-        hdbank_transactions = self.HDBankTransaction.query.filter_by(customer_id=customer_id).all()
+        hdbank_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).all() if HDBankTransaction else []
         hdbank_summary = {}
         if hdbank_transactions:
             balances = [float(t.balance) for t in hdbank_transactions]
@@ -31,7 +38,7 @@ class CustomerService:
             }
 
         # Vietjet summary
-        vietjet_flights = self.VietjetFlight.query.filter_by(customer_id=customer_id).all()
+        vietjet_flights = VietjetFlight.query.filter_by(customer_id=customer_id).all() if VietjetFlight else []
         vietjet_summary = {}
         if vietjet_flights:
             vietjet_summary = {
@@ -42,7 +49,7 @@ class CustomerService:
             }
 
         # Resort summary
-        resort_bookings = self.ResortBooking.query.filter_by(customer_id=customer_id).all()
+        resort_bookings = ResortBooking.query.filter_by(customer_id=customer_id).all() if ResortBooking else []
         resort_summary = {}
         if resort_bookings:
             resort_summary = {

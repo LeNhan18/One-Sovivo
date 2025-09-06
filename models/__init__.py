@@ -1,4 +1,24 @@
 # models/__init__.py
+from .database import db, bcrypt, init_db
+from .user import User
+from .customer import Customer
+from .transactions import HDBankTransaction, TokenTransaction
+from .hdbank_card import HDBankCard
+from .achievements import Achievement, CustomerAchievement
+from .missions import CustomerMission, CustomerMissionProgress
+from .marketplace import MarketplaceItem, P2PListing
+from .flights import VietjetFlight
+from .resorts import ResortBooking
+
+__all__ = [
+    'db', 'bcrypt', 'init_db',
+    'User', 'Customer', 
+    'HDBankTransaction', 'TokenTransaction', 'HDBankCard',
+    'Achievement', 'CustomerAchievement',
+    'CustomerMission', 'CustomerMissionProgress',
+    'MarketplaceItem', 'P2PListing',
+    'VietjetFlight', 'ResortBooking'
+]
 """
 Models package for One-Sovico Platform
 Handles all database models with lazy initialization to avoid circular imports
@@ -15,7 +35,7 @@ def init_models(database, bcrypt_instance):
     bcrypt = bcrypt_instance
     
     # Import models after db is initialized
-    from . import user, customer, transactions, achievements, missions, marketplace
+    from . import user, customer, transactions, achievements, missions, marketplace, hdbank_card
     
     # Initialize each model module
     user.init_db(db, bcrypt)
@@ -24,6 +44,7 @@ def init_models(database, bcrypt_instance):
     achievements.init_db(db)
     missions.init_db(db)
     marketplace.init_db(db)
+    hdbank_card.init_db(db)
     
     # Return model classes for convenience
     return {
@@ -38,7 +59,8 @@ def init_models(database, bcrypt_instance):
         'CustomerMission': missions.CustomerMission,
         'CustomerMissionProgress': missions.CustomerMissionProgress,
         'MarketplaceItem': marketplace.MarketplaceItem,
-        'P2PListing': marketplace.P2PListing
+        'P2PListing': marketplace.P2PListing,
+        'HDBankCard': hdbank_card.HDBankCard
     }
 
 def get_models():

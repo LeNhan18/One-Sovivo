@@ -32,9 +32,9 @@ try:
         ACHIEVEMENT_CONFIG
     )
     BLOCKCHAIN_ENABLED = True
-    print("✅ Blockchain integration loaded successfully")
+    print("Blockchain integration loaded successfully")
 except ImportError as e:
-    print(f"⚠️ Blockchain integration not available: {e}")
+    print(f"Blockchain integration not available: {e}")
     BLOCKCHAIN_ENABLED = False
 
 # Import mission progression system
@@ -42,9 +42,9 @@ try:
     from mission_progression import mission_system, get_missions_for_customer
     from detailed_missions import DetailedMissionSystem
     MISSION_SYSTEM_ENABLED = True
-    print("✅ Mission progression system loaded successfully")
+    print("Mission progression system loaded successfully")
 except ImportError as e:
-    print(f"⚠️ Mission progression system not available: {e}")
+    print(f"Mission progression system not available: {e}")
     MISSION_SYSTEM_ENABLED = False
 
 # =============================================================================
@@ -3570,14 +3570,14 @@ def hdbank_dashboard(customer_id):
             "available_services": [
                 {
                     "type": "transfer",
-                    "title": "💸 Chuyển khoản",
+                    "title": " Chuyển khoản",
                     "description": "Chuyển tiền nhanh, nhận SVT Token",
                     "endpoint": "/api/service/hdbank/transfer",
                     "icon": "💸"
                 },
                 {
                     "type": "loan",
-                    "title": "💰 Đăng ký vay",
+                    "title": " Đăng ký vay",
                     "description": "Vay vốn lãi suất ưu đãi",
                     "endpoint": "/api/service/hdbank/loan",
                     "icon": "💰"
@@ -4233,19 +4233,19 @@ def init_app():
         try:
             # Test database connection
             db.engine.connect()
-            print("✅ Kết nối MySQL thành công!")
+            print(" Kết nối MySQL thành công!")
 
             # Create tables if not exist
             db.create_all()
-            print("✅ Đã tạo/kiểm tra các bảng database")
+            print("Đã tạo/kiểm tra các bảng database")
 
             # Load or train AI model
             load_model()
-            print("✅ AI Model đã sẵn sàng")
+            print(" AI Model đã sẵn sàng")
 
         except Exception as e:
-            print(f"❌ Lỗi khởi tạo: {e}")
-            print("💡 Hãy đảm bảo MySQL đang chạy và cấu hình đúng trong config.py")
+            print(f"Lỗi khởi tạo: {e}")
+            print(" Hãy đảm bảo MySQL đang chạy và cấu hình đúng trong config.py")
 
 
 # =============================================================================
@@ -4785,10 +4785,10 @@ def get_all_achievements_simple():
 # MAIN
 # =============================================================================
 if __name__ == '__main__':
-    print("🚀 Khởi động One-Sovico Platform...")
-    print(f"📊 Database: {Config.get_database_url()}")
+    print("Khởi động One-Sovico Platform...")
+    print(f"Database: {Config.get_database_url()}")
 
     init_app()
 
-    print("🌐 Server đang chạy tại: http://127.0.0.1:5000")
+    print("Server đang chạy tại: http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
