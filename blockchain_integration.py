@@ -62,13 +62,13 @@ def setup_web3_connection():
         if not w3.is_connected():
             raise ConnectionError(f"Failed to connect to blockchain node at {BLOCKCHAIN_NODE_URL}")
         
-        print(f"✅ Connected to blockchain node at {BLOCKCHAIN_NODE_URL}")
-        print(f"📊 Current block number: {w3.eth.block_number}")
+        print(f" Connected to blockchain node at {BLOCKCHAIN_NODE_URL}")
+        print(f" Current block number: {w3.eth.block_number}")
         
         return w3
     
     except Exception as e:
-        print(f"❌ Error connecting to blockchain: {e}")
+        print(f" Error connecting to blockchain: {e}")
         raise
 
 def setup_account(w3, private_key=None):
@@ -99,16 +99,16 @@ def setup_account(w3, private_key=None):
         balance = w3.eth.get_balance(account_address)
         balance_eth = w3.from_wei(balance, 'ether')
         
-        print(f"🔑 Account address: {account_address}")
-        print(f"💰 Account balance: {balance_eth} ETH")
+        print(f" Account address: {account_address}")
+        print(f" Account balance: {balance_eth} ETH")
         
         if balance == 0:
-            print("⚠️  Warning: Account has zero balance. Make sure to fund it for transactions.")
+            print("  Warning: Account has zero balance. Make sure to fund it for transactions.")
         
         return account, account_address
     
     except Exception as e:
-        print(f"❌ Error setting up account: {e}")
+        print(f" Error setting up account: {e}")
         raise
 
 def update_nft_on_blockchain(token_id, new_rank, new_badge, private_key=None):
@@ -125,50 +125,50 @@ def update_nft_on_blockchain(token_id, new_rank, new_badge, private_key=None):
         str: Transaction hash if successful
     """
     try:
-        print(f"🚀 Starting NFT update process...")
-        print(f"📝 Token ID: {token_id}")
-        print(f"🏆 New Rank: {new_rank}")
-        print(f"🏅 New Badge: {new_badge}")
+        print(f" Starting NFT update process...")
+        print(f" Token ID: {token_id}")
+        print(f" New Rank: {new_rank}")
+        print(f" New Badge: {new_badge}")
         print("-" * 50)
         
         # Step 1: Setup Web3 connection
-        print("1️⃣ Connecting to blockchain node...")
+        print(" Connecting to blockchain node...")
         w3 = setup_web3_connection()
         
         # Step 2: Load contract ABI and address
-        print("2️⃣ Loading contract artifacts...")
+        print(" Loading contract artifacts...")
         abi, contract_address = load_contract_artifacts()
-        print(f"📄 Contract address: {contract_address}")
+        print(f" Contract address: {contract_address}")
         
         # Step 3: Create contract instance
-        print("3️⃣ Creating contract instance...")
+        print(" Creating contract instance...")
         contract = w3.eth.contract(address=contract_address, abi=abi)
-        print(f"✅ Contract instance created successfully")
+        print(f" Contract instance created successfully")
         
         # Step 4: Setup account
-        print("4️⃣ Setting up account...")
+        print(" Setting up account...")
         account, account_address = setup_account(w3, private_key)
         
         # Step 5: Check if token exists and get current data
-        print("5️⃣ Validating token...")
+        print(" Validating token...")
         try:
             current_data = contract.functions.getPassportData(token_id).call()
-            print(f"📋 Current passport data: {current_data}")
+            print(f" Current passport data: {current_data}")
         except Exception as e:
-            print(f"❌ Token {token_id} does not exist or error reading data: {e}")
+            print(f" Token {token_id} does not exist or error reading data: {e}")
             return None
         
         # Step 6: Build transaction
-        print("6️⃣ Building transaction...")
+        print(" Building transaction...")
         
         # Get gas estimate
         try:
             gas_estimate = contract.functions.updatePassport(
                 token_id, new_rank, new_badge
             ).estimate_gas({'from': account_address})
-            print(f"⛽ Estimated gas: {gas_estimate}")
+            print(f" Estimated gas: {gas_estimate}")
         except Exception as e:
-            print(f"❌ Error estimating gas: {e}")
+            print(f" Error estimating gas: {e}")
             gas_estimate = 300000  # Fallback gas limit
         
         # Build transaction
@@ -181,10 +181,10 @@ def update_nft_on_blockchain(token_id, new_rank, new_badge, private_key=None):
             'nonce': w3.eth.get_transaction_count(account_address),
         })
         
-        print(f"📦 Transaction built: {transaction}")
+        print(f" Transaction built: {transaction}")
         
         # Step 7: Sign and send transaction
-        print("7️⃣ Signing and sending transaction...")
+        print(" Signing and sending transaction...")
         
         if account:
             # Sign with private key
@@ -194,50 +194,50 @@ def update_nft_on_blockchain(token_id, new_rank, new_badge, private_key=None):
             # Send from unlocked account (Ganache)
             tx_hash = w3.eth.send_transaction(transaction)
         
-        print(f"📤 Transaction sent: {tx_hash.hex()}")
+        print(f" Transaction sent: {tx_hash.hex()}")
         
         # Step 8: Wait for confirmation
-        print("8️⃣ Waiting for transaction confirmation...")
+        print(" Waiting for transaction confirmation...")
         tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
         
         if tx_receipt.status == 1:
-            print("✅ Transaction confirmed successfully!")
-            print(f"🔗 Transaction hash: {tx_hash.hex()}")
-            print(f"📊 Block number: {tx_receipt.blockNumber}")
-            print(f"⛽ Gas used: {tx_receipt.gasUsed}")
+            print(" Transaction confirmed successfully!")
+            print(f" Transaction hash: {tx_hash.hex()}")
+            print(f" Block number: {tx_receipt.blockNumber}")
+            print(f" Gas used: {tx_receipt.gasUsed}")
             
             # Verify the update
-            print("9️⃣ Verifying update...")
+            print(" Verifying update...")
             try:
                 updated_data = contract.functions.getEnhancedPassportData(token_id).call()
-                print(f"🔄 Updated passport data:")
+                print(f" Updated passport data:")
                 print(f"   Rank: {updated_data[0]}")
                 print(f"   Badges: {updated_data[1]}")
                 
                 # Check for events
                 if tx_receipt.logs:
-                    print("📢 Events emitted:")
+                    print(" Events emitted:")
                     for log in tx_receipt.logs:
                         try:
                             decoded_log = contract.events.PassportRankUpdated().processLog(log)
-                            print(f"   🏆 Rank Updated: Token {decoded_log.args.tokenId} -> {decoded_log.args.newRank}")
+                            print(f"    Rank Updated: Token {decoded_log.args.tokenId} -> {decoded_log.args.newRank}")
                         except:
                             try:
                                 decoded_log = contract.events.PassportBadgeAdded().processLog(log)
-                                print(f"   🏅 Badge Added: Token {decoded_log.args.tokenId} -> {decoded_log.args.badge}")
+                                print(f"    Badge Added: Token {decoded_log.args.tokenId} -> {decoded_log.args.badge}")
                             except:
                                 pass
                 
             except Exception as e:
-                print(f"⚠️  Could not verify update: {e}")
+                print(f"  Could not verify update: {e}")
             
             return tx_hash.hex()
         else:
-            print("❌ Transaction failed!")
+            print(" Transaction failed!")
             return None
             
     except Exception as e:
-        print(f"❌ Error updating NFT on blockchain: {e}")
+        print(f" Error updating NFT on blockchain: {e}")
         return None
 
 def get_nft_metadata(token_id):
@@ -251,7 +251,7 @@ def get_nft_metadata(token_id):
         dict: NFT metadata
     """
     try:
-        print(f"📖 Getting metadata for token {token_id}...")
+        print(f" Getting metadata for token {token_id}...")
         
         # Setup connection
         w3 = setup_web3_connection()
@@ -260,7 +260,7 @@ def get_nft_metadata(token_id):
         
         # Get token URI
         token_uri = contract.functions.tokenURI(token_id).call()
-        print(f"🔗 Token URI: {token_uri}")
+        print(f" Token URI: {token_uri}")
         
         # If it's a data URI, decode it
         if token_uri.startswith("data:application/json;base64,"):
@@ -268,14 +268,14 @@ def get_nft_metadata(token_id):
             base64_data = token_uri[29:]  # Remove prefix
             json_data = base64.b64decode(base64_data).decode('utf-8')
             metadata = json.loads(json_data)
-            print(f"📋 Metadata: {json.dumps(metadata, indent=2)}")
+            print(f" Metadata: {json.dumps(metadata, indent=2)}")
             return metadata
         else:
-            print(f"🔗 External URI: {token_uri}")
+            print(f" External URI: {token_uri}")
             return {"uri": token_uri}
             
     except Exception as e:
-        print(f"❌ Error getting NFT metadata: {e}")
+        print(f"Error getting NFT metadata: {e}")
         return None
 
 def batch_update_nfts(updates, private_key=None):
@@ -290,25 +290,25 @@ def batch_update_nfts(updates, private_key=None):
         list: List of transaction hashes
     """
     results = []
-    print(f"🔄 Starting batch update for {len(updates)} NFTs...")
+    print(f" Starting batch update for {len(updates)} NFTs...")
     
     for i, (token_id, rank, badge) in enumerate(updates, 1):
-        print(f"\n📦 Processing update {i}/{len(updates)}...")
+        print(f"\n Processing update {i}/{len(updates)}...")
         tx_hash = update_nft_on_blockchain(token_id, rank, badge, private_key)
         results.append(tx_hash)
         
         # Small delay between transactions
         if i < len(updates):
-            print("⏳ Waiting 2 seconds before next transaction...")
+            print(" Waiting 2 seconds before next transaction...")
             time.sleep(2)
     
     successful = len([r for r in results if r])
-    print(f"\n✅ Batch update completed: {successful}/{len(updates)} successful")
+    print(f"\n Batch update completed: {successful}/{len(updates)} successful")
     return results
 
 # Example usage and testing
 if __name__ == "__main__":
-    print("🧪 SovicoPassport Blockchain Integration Test")
+    print(" SovicoPassport Blockchain Integration Test")
     print("=" * 60)
     
     # Test parameters
@@ -318,22 +318,22 @@ if __name__ == "__main__":
     
     try:
         # Test single update
-        print("\n🔬 Testing single NFT update...")
+        print("\n Testing single NFT update...")
         result = update_nft_on_blockchain(test_token_id, test_rank, test_badge)
         
         if result:
-            print(f"✅ Test successful! Transaction: {result}")
+            print(f" Test successful! Transaction: {result}")
             
             # Test metadata retrieval
-            print("\n📖 Testing metadata retrieval...")
+            print("\n Testing metadata retrieval...")
             metadata = get_nft_metadata(test_token_id)
             
         else:
-            print("❌ Test failed!")
+            print(" Test failed!")
             
     except Exception as e:
-        print(f"❌ Test error: {e}")
-        print("\n💡 Make sure to:")
+        print(f" Test error: {e}")
+        print("\n Make sure to:")
         print("   1. Start Ganache on http://127.0.0.1:7545")
         print("   2. Deploy SovicoPassport contract")
         print("   3. Mint at least one token for testing")

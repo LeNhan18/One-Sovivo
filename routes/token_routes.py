@@ -20,14 +20,49 @@ def get_token_service():
 def get_user_tokens(customer_id):
     """Get user's SVT token balance and transaction history"""
     try:
-        token_data = get_token_service().get_customer_tokens(customer_id)
+        from models.customer import Customer
+        from models.transactions import TokenTransaction
+        
+        # Check if customer exists
+        customer = Customer.query.filter_by(customer_id=customer_id).first()
+        if not customer:
+            return jsonify({'success': False, 'error': 'Customer not found'}), 404
+        
+        # Get transactions directly from database
+        transactions = TokenTransaction.query.filter_by(customer_id=customer.customer_id)\
+            .order_by(TokenTransaction.created_at.desc())\
+            .limit(10)\
+            .all()
+        
+        # Calculate balance
+        all_transactions = TokenTransaction.query.filter_by(customer_id=customer.customer_id).all()
+        total_earned = sum(float(t.amount) for t in all_transactions if t.amount > 0)
+        total_spent = sum(float(abs(t.amount)) for t in all_transactions if t.amount < 0)
+        current_balance = total_earned - total_spent
+        
         return jsonify({
             'success': True,
             'customer_id': customer_id,
-            'balance': token_data['balance'],
-            'transactions': token_data['transactions'],
-            'summary': token_data['summary']
+            'balance': current_balance,
+            'total_earned': total_earned,
+            'total_spent': total_spent,
+            'recent_transactions': [
+                {
+                    'id': t.id,
+                    'type': t.transaction_type,
+                    'amount': float(t.amount),
+                    'description': t.description,
+                    'created_at': t.created_at.isoformat()
+                }
+                for t in transactions
+            ]
         })
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in get_user_tokens: {e}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
     except Exception as e:
         return jsonify({
             'success': False,

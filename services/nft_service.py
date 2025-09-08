@@ -53,7 +53,7 @@ class NFTService:
                     if blockchain_metadata:
                         nft_metadata.update(blockchain_metadata)
                 except Exception as e:
-                    print(f"⚠️ Error getting blockchain metadata: {e}")
+                    print(f" Error getting blockchain metadata: {e}")
             
             return {
                 'success': True,
@@ -61,7 +61,7 @@ class NFTService:
             }
             
         except Exception as e:
-            print(f"❌ Error getting NFT passport: {e}")
+            print(f" Error getting NFT passport: {e}")
             return {'success': False, 'error': str(e)}
     
     def get_customer_achievements(self, customer_id):
@@ -90,7 +90,7 @@ class NFTService:
             }
             
         except Exception as e:
-            print(f"❌ Error getting customer achievements: {e}")
+            print(f" Error getting customer achievements: {e}")
             return {'achievements': [], 'total_achievements': 0}
     
     def update_nft_on_blockchain(self, token_id, customer_id, rank=None, badge=None):
@@ -130,7 +130,7 @@ class NFTService:
                 }
                 
         except Exception as e:
-            print(f"❌ Error updating NFT on blockchain: {e}")
+            print(f" Lỗi Cập nhật NFT Blockchain: {e}")
             return {'success': False, 'error': str(e)}
     
     def mint_nft_passport(self, customer_id):
@@ -156,9 +156,9 @@ class NFTService:
                 try:
                     blockchain_result = update_nft_on_blockchain(token_id, rank, f"{rank.lower()}_badge")
                     if not blockchain_result.get('success'):
-                        print(f"⚠️ Blockchain mint failed, continuing with database only")
+                        print(f"️ Blockchain mint failed, continuing with database only")
                 except Exception as e:
-                    print(f"⚠️ Blockchain mint error: {e}")
+                    print(f"️ Blockchain mint error: {e}")
             
             # Cập nhật database
             customer.nft_token_id = token_id
@@ -176,7 +176,7 @@ class NFTService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error minting NFT passport: {e}")
+            print(f" Error minting NFT passport: {e}")
             return {'success': False, 'error': str(e)}
     
     def evaluate_and_update_achievements(self, customer_id):

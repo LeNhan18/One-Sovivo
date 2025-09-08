@@ -2,7 +2,7 @@
 
 Hệ thống tích hợp blockchain cho việc cấp phát thành tựu NFT trong One-Sovico Platform.
 
-## 🚀 Tính năng chính
+##  Tính năng chính
 
 ### 1. AI-Powered Achievement Detection
 - Phân tích hồ sơ 360° của khách hàng
@@ -36,7 +36,7 @@ Hệ thống tích hợp blockchain cho việc cấp phát thành tựu NFT tron
 - **Rank**: Gold
 - **SVT Reward**: 1,500 tokens
 
-#### 🌙 Long Stay Guest
+####  Long Stay Guest
 - **Điều kiện**: > 30 đêm nghỉ dưỡng/năm
 - **Rank**: Platinum
 - **SVT Reward**: 2,500 tokens

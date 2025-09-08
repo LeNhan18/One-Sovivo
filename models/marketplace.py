@@ -2,6 +2,7 @@
 import datetime
 from flask_sqlalchemy import SQLAlchemy
 
+_initialized = False
 # This will be injected from app.py
 db = None
 MarketplaceItem = None
@@ -9,7 +10,10 @@ P2PListing = None
 
 
 def init_db(database):
-    global db, MarketplaceItem, P2PListing
+    global db, MarketplaceItem, P2PListing, _initialized
+    if _initialized:
+        return
+    _initialized = True
     db = database
     
     # Define classes after db is initialized

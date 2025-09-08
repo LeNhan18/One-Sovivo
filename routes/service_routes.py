@@ -14,10 +14,28 @@ hdbank_bp = Blueprint('hdbank', __name__, url_prefix='/api/service/hdbank')
 vietjet_bp = Blueprint('vietjet', __name__, url_prefix='/api/service/vietjet')
 resort_bp = Blueprint('resort', __name__, url_prefix='/api/service/resort')
 
-# Initialize services
-hdbank_service = HDBankService()
-vietjet_service = VietjetService()
-resort_service = ResortService()
+# Lazy service singletons (avoid instantiation before init_db runs)
+_hdbank_service = None
+_vietjet_service = None
+_resort_service = None
+
+def get_hdbank_service():
+    global _hdbank_service
+    if _hdbank_service is None:
+        _hdbank_service = HDBankService()
+    return _hdbank_service
+
+def get_vietjet_service():
+    global _vietjet_service
+    if _vietjet_service is None:
+        _vietjet_service = VietjetService()
+    return _vietjet_service
+
+def get_resort_service():
+    global _resort_service
+    if _resort_service is None:
+        _resort_service = ResortService()
+    return _resort_service
 
 # =============================================================================
 # HDBANK ROUTES
@@ -27,7 +45,7 @@ resort_service = ResortService()
 def hdbank_dashboard(customer_id):
     """Dashboard tổng quan dịch vụ HDBank cho khách hàng"""
     try:
-        dashboard_data = hdbank_service.get_dashboard_data(customer_id)
+        dashboard_data = get_hdbank_service().get_dashboard_data(customer_id)
         return jsonify({
             'success': True,
             'customer_id': customer_id,
@@ -43,7 +61,7 @@ def hdbank_dashboard(customer_id):
 def hdbank_service_status(customer_id):
     """Kiểm tra trạng thái dịch vụ ngân hàng của khách hàng"""
     try:
-        status = hdbank_service.get_service_status(customer_id)
+        status = get_hdbank_service().get_service_status(customer_id)
         return jsonify({
             'success': True,
             'customer_id': customer_id,
@@ -59,19 +77,14 @@ def hdbank_service_status(customer_id):
 def hdbank_transfer():
     """Thực hiện chuyển khoản HDBank"""
     try:
-        data = request.get_json()
-        result = hdbank_service.process_transfer(
+        data = request.get_json() or {}
+        result = get_hdbank_service().process_transfer(
             from_customer_id=data.get('from_customer_id'),
             to_account=data.get('to_account'),
             amount=data.get('amount'),
             description=data.get('description', '')
         )
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 400
-            
+        return (jsonify(result), 200) if result.get('success') else (jsonify(result), 400)
     except Exception as e:
         return jsonify({
             'success': False,
@@ -82,19 +95,14 @@ def hdbank_transfer():
 def hdbank_loan():
     """Đăng ký khoản vay HDBank"""
     try:
-        data = request.get_json()
-        result = hdbank_service.apply_loan(
+        data = request.get_json() or {}
+        result = get_hdbank_service().apply_loan(
             customer_id=data.get('customer_id'),
             loan_amount=data.get('loan_amount'),
             loan_term=data.get('loan_term'),
             loan_purpose=data.get('loan_purpose', '')
         )
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 400
-            
+        return (jsonify(result), 200) if result.get('success') else (jsonify(result), 400)
     except Exception as e:
         return jsonify({
             'success': False,
@@ -105,18 +113,13 @@ def hdbank_loan():
 def hdbank_open_card():
     """Mở thẻ ngân hàng HDBank mới"""
     try:
-        data = request.get_json()
-        result = hdbank_service.open_card(
+        data = request.get_json() or {}
+        result = get_hdbank_service().open_card(
             customer_id=data.get('customer_id'),
             card_type=data.get('card_type'),
             card_name=data.get('card_name', '')
         )
-        
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 400
-            
+        return (jsonify(result), 200) if result.get('success') else (jsonify(result), 400)
     except Exception as e:
         return jsonify({
             'success': False,
@@ -127,7 +130,7 @@ def hdbank_open_card():
 def get_customer_cards(customer_id):
     """Xem danh sách thẻ của khách hàng"""
     try:
-        cards = hdbank_service.get_customer_cards(customer_id)
+        cards = get_hdbank_service().get_customer_cards(customer_id)
         return jsonify({
             'success': True,
             'customer_id': customer_id,
@@ -143,7 +146,7 @@ def get_customer_cards(customer_id):
 def get_card_types():
     """Xem các loại thẻ có sẵn"""
     try:
-        card_types = hdbank_service.get_available_card_types()
+        card_types = get_hdbank_service().get_available_card_types()
         return jsonify({
             'success': True,
             'card_types': card_types
@@ -163,7 +166,7 @@ def vietjet_book_flight():
     """Đặt vé máy bay Vietjet"""
     try:
         data = request.get_json()
-        result = vietjet_service.book_flight(
+        result = get_vietjet_service().book_flight(
             customer_id=data.get('customer_id'),
             origin=data.get('origin'),
             destination=data.get('destination'),
@@ -184,14 +187,14 @@ def vietjet_book_flight():
         }), 500
 
 @vietjet_bp.route('/history/<int:customer_id>', methods=['GET'])
-def vietjet_booking_history(customer_id):
+def vietjet_history(customer_id):
     """Lấy lịch sử đặt vé của khách hàng"""
     try:
-        history = vietjet_service.get_booking_history(customer_id)
+        history = get_vietjet_service().get_booking_history(customer_id)
         return jsonify({
             'success': True,
             'customer_id': customer_id,
-            'booking_history': history
+            'history': history
         })
     except Exception as e:
         return jsonify({
@@ -208,7 +211,7 @@ def resort_book_room():
     """Đặt phòng Resort"""
     try:
         data = request.get_json()
-        result = resort_service.book_room(
+        result = get_resort_service().book_room(
             customer_id=data.get('customer_id'),
             resort_name=data.get('resort_name'),
             booking_date=data.get('booking_date'),
@@ -232,7 +235,7 @@ def resort_book_spa():
     """Đặt dịch vụ Spa"""
     try:
         data = request.get_json()
-        result = resort_service.book_spa(
+        result = get_resort_service().book_spa(
             customer_id=data.get('customer_id'),
             spa_service=data.get('spa_service'),
             booking_date=data.get('booking_date'),

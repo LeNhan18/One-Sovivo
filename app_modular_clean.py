@@ -7,8 +7,13 @@ Clean architecture with separated routes, services, and models
 
 import os
 import datetime
-from flask import Flask, jsonify, send_from_directory
+import logging
+from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
+
+# Setup logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Import configuration
 from config import Config
@@ -51,8 +56,12 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Initialize CORS
-    CORS(app)
+    # Initialize CORS with specific configuration (added :5173 for frontend dev)
+    CORS(app,
+         origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5000', 'http://localhost:5173'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         allow_headers=['Content-Type', 'Authorization'],
+         supports_credentials=True)
     
     # Initialize database
     init_db(app)
@@ -63,6 +72,7 @@ def create_app():
     # Register additional routes
     register_static_routes(app)
     register_utility_routes(app)
+    register_options_handlers(app)
     
     return app
 
@@ -194,6 +204,18 @@ def register_utility_routes(app):
                 'error': f'Event simulation error: {str(e)}'
             }), 500
 
+def register_options_handlers(app):
+    """Register OPTIONS handlers for CORS"""
+    
+    @app.before_request
+    def handle_preflight():
+        if request.method == "OPTIONS":
+            response = jsonify({'message': 'OK'})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
+            response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+            return response
+
 # =============================================================================
 # ERROR HANDLERS
 # =============================================================================
@@ -203,26 +225,32 @@ def register_error_handlers(app):
     
     @app.errorhandler(404)
     def not_found(error):
+        logger.error(f"404 Error: {request.url} - {error}")
         return jsonify({
             'success': False,
             'error': 'Endpoint not found',
-            'status_code': 404
+            'status_code': 404,
+            'requested_url': request.url
         }), 404
     
     @app.errorhandler(500)
     def internal_error(error):
+        logger.error(f"500 Error: {request.url} - {error}")
         return jsonify({
             'success': False,
             'error': 'Internal server error',
-            'status_code': 500
+            'status_code': 500,
+            'requested_url': request.url
         }), 500
     
     @app.errorhandler(400)
     def bad_request(error):
+        logger.error(f"400 Error: {request.url} - {error}")
         return jsonify({
             'success': False,
             'error': 'Bad request',
-            'status_code': 400
+            'status_code': 400,
+            'requested_url': request.url
         }), 400
 
 # =============================================================================
@@ -231,6 +259,26 @@ def register_error_handlers(app):
 
 # Create the Flask app
 app = create_app()
+
+# Add request logging
+@app.before_request
+def log_request_info():
+    logger.debug('Request: %s %s', request.method, request.url)
+    logger.debug('Headers: %s', dict(request.headers))
+    logger.debug('Content-Type: %s', request.content_type)
+    # Safe JSON logging without forcing parse for non-JSON GET requests
+    json_payload = None
+    try:
+        json_payload = request.get_json(silent=True)
+    except Exception:
+        json_payload = None
+    if json_payload is not None:
+        logger.debug('Request data: %s', json_payload)
+
+@app.after_request
+def after_request(response):
+    logger.debug('Response: %s %s', response.status_code, response.status)
+    return response
 
 # Register error handlers
 register_error_handlers(app)
