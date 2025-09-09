@@ -24,7 +24,7 @@ class MarketplaceService:
                 'image_url': item.image_url
             } for item in items]
         except Exception as e:
-            print(f"❌ Error getting marketplace items: {e}")
+            print(f"Error getting marketplace items: {e}")
             return []
     
     def purchase_item(self, customer_id, item_id, quantity=1):
@@ -76,7 +76,7 @@ class MarketplaceService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error purchasing item: {e}")
+            print(f" Error purchasing item: {e}")
             return {'success': False, 'error': str(e)}
     
     def get_p2p_listings(self):
@@ -96,7 +96,7 @@ class MarketplaceService:
             } for listing, customer in listings]
             
         except Exception as e:
-            print(f"❌ Error getting P2P listings: {e}")
+            print(f" Error getting P2P listings: {e}")
             return []
     
     def create_p2p_listing(self, seller_customer_id, item_name, description, price_svt):
@@ -127,7 +127,7 @@ class MarketplaceService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error creating P2P listing: {e}")
+            print(f"Error creating P2P listing: {e}")
             return {'success': False, 'error': str(e)}
     
     def _get_customer_svt_balance(self, customer_id):
