@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
+import ImageIcon from '../components/ImageIcon'
 import { SearchPanel } from '../parts/SearchPanel'
 import { Profile360 } from '../parts/Profile360'
 import { AIInsights } from '../parts/AIInsights'
@@ -14,14 +15,14 @@ export type CustomerBasic = {
 }
 
 export type Profile360Data = {
-  basic_info: CustomerBasic
-  hdbank_summary: {
+  basic_info?: CustomerBasic
+  hdbank_summary?: {
     total_transactions?: number
     average_balance?: number
     total_credit_last_3m?: number
     total_debit_last_3m?: number
   }
-  vietjet_summary: {
+  vietjet_summary?: {
     total_flights_last_year?: number
     total_spending?: number
     is_business_flyer?: boolean
@@ -56,7 +57,8 @@ export const Dashboard: React.FC = () => {
       axios.get(`/api/customer/${selectedId}/insights`)
     ])
       .then(([pRes, iRes]) => {
-        setProfile(pRes.data)
+        // Handle new API response format
+        setProfile(pRes.data.customer || pRes.data)
         setInsight(iRes.data)
       })
       .catch((error) => {
@@ -88,7 +90,9 @@ export const Dashboard: React.FC = () => {
       <div className="max-w-[1400px] mx-auto mb-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-2">🧠 AI Insight Dashboard</h1>
+            <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+              <ImageIcon name="AI.jpg" size={24} rounded={6} /> AI Insight Dashboard
+            </h1>
             <p className="text-gray-400">Phòng điều khiển phân tích khách hàng thông minh</p>
           </div>
           <div className="flex space-x-3">
@@ -100,10 +104,10 @@ export const Dashboard: React.FC = () => {
                   : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
               }`}
             >
-              📊 Model Metrics
+              <span className="inline-flex items-center gap-2"><ImageIcon name="unnamed.png" size={16} /> Model Metrics</span>
             </button>
             <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-              📊 Báo cáo
+              <span className="inline-flex items-center gap-2"><ImageIcon name="unnamed.png" size={16} /> Báo cáo</span>
             </button>
           </div>
         </div>

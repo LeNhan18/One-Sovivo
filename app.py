@@ -1329,7 +1329,7 @@ def purchase_marketplace_item_api():
         # Kiểm tra số dư SVT (từ token_transactions)
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :customer_id
         """
 
@@ -2084,7 +2084,7 @@ def get_user_tokens(user_id):
         # Query token_transactions table to get real SVT balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :user_id
         """
 
@@ -2095,7 +2095,7 @@ def get_user_tokens(user_id):
         # Get recent transactions
         recent_query = """
             SELECT tx_hash, transaction_type, amount, description, created_at
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :user_id
             ORDER BY created_at DESC
             LIMIT 10
@@ -2191,7 +2191,7 @@ def add_svt_tokens():
         # Get updated balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :customer_id
         """
 
@@ -2263,7 +2263,7 @@ def test_add_svt_tokens(customer_id):
         # Get updated balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :customer_id
         """
 
@@ -2590,7 +2590,7 @@ def complete_mission_api(customer_id):
         # Lấy số dư SVT hiện tại
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :customer_id
         """
         result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
@@ -2718,14 +2718,14 @@ def get_mission_leaderboard_api():
     try:
         # Tính toán số missions đã hoàn thành cho mỗi customer
         leaderboard_query = """
-            SELECT
+            SELECT 
                 c.customer_id,
                 c.name,
                 COUNT(cm.id) as completed_missions,
                 COALESCE(SUM(cm.svt_reward), 0) as total_svt_earned,
                 MAX(cm.completed_at) as last_completion
             FROM customers c
-            LEFT JOIN customer_missions cm ON c.customer_id = cm.customer_id
+            LEFT JOIN customer_missions cm ON c.customer_id = cm.customer_id 
                 AND cm.status = 'completed'
             GROUP BY c.customer_id, c.name
             HAVING completed_missions > 0
@@ -2772,7 +2772,7 @@ def update_customer_stats_api(customer_id):
             update_query = """
                 INSERT INTO customer_stats (customer_id, stat_key, stat_value)
                 VALUES (:customer_id, :stat_key, :stat_value)
-                ON DUPLICATE KEY UPDATE
+                ON DUPLICATE KEY UPDATE 
                     stat_value = :stat_value,
                     last_updated = CURRENT_TIMESTAMP
             """
@@ -2866,8 +2866,8 @@ def get_customer_data_for_missions(customer_id: int) -> dict:
 
         # Lấy stats từ customer_stats table
         stats_query = """
-            SELECT stat_key, stat_value
-            FROM customer_stats
+            SELECT stat_key, stat_value 
+            FROM customer_stats 
             WHERE customer_id = :customer_id
         """
         stats_result = db.session.execute(db.text(stats_query), {"customer_id": customer_id})
@@ -2879,7 +2879,7 @@ def get_customer_data_for_missions(customer_id: int) -> dict:
         # Tính tổng chi tiêu thực tế
         spending_query = """
             SELECT COALESCE(SUM(ABS(amount)), 0) as total_spending
-            FROM token_transactions
+            FROM token_transactions 
             WHERE customer_id = :customer_id AND amount < 0
         """
         spending_result = db.session.execute(db.text(spending_query), {"customer_id": customer_id})
@@ -2976,9 +2976,9 @@ def sync_detailed_missions_to_database(customer_id: int, missions: list):
                 db.session.add(new_mission)
 
         db.session.commit()
-        print(f" Synced {len(missions)} detailed missions for customer {customer_id}")
+        print(f"✅ Synced {len(missions)} detailed missions for customer {customer_id}")
     except Exception as e:
-        print(f" Error syncing detailed missions: {e}")
+        print(f"❌ Error syncing detailed missions: {e}")
         db.session.rollback()
 
 
@@ -3007,7 +3007,7 @@ def create_mission_progress_tracking(customer_id: int, mission_id: str, mission_
 
         db.session.commit()
     except Exception as e:
-        print(f" Error creating progress tracking: {e}")
+        print(f"❌ Error creating progress tracking: {e}")
         db.session.rollback()
 
 
@@ -3097,6 +3097,61 @@ def get_recommendations(predicted_persona, input_data):
 # =============================================================================
 # TEST ENDPOINTS - For development only
 # =============================================================================
+
+@app.route('/api/test/add-svt', methods=['POST'])
+def test_add_svt():
+    """Test endpoint to add SVT tokens for development"""
+    try:
+        data = request.get_json()
+        customer_id = data.get('customer_id', 2015)  # Default to 2015
+        amount = data.get('amount', 10000)  # Default to 10000 SVT
+
+        # Generate unique transaction hash
+        import time
+        import uuid
+        import random
+        timestamp = int(time.time() * 1000000)
+        unique_id = str(uuid.uuid4()).replace('-', '')[:16]
+        random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(8)])
+        tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
+
+        # Add test transaction
+        test_transaction = TokenTransaction(
+            customer_id=customer_id,
+            amount=amount,
+            transaction_type='test_reward',
+            description=f'Test reward - {amount} SVT tokens',
+            tx_hash=tx_hash
+        )
+
+        db.session.add(test_transaction)
+        db.session.commit()
+
+        # Get updated balance
+        token_query = """
+            SELECT COALESCE(SUM(amount), 0) as total_svt
+            FROM token_transactions 
+            WHERE customer_id = :customer_id
+        """
+
+        result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
+        row = result.fetchone()
+        new_balance = float(row.total_svt) if row and row.total_svt else 0
+
+        return jsonify({
+            "success": True,
+            "message": f"Added {amount} SVT tokens to customer {customer_id}",
+            "new_balance": new_balance,
+            "transaction_id": test_transaction.id,
+            "tx_hash": tx_hash
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 @app.route('/api/token-transactions/<int:customer_id>', methods=['GET'])
@@ -4216,6 +4271,11 @@ def init_app():
 # =============================================================================
 # STATIC ROUTES
 # =============================================================================
+@app.route('/admin/achievements')
+def admin_achievements_page():
+    """Serve admin achievements HTML page"""
+    return send_from_directory('.', 'admin_achievements.html')
+
 
 @app.route('/admin/achievements/list', methods=['GET'])
 def get_achievements_list():
@@ -4341,7 +4401,30 @@ def search_customers_for_admin_simple():
         return jsonify({'error': f'Lỗi tìm kiếm: {str(e)}'}), 500
 
 
+@app.route('/debug/customers', methods=['GET'])
+def debug_customers():
+    """Debug endpoint để xem tất cả customers"""
+    try:
+        customers = Customer.query.limit(10).all()
+        customer_list = []
+        for c in customers:
+            flights = VietjetFlight.query.filter_by(customer_id=c.customer_id).count()
+            achievements = CustomerAchievement.query.filter_by(customer_id=c.customer_id).count()
+            customer_list.append({
+                'customer_id': c.customer_id,
+                'name': c.name,
+                'age': c.age,
+                'city': c.city,
+                'flights': flights,
+                'achievements': achievements
+            })
 
+        return jsonify({
+            'total_customers': Customer.query.count(),
+            'sample_customers': customer_list
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 
 @app.route('/admin/customer/<int:customer_id>/achievements', methods=['GET'])
@@ -4747,4 +4830,3 @@ if __name__ == '__main__':
 
     print("Server đang chạy tại: http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
-

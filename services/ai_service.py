@@ -27,6 +27,10 @@ class AIService:
         """Set model classes after initialization"""
         self.models = model_classes
 
+    def is_model_loaded(self):
+        """Check if AI model is loaded and ready"""
+        return all([self.ai_model, self.scaler, self.encoder])
+
     def load_model(self):
         """Tải model đã được huấn luyện."""
         try:

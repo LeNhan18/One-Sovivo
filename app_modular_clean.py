@@ -72,12 +72,111 @@ def create_app():
     # Register all blueprints
     register_blueprints(app)
 
+    # Initialize services for routes
+    initialize_route_services(app)
+
     # Register additional routes
     register_static_routes(app)
     register_utility_routes(app)
     register_options_handlers(app)
 
     return app
+
+
+# =============================================================================
+# SERVICE INITIALIZATION FOR ROUTES
+# =============================================================================
+
+def initialize_route_services(app):
+    """Initialize services for routes that need them"""
+    with app.app_context():
+        try:
+            # Import database and models first
+            from models import db
+            
+            # Import and initialize service instances
+            from services.ai_service import AIService
+            from services.customer_service import CustomerService
+            from services.admin_service import AdminService
+            
+            # Initialize services with proper dependencies
+            ai_service = AIService(app.config)
+            customer_service = CustomerService(db, app.config)
+            admin_service = AdminService(db, app.config)
+            
+            # Load AI model để service có thể predict
+            try:
+                ai_service.load_model()
+                print("✅ AI model loaded successfully")
+            except Exception as e:
+                print(f"⚠️ Warning: AI model loading failed: {e}")
+                # Tạo mock model nếu load thất bại
+                try:
+                    ai_service.create_mock_model()
+                    print("✅ AI mock model created successfully")
+                except Exception as e2:
+                    print(f"❌ Warning: AI mock model creation failed: {e2}")
+            
+            # Set model classes for services that need them
+            try:
+                from models.customer import Customer
+                from models.achievements import Achievement, CustomerAchievement  
+                from models.transactions import HDBankTransaction, TokenTransaction
+                from models.flights import VietjetFlight
+                from models.resorts import ResortBooking
+                from models.user import User
+                
+                model_classes = {
+                    'Customer': Customer,
+                    'Achievement': Achievement,
+                    'CustomerAchievement': CustomerAchievement,
+                    'HDBankTransaction': HDBankTransaction,
+                    'TokenTransaction': TokenTransaction,
+                    'VietjetFlight': VietjetFlight,
+                    'ResortBooking': ResortBooking,
+                    'User': User
+                }
+                
+                # Set models for services
+                ai_service.set_models(model_classes)
+                customer_service.set_models(model_classes)
+                admin_service.set_models(model_classes)
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Could not load all model classes: {e}")
+            
+            # Create service instances dict
+            service_instances = {
+                'ai_service': ai_service,
+                'customer_service': customer_service,
+                'admin_service': admin_service
+            }
+            
+            # Initialize route modules that need services
+            try:
+                from routes.ai_routes import init_ai_routes
+                init_ai_routes(service_instances)
+            except Exception as e:
+                print(f"Warning: Could not initialize AI routes: {e}")
+                
+            try:
+                from routes.customer_routes import init_customer_routes
+                init_customer_routes(service_instances)
+            except Exception as e:
+                print(f" Warning: Could not initialize customer routes: {e}")
+                
+            try:
+                from routes.admin_routes import init_admin_routes
+                init_admin_routes(service_instances)
+            except Exception as e:
+                print(f"⚠️ Warning: Could not initialize admin routes: {e}")
+                
+            print("✅ Route services initialized successfully")
+            
+        except Exception as e:
+            print(f"❌ Warning: Route service initialization failed: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 # =============================================================================
@@ -103,6 +202,8 @@ def register_static_routes(app):
         model_dir = app.config.get('MODEL_DIR', 'dl_model')
         return send_from_directory(model_dir, filename)
 
+    # Missing legacy API route from app.py - achievements data endpoint
+ 
 
 def register_utility_routes(app):
     """Register utility and health check routes"""
@@ -209,6 +310,39 @@ def register_utility_routes(app):
                 'error': f'Event simulation error: {str(e)}'
             }), 500
 
+    # Legacy AI prediction route for compatibility
+    @app.route('/ai/predict', methods=['POST'])
+    def predict_persona():
+        """AI prediction endpoint - Legacy compatibility"""
+        try:
+            from services.ai_service import AIService
+            ai_service = AIService()
+            
+            data = request.json or {}
+            result = ai_service.predict_with_achievements(data)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'AI prediction error: {str(e)}'
+            }), 500
+
+    # Legacy customer profile route for compatibility
+    @app.route('/customer/<int:customer_id>', methods=['GET'])
+    def get_customer_profile_legacy(customer_id):
+        """Customer 360 profile endpoint - Legacy compatibility"""
+        try:
+            from services.customer_service import CustomerService
+            customer_service = CustomerService()
+            
+            result = customer_service.get_customer_360_profile(customer_id)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Customer profile error: {str(e)}'
+            }), 500
+
 
 def register_options_handlers(app):
     """Register OPTIONS handlers for CORS"""
@@ -256,7 +390,7 @@ def register_error_handlers(app):
         return jsonify({
             'success': False,
             'error': 'Bad request',
-            'status_code': 400,
+                'status_code': 400,
             'requested_url': request.url
         }), 400
 
@@ -299,48 +433,70 @@ def init_app_data():
     """Initialize application data and services"""
     with app.app_context():
         try:
-            print(" Initializing One-Sovico Platform (Modular)...")
+            print("🚀 Initializing One-Sovico Platform (Modular)...")
+
+            # Get database instance
+            from models import db
 
             # Initialize AI service
             try:
                 from services.ai_service import AIService
-                ai_service = AIService()
-                ai_service.load_or_train_model()
-                print(" AI service initialized")
+                ai_service = AIService(app.config)
+                ai_service.load_model()  # Use correct method name
+                print("✅ AI service initialized")
             except Exception as e:
-                print(f" AI service initialization failed: {e}")
+                print(f"❌ AI service initialization failed: {e}")
 
             # Initialize default marketplace items
             try:
                 from services.marketplace_service import MarketplaceService
                 marketplace_service = MarketplaceService()
                 # Add any default marketplace setup here
-                print(" Marketplace service initialized")
+                print("✅ Marketplace service initialized")
             except Exception as e:
-                print(f" Marketplace service initialization failed: {e}")
+                print(f"❌ Marketplace service initialization failed: {e}")
 
-            print(" Application initialization completed")
+            # Initialize customer service
+            try:
+                from services.customer_service import CustomerService
+                customer_service = CustomerService(db, app.config)
+                print("✅ Customer service initialized")
+            except Exception as e:
+                print(f"❌ Customer service initialization failed: {e}")
+
+            # Initialize admin service
+            try:
+                from services.admin_service import AdminService
+                admin_service = AdminService(db, app.config)
+                print("✅ Admin service initialized")
+            except Exception as e:
+                print(f"❌ Admin service initialization failed: {e}")
+
+            print("🎉 Application initialization completed")
 
         except Exception as e:
-            print(f" Application initialization failed: {e}")
+            print(f"💥 Application initialization failed: {e}")
             raise e
 
 
 if __name__ == '__main__':
     print("=" * 80)
-    print(" One-Sovico Platform - Modular Architecture")
+    print("🚀 One-Sovico Platform - Modular Architecture")
     print("=" * 80)
-    print(f" Database: {Config.get_database_url()}")
-    print(f" Blockchain: {'Enabled' if BLOCKCHAIN_ENABLED else 'Disabled'}")
-    print(f" Missions: {'Enabled' if MISSION_SYSTEM_ENABLED else 'Disabled'}")
+    print(f"📊 Database: {Config.get_database_url()}")
+    print(f"⛓️  Blockchain: {'Enabled' if BLOCKCHAIN_ENABLED else 'Disabled'}")
+    print(f"🎯 Missions: {'Enabled' if MISSION_SYSTEM_ENABLED else 'Disabled'}")
     print("=" * 80)
 
     # Initialize app data
     init_app_data()
 
-    print(" Server starting at: http://127.0.0.1:5000")
-    print(" API Documentation available at: /health")
-    print(" Admin Panel: /admin/achievements")
+    print("🌐 Server starting at: http://127.0.0.1:5000")
+    print("📚 API Documentation available at: /health")
+    print("🔧 Admin Panel: /admin/achievements")
+    print("🤖 AI Prediction: /ai/predict")
+    print("👤 Customer Profile: /customer/<id>")
+    print("🏆 NFT Achievements: /api/nft/<id>/achievements")
     print("=" * 80)
 
     # Run the application

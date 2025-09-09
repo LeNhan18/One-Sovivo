@@ -67,5 +67,5 @@ def init_db(app):
             create_default_achievements()
             
         except Exception as e:
-            print(f"❌ Error initializing database: {e}")
+            print(f" Error initializing database: {e}")
             raise e
