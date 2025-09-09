@@ -6,16 +6,18 @@ from flask import Blueprint, request, jsonify
 
 # Add url_prefix so routes are under /customer
 customer_bp = Blueprint('customer', __name__, url_prefix='/customer')
-
+customers_bp =Blueprint('customers', __name__, url_prefix='/customers')
 # Import service instances will be injected later
 customer_service = None
 ai_service = None
+
 
 def init_customer_routes(service_instances):
     """Initialize customer routes with service instances"""
     global customer_service, ai_service
     customer_service = service_instances.get('customer_service')
     ai_service = service_instances.get('ai_service')
+
 
 @customer_bp.route('/<int:customer_id>', methods=['GET'])
 def get_customer_profile(customer_id):
@@ -24,18 +26,18 @@ def get_customer_profile(customer_id):
         from models.customer import Customer
         from models.achievements import CustomerAchievement
         from models.transactions import TokenTransaction
-        
+
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Không tìm thấy khách hàng với ID {customer_id}'}), 404
-        
+
         # Get achievements count (table uses customer_id referencing customers.customer_id)
         achievements_count = CustomerAchievement.query.filter_by(customer_id=customer.customer_id).count()
 
         # Get token balance
         transactions = TokenTransaction.query.filter_by(customer_id=customer.customer_id).all()
         token_balance = sum(t.amount for t in transactions)
-        
+
         return jsonify({
             'success': True,
             'customer': {
@@ -54,19 +56,20 @@ def get_customer_profile(customer_id):
                 'token_balance': float(token_balance) if token_balance is not None else 0.0
             }
         })
-        
+
     except Exception as e:
         import traceback
         print(f"Error in get_customer_profile: {e}")
         print(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @customer_bp.route('/<int:customer_id>/insights', methods=['GET'])
 def get_insights(customer_id):
     """API trả về persona dự đoán, evidence và đề xuất."""
     if not customer_service or not ai_service:
         return jsonify({'error': 'Required services not available'}), 500
-    
+
     profile = customer_service.get_customer_360_profile(customer_id)
     if profile is None:
         return jsonify({'error': f'Không tìm thấy khách hàng với ID {customer_id}'}), 404
@@ -95,12 +98,13 @@ def get_insights(customer_id):
         'recommendations': recommendations
     })
 
-@customer_bp.route('/search', methods=['GET'])
+
+@customers_bp.route('/search', methods=['GET'])
 def search_customers():
     """Tìm kiếm khách hàng theo từ khóa."""
     if not customer_service:
         return jsonify({'error': 'Customer service not available'}), 500
-    
+
     q = (request.args.get('q') or '').strip().lower()
     if not q:
         return jsonify([])

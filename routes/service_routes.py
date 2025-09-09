@@ -19,11 +19,13 @@ _hdbank_service = None
 _vietjet_service = None
 _resort_service = None
 
+
 def get_hdbank_service():
     global _hdbank_service
     if _hdbank_service is None:
         _hdbank_service = HDBankService()
     return _hdbank_service
+
 
 def get_vietjet_service():
     global _vietjet_service
@@ -31,11 +33,13 @@ def get_vietjet_service():
         _vietjet_service = VietjetService()
     return _vietjet_service
 
+
 def get_resort_service():
     global _resort_service
     if _resort_service is None:
         _resort_service = ResortService()
     return _resort_service
+
 
 # =============================================================================
 # HDBANK ROUTES
@@ -57,6 +61,7 @@ def hdbank_dashboard(customer_id):
             'error': f'Lỗi lấy dashboard HDBank: {str(e)}'
         }), 500
 
+
 @hdbank_bp.route('/status/<int:customer_id>', methods=['GET'])
 def hdbank_service_status(customer_id):
     """Kiểm tra trạng thái dịch vụ ngân hàng của khách hàng"""
@@ -72,6 +77,7 @@ def hdbank_service_status(customer_id):
             'success': False,
             'error': f'Lỗi kiểm tra trạng thái HDBank: {str(e)}'
         }), 500
+
 
 @hdbank_bp.route('/transfer', methods=['POST'])
 def hdbank_transfer():
@@ -91,6 +97,7 @@ def hdbank_transfer():
             'error': f'Lỗi chuyển khoản: {str(e)}'
         }), 500
 
+
 @hdbank_bp.route('/loan', methods=['POST'])
 def hdbank_loan():
     """Đăng ký khoản vay HDBank"""
@@ -109,6 +116,7 @@ def hdbank_loan():
             'error': f'Lỗi đăng ký vay: {str(e)}'
         }), 500
 
+
 @hdbank_bp.route('/open-card', methods=['POST'])
 def hdbank_open_card():
     """Mở thẻ ngân hàng HDBank mới"""
@@ -126,6 +134,7 @@ def hdbank_open_card():
             'error': f'Lỗi mở thẻ: {str(e)}'
         }), 500
 
+
 @hdbank_bp.route('/cards/<int:customer_id>', methods=['GET'])
 def get_customer_cards(customer_id):
     """Xem danh sách thẻ của khách hàng"""
@@ -142,6 +151,7 @@ def get_customer_cards(customer_id):
             'error': f'Lỗi lấy danh sách thẻ: {str(e)}'
         }), 500
 
+
 @hdbank_bp.route('/card-types', methods=['GET'])
 def get_card_types():
     """Xem các loại thẻ có sẵn"""
@@ -156,6 +166,7 @@ def get_card_types():
             'success': False,
             'error': f'Lỗi lấy loại thẻ: {str(e)}'
         }), 500
+
 
 # =============================================================================
 # VIETJET ROUTES
@@ -174,17 +185,18 @@ def vietjet_book_flight():
             ticket_class=data.get('ticket_class', 'economy'),
             booking_value=data.get('booking_value')
         )
-        
+
         if result['success']:
             return jsonify(result)
         else:
             return jsonify(result), 400
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
             'error': f'Lỗi đặt vé: {str(e)}'
         }), 500
+
 
 @vietjet_bp.route('/history/<int:customer_id>', methods=['GET'])
 def vietjet_history(customer_id):
@@ -202,6 +214,7 @@ def vietjet_history(customer_id):
             'error': f'Lỗi lấy lịch sử: {str(e)}'
         }), 500
 
+
 # =============================================================================
 # RESORT ROUTES
 # =============================================================================
@@ -218,17 +231,18 @@ def resort_book_room():
             nights_stayed=data.get('nights_stayed'),
             booking_value=data.get('booking_value')
         )
-        
+
         if result['success']:
             return jsonify(result)
         else:
             return jsonify(result), 400
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
             'error': f'Lỗi đặt phòng: {str(e)}'
         }), 500
+
 
 @resort_bp.route('/book-spa', methods=['POST'])
 def resort_book_spa():
@@ -241,12 +255,12 @@ def resort_book_spa():
             booking_date=data.get('booking_date'),
             booking_value=data.get('booking_value')
         )
-        
+
         if result['success']:
             return jsonify(result)
         else:
             return jsonify(result), 400
-            
+
     except Exception as e:
         return jsonify({
             'success': False,

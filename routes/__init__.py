@@ -1,6 +1,6 @@
 # routes/__init__.py
 from .auth_routes import auth_bp
-from .customer_routes import customer_bp
+from .customer_routes import customer_bp, customers_bp
 from .admin_routes import admin_bp
 from .ai_routes import ai_bp
 from .marketplace_routes import marketplace_bp, p2p_bp
@@ -23,6 +23,7 @@ def register_blueprints(app):
     """Register all blueprints with the Flask app (each blueprint already has its own url_prefix)."""
     app.register_blueprint(auth_bp)
     app.register_blueprint(customer_bp)
+    app.register_blueprint(customers_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(ai_bp)
     app.register_blueprint(marketplace_bp)

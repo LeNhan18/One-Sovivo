@@ -16,16 +16,17 @@ class CustomerService:
         HDBankTransaction = self.models.get('HDBankTransaction')
         VietjetFlight = self.models.get('VietjetFlight')
         ResortBooking = self.models.get('ResortBooking')
-        
+
         if not Customer:
             return None
-            
+
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return None
 
         # HDBank summary
-        hdbank_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).all() if HDBankTransaction else []
+        hdbank_transactions = HDBankTransaction.query.filter_by(
+            customer_id=customer_id).all() if HDBankTransaction else []
         hdbank_summary = {}
         if hdbank_transactions:
             balances = [float(t.balance) for t in hdbank_transactions]
@@ -33,8 +34,10 @@ class CustomerService:
             hdbank_summary = {
                 'total_transactions': len(hdbank_transactions),
                 'average_balance': sum(balances) / len(balances),
-                'total_credit_last_3m': sum(float(t.amount) for t in hdbank_transactions if t.transaction_type == 'credit'),
-                'total_debit_last_3m': sum(float(t.amount) for t in hdbank_transactions if t.transaction_type == 'debit')
+                'total_credit_last_3m': sum(
+                    float(t.amount) for t in hdbank_transactions if t.transaction_type == 'credit'),
+                'total_debit_last_3m': sum(
+                    float(t.amount) for t in hdbank_transactions if t.transaction_type == 'debit')
             }
 
         # Vietjet summary

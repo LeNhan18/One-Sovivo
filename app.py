@@ -27,10 +27,11 @@ import matplotlib.pyplot as plt
 try:
     from blockchain_simple import update_nft_on_blockchain, get_nft_metadata
     from blockchain_config import (
-        evaluate_all_achievements, 
+        evaluate_all_achievements,
         get_highest_rank_from_achievements,
         ACHIEVEMENT_CONFIG
     )
+
     BLOCKCHAIN_ENABLED = True
     print("Blockchain integration loaded successfully")
 except ImportError as e:
@@ -41,6 +42,7 @@ except ImportError as e:
 try:
     from mission_progression import mission_system, get_missions_for_customer
     from detailed_missions import DetailedMissionSystem
+
     MISSION_SYSTEM_ENABLED = True
     print("Mission progression system loaded successfully")
 except ImportError as e:
@@ -139,7 +141,7 @@ class HDBankCard(db.Model):
     expiry_date = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
+
     def to_dict(self):
         return {
             'card_id': self.card_id,
@@ -198,7 +200,7 @@ class TokenTransaction(db.Model):
 # =============================================================================
 class Achievement(db.Model):
     __tablename__ = 'achievements'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)  # ví dụ: "Phi công Vàng"
     description = db.Column(db.Text, nullable=False)  # "Bay hơn 20 chuyến trong năm"
@@ -208,12 +210,12 @@ class Achievement(db.Model):
 
 class CustomerAchievement(db.Model):
     __tablename__ = 'customer_achievements'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False)
     achievement_id = db.Column(db.Integer, db.ForeignKey('achievements.id'), nullable=False)
     unlocked_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    
+
     # Relationships
     customer = db.relationship('Customer', backref='achievements')
     achievement = db.relationship('Achievement', backref='customers')
@@ -221,7 +223,7 @@ class CustomerAchievement(db.Model):
 
 class CustomerMission(db.Model):
     __tablename__ = 'customer_missions'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False)
     mission_id = db.Column(db.String(100), nullable=False)  # ID từ mission progression system
@@ -234,14 +236,14 @@ class CustomerMission(db.Model):
     started_at = db.Column(db.DateTime, nullable=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    
+
     # Relationships
     customer = db.relationship('Customer', backref='missions')
 
 
 class CustomerMissionProgress(db.Model):
     __tablename__ = 'customer_mission_progress'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False)
     mission_id = db.Column(db.String(100), nullable=False)
@@ -250,7 +252,7 @@ class CustomerMissionProgress(db.Model):
     required_value = db.Column(db.Numeric(15, 2), nullable=False)
     is_completed = db.Column(db.Boolean, default=False)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
+
     # Relationships
     customer = db.relationship('Customer', backref='mission_progress')
 
@@ -260,7 +262,7 @@ class CustomerMissionProgress(db.Model):
 # =============================================================================
 class MarketplaceItem(db.Model):
     __tablename__ = 'marketplace_items'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)  # "Voucher ăn uống 100K"
     description = db.Column(db.Text)
@@ -274,7 +276,7 @@ class MarketplaceItem(db.Model):
 
 class P2PListing(db.Model):
     __tablename__ = 'p2p_listings'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     seller_customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=False)
     item_name = db.Column(db.String(100), nullable=False)
@@ -284,7 +286,7 @@ class P2PListing(db.Model):
     buyer_customer_id = db.Column(db.Integer, db.ForeignKey('customers.customer_id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     sold_at = db.Column(db.DateTime, nullable=True)
-    
+
     # Relationships
     seller = db.relationship('Customer', foreign_keys=[seller_customer_id], backref='p2p_listings')
     buyer = db.relationship('Customer', foreign_keys=[buyer_customer_id], backref='p2p_purchases')
@@ -537,7 +539,7 @@ def get_customer_achievements_api(customer_id):
         ).join(Achievement).filter(
             CustomerAchievement.customer_id == customer_id
         ).all()
-        
+
         achievements = []
         for ca, achievement in customer_achievements:
             achievements.append({
@@ -547,13 +549,13 @@ def get_customer_achievements_api(customer_id):
                 'badge_image_url': achievement.badge_image_url,
                 'unlocked_at': ca.unlocked_at.isoformat() if ca.unlocked_at else None
             })
-        
+
         return jsonify({
             'customer_id': customer_id,
             'achievements': achievements,
             'total_achievements': len(achievements)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi khi lấy thành tựu: {str(e)}'}), 500
 
@@ -567,37 +569,37 @@ def assign_achievement_to_customer():
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền gán thành tựu'}), 403
-        
+
         data = request.get_json()
         customer_id = data.get('customer_id')
         achievement_id = data.get('achievement_id')
         admin_note = data.get('admin_note', '')
-        
+
         if not customer_id or not achievement_id:
             return jsonify({'error': 'Thiếu customer_id hoặc achievement_id'}), 400
-        
+
         # Kiểm tra customer tồn tại
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Kiểm tra achievement tồn tại
         achievement = Achievement.query.get(achievement_id)
         if not achievement:
             return jsonify({'error': f'Achievement {achievement_id} không tồn tại'}), 404
-        
+
         # Kiểm tra đã có achievement này chưa
         existing = CustomerAchievement.query.filter_by(
             customer_id=customer_id,
             achievement_id=achievement_id
         ).first()
-        
+
         if existing:
             return jsonify({
                 'error': f'Khách hàng đã có achievement "{achievement.name}" rồi',
                 'unlocked_at': existing.unlocked_at.isoformat() if existing.unlocked_at else None
             }), 400
-        
+
         # Gán achievement cho customer
         customer_achievement = CustomerAchievement(
             customer_id=customer_id,
@@ -605,7 +607,7 @@ def assign_achievement_to_customer():
             unlocked_at=datetime.datetime.utcnow()
         )
         db.session.add(customer_achievement)
-        
+
         # Thêm SVT token reward nếu có
         svt_reward = 0
         if 'Phi công Vàng' in achievement.name:
@@ -620,7 +622,7 @@ def assign_achievement_to_customer():
             svt_reward = 800
         else:
             svt_reward = 500  # Default reward
-        
+
         # Tạo token transaction
         if svt_reward > 0:
             token_tx = TokenTransaction(
@@ -632,15 +634,15 @@ def assign_achievement_to_customer():
                 block_number=random.randint(1000000, 2000000)
             )
             db.session.add(token_tx)
-        
+
         # Log admin action
         admin_log = f"Admin {user.email} gán achievement '{achievement.name}' cho customer {customer_id}"
         if admin_note:
             admin_log += f" - Ghi chú: {admin_note}"
         print(f"🔧 {admin_log}")
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã gán thành tựu "{achievement.name}" cho {customer.name}',
@@ -656,7 +658,7 @@ def assign_achievement_to_customer():
             'assigned_by': user.email,
             'assigned_at': customer_achievement.unlocked_at.isoformat()
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi gán thành tựu: {str(e)}'}), 500
@@ -671,16 +673,16 @@ def get_all_achievements():
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền xem danh sách achievements'}), 403
-        
+
         achievements = Achievement.query.all()
-        
+
         achievement_list = []
         for achievement in achievements:
             # Đếm số customer đã có achievement này
             customer_count = CustomerAchievement.query.filter_by(
                 achievement_id=achievement.id
             ).count()
-            
+
             achievement_list.append({
                 'id': achievement.id,
                 'name': achievement.name,
@@ -689,13 +691,13 @@ def get_all_achievements():
                 'customer_count': customer_count,
                 'created_at': achievement.created_at.isoformat() if achievement.created_at else None
             })
-        
+
         return jsonify({
             'success': True,
             'achievements': achievement_list,
             'total': len(achievement_list)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi lấy danh sách achievements: {str(e)}'}), 500
 
@@ -709,20 +711,20 @@ def create_new_achievement():
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền tạo achievement'}), 403
-        
+
         data = request.get_json()
         name = data.get('name')
         description = data.get('description')
         badge_image_url = data.get('badge_image_url', '/static/badges/default.png')
-        
+
         if not name or not description:
             return jsonify({'error': 'Thiếu tên hoặc mô tả achievement'}), 400
-        
+
         # Kiểm tra tên đã tồn tại chưa
         existing = Achievement.query.filter_by(name=name).first()
         if existing:
             return jsonify({'error': f'Achievement "{name}" đã tồn tại'}), 400
-        
+
         # Tạo achievement mới
         new_achievement = Achievement(
             name=name,
@@ -731,9 +733,9 @@ def create_new_achievement():
         )
         db.session.add(new_achievement)
         db.session.commit()
-        
+
         print(f"🏆 Admin {user.email} tạo achievement mới: {name}")
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã tạo achievement "{name}" thành công',
@@ -746,7 +748,7 @@ def create_new_achievement():
             },
             'created_by': user.email
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi tạo achievement: {str(e)}'}), 500
@@ -761,26 +763,26 @@ def get_customer_achievements_for_admin(customer_id):
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền xem'}), 403
-        
+
         # Kiểm tra customer tồn tại
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Lấy tất cả achievements có sẵn
         all_achievements = Achievement.query.all()
-        
+
         # Lấy achievements đã có của customer
         customer_achievements = db.session.query(CustomerAchievement).filter_by(
             customer_id=customer_id
         ).all()
-        
+
         achieved_ids = {ca.achievement_id for ca in customer_achievements}
-        
+
         # Phân loại achievements
         achieved_list = []
         available_list = []
-        
+
         for achievement in all_achievements:
             achievement_data = {
                 'id': achievement.id,
@@ -788,7 +790,7 @@ def get_customer_achievements_for_admin(customer_id):
                 'description': achievement.description,
                 'badge_image_url': achievement.badge_image_url
             }
-            
+
             if achievement.id in achieved_ids:
                 # Tìm thông tin unlock
                 ca = next(ca for ca in customer_achievements if ca.achievement_id == achievement.id)
@@ -796,12 +798,14 @@ def get_customer_achievements_for_admin(customer_id):
                 achieved_list.append(achievement_data)
             else:
                 available_list.append(achievement_data)
-        
+
         # Thống kê hoạt động của customer
         total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
-        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
-        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
-        
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+            customer_id=customer_id).scalar() or 0
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+            customer_id=customer_id).scalar() or 0
+
         return jsonify({
             'success': True,
             'customer': {
@@ -823,9 +827,10 @@ def get_customer_achievements_for_admin(customer_id):
                 'avg_balance': float(avg_balance),
                 'member_since': customer.created_at.strftime('%Y-%m-%d') if customer.created_at else None
             },
-            'suggested_achievements': get_suggested_achievements_for_customer(customer_id, total_flights, total_resort_nights, avg_balance)
+            'suggested_achievements': get_suggested_achievements_for_customer(customer_id, total_flights,
+                                                                              total_resort_nights, avg_balance)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi lấy thông tin: {str(e)}'}), 500
 
@@ -833,13 +838,13 @@ def get_customer_achievements_for_admin(customer_id):
 def get_suggested_achievements_for_customer(customer_id, total_flights, total_resort_nights, avg_balance):
     """Gợi ý achievements phù hợp cho khách hàng dựa trên hoạt động"""
     suggestions = []
-    
+
     # Kiểm tra các achievements đã có
     existing_achievements = db.session.query(CustomerAchievement.achievement_id).filter_by(
         customer_id=customer_id
     ).all()
     existing_ids = {ea.achievement_id for ea in existing_achievements}
-    
+
     # Logic gợi ý dựa trên hoạt động
     if total_flights >= 20:
         # Gợi ý Phi công Vàng nếu chưa có
@@ -871,7 +876,7 @@ def get_suggested_achievements_for_customer(customer_id, total_flights, total_re
                 'reason': f'Khách hàng đã bay {total_flights} chuyến (≥5 chuyến)',
                 'confidence': 'high'
             })
-    
+
     # Gợi ý dựa trên số dư
     if avg_balance >= 100000000:  # ≥ 100 triệu
         vip_achievement = Achievement.query.filter_by(name='Khách hàng VIP').first()
@@ -882,7 +887,7 @@ def get_suggested_achievements_for_customer(customer_id, total_flights, total_re
                 'reason': f'Số dư trung bình {avg_balance:,.0f} VNĐ (≥100 triệu)',
                 'confidence': 'high'
             })
-    
+
     # Gợi ý dựa trên nghỉ dưỡng
     if total_resort_nights >= 10:
         traveler_achievement = Achievement.query.filter_by(name='Người du lịch').first()
@@ -893,7 +898,7 @@ def get_suggested_achievements_for_customer(customer_id, total_flights, total_re
                 'reason': f'Đã nghỉ dưỡng {total_resort_nights} đêm (≥10 đêm)',
                 'confidence': 'medium'
             })
-    
+
     return suggestions[:5]  # Giới hạn 5 gợi ý
 
 
@@ -906,23 +911,23 @@ def bulk_assign_achievements():
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền gán hàng loạt'}), 403
-        
+
         data = request.get_json()
         customer_ids = data.get('customer_ids', [])
         achievement_id = data.get('achievement_id')
         admin_note = data.get('admin_note', 'Bulk assignment')
-        
+
         if not customer_ids or not achievement_id:
             return jsonify({'error': 'Thiếu customer_ids hoặc achievement_id'}), 400
-        
+
         # Kiểm tra achievement tồn tại
         achievement = Achievement.query.get(achievement_id)
         if not achievement:
             return jsonify({'error': f'Achievement {achievement_id} không tồn tại'}), 404
-        
+
         success_count = 0
         errors = []
-        
+
         for customer_id in customer_ids:
             try:
                 # Kiểm tra customer tồn tại
@@ -930,17 +935,17 @@ def bulk_assign_achievements():
                 if not customer:
                     errors.append(f'Customer {customer_id}: không tồn tại')
                     continue
-                
+
                 # Kiểm tra đã có achievement chưa
                 existing = CustomerAchievement.query.filter_by(
                     customer_id=customer_id,
                     achievement_id=achievement_id
                 ).first()
-                
+
                 if existing:
                     errors.append(f'Customer {customer_id}: đã có achievement này')
                     continue
-                
+
                 # Gán achievement
                 customer_achievement = CustomerAchievement(
                     customer_id=customer_id,
@@ -948,7 +953,7 @@ def bulk_assign_achievements():
                     unlocked_at=datetime.datetime.utcnow()
                 )
                 db.session.add(customer_achievement)
-                
+
                 # Thêm SVT reward
                 svt_reward = 500  # Default reward for bulk assignment
                 token_tx = TokenTransaction(
@@ -960,16 +965,16 @@ def bulk_assign_achievements():
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(token_tx)
-                
+
                 success_count += 1
-                
+
             except Exception as e:
                 errors.append(f'Customer {customer_id}: {str(e)}')
-        
+
         db.session.commit()
-        
+
         print(f"🔧 Admin {user.email} bulk assigned '{achievement.name}' to {success_count} customers")
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã gán "{achievement.name}" cho {success_count} khách hàng',
@@ -979,7 +984,7 @@ def bulk_assign_achievements():
             'errors': errors,
             'assigned_by': user.email
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi gán hàng loạt: {str(e)}'}), 500
@@ -994,30 +999,33 @@ def auto_assign_achievements(customer_id):
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền tự động gán achievements'}), 403
-        
+
         # Kiểm tra customer tồn tại
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Thu thập dữ liệu thực tế của khách hàng
         total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
         business_flights = VietjetFlight.query.filter_by(customer_id=customer_id, ticket_class='business').count()
-        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
-        total_resort_spending = db.session.query(db.func.sum(ResortBooking.booking_value)).filter_by(customer_id=customer_id).scalar() or 0
-        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+            customer_id=customer_id).scalar() or 0
+        total_resort_spending = db.session.query(db.func.sum(ResortBooking.booking_value)).filter_by(
+            customer_id=customer_id).scalar() or 0
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+            customer_id=customer_id).scalar() or 0
         total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
-        
+
         # Lấy achievements đã có
         existing_achievements = db.session.query(CustomerAchievement.achievement_id).filter_by(
             customer_id=customer_id
         ).all()
         existing_ids = {ea.achievement_id for ea in existing_achievements}
-        
+
         # Logic tự động gán achievements
         assigned_achievements = []
         total_svt_reward = 0
-        
+
         # 1. Achievements bay chở
         if total_flights >= 20:
             gold_pilot = Achievement.query.filter_by(name='Phi công Vàng').first()
@@ -1025,60 +1033,64 @@ def auto_assign_achievements(customer_id):
                 assign_achievement_automatically(customer_id, gold_pilot.id, "Tự động: ≥20 chuyến bay")
                 assigned_achievements.append(gold_pilot.name)
                 total_svt_reward += 2000
-        
+
         elif total_flights >= 10:
             silver_pilot = Achievement.query.filter_by(name='Phi công Bạc').first()
             if silver_pilot and silver_pilot.id not in existing_ids:
                 assign_achievement_automatically(customer_id, silver_pilot.id, "Tự động: ≥10 chuyến bay")
                 assigned_achievements.append(silver_pilot.name)
                 total_svt_reward += 1500
-        
+
         elif total_flights >= 5:
             bronze_pilot = Achievement.query.filter_by(name='Phi công Đồng').first()
             if bronze_pilot and bronze_pilot.id not in existing_ids:
                 assign_achievement_automatically(customer_id, bronze_pilot.id, "Tự động: ≥5 chuyến bay")
                 assigned_achievements.append(bronze_pilot.name)
                 total_svt_reward += 1000
-        
+
         # 2. VIP based on balance
         if avg_balance >= 100000000:  # ≥ 100 triệu
             vip_achievement = Achievement.query.filter_by(name='Khách hàng VIP').first()
             if vip_achievement and vip_achievement.id not in existing_ids:
-                assign_achievement_automatically(customer_id, vip_achievement.id, f"Tự động: Số dư TB {avg_balance:,.0f} VNĐ")
+                assign_achievement_automatically(customer_id, vip_achievement.id,
+                                                 f"Tự động: Số dư TB {avg_balance:,.0f} VNĐ")
                 assigned_achievements.append(vip_achievement.name)
                 total_svt_reward += 1500
-        
+
         # 3. Du lịch resort
         if total_resort_nights >= 10:
             traveler_achievement = Achievement.query.filter_by(name='Người du lịch').first()
             if traveler_achievement and traveler_achievement.id not in existing_ids:
-                assign_achievement_automatically(customer_id, traveler_achievement.id, f"Tự động: {total_resort_nights} đêm nghỉ dưỡng")
+                assign_achievement_automatically(customer_id, traveler_achievement.id,
+                                                 f"Tự động: {total_resort_nights} đêm nghỉ dưỡng")
                 assigned_achievements.append(traveler_achievement.name)
                 total_svt_reward += 800
-        
+
         # 4. Đầu tư thông minh (có hơn 1000 SVT tokens)
         current_svt = db.session.execute(
             db.text("SELECT COALESCE(SUM(amount), 0) FROM token_transactions WHERE customer_id = :customer_id"),
             {"customer_id": customer_id}
         ).fetchone()[0] or 0
-        
+
         if current_svt >= 1000:
             investor_achievement = Achievement.query.filter_by(name='Nhà đầu tư thông minh').first()
             if investor_achievement and investor_achievement.id not in existing_ids:
-                assign_achievement_automatically(customer_id, investor_achievement.id, f"Tự động: Có {current_svt:,.0f} SVT tokens")
+                assign_achievement_automatically(customer_id, investor_achievement.id,
+                                                 f"Tự động: Có {current_svt:,.0f} SVT tokens")
                 assigned_achievements.append(investor_achievement.name)
                 total_svt_reward += 500
-        
+
         # 5. Người tiên phong (nhiều giao dịch)
         if total_transactions >= 100:
             pioneer_achievement = Achievement.query.filter_by(name='Người tiên phong').first()
             if pioneer_achievement and pioneer_achievement.id not in existing_ids:
-                assign_achievement_automatically(customer_id, pioneer_achievement.id, f"Tự động: {total_transactions} giao dịch")
+                assign_achievement_automatically(customer_id, pioneer_achievement.id,
+                                                 f"Tự động: {total_transactions} giao dịch")
                 assigned_achievements.append(pioneer_achievement.name)
                 total_svt_reward += 600
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã tự động phân tích và gán {len(assigned_achievements)} achievements cho {customer.name}',
@@ -1099,7 +1111,7 @@ def auto_assign_achievements(customer_id):
             },
             'assigned_by': f"Auto-analysis by {user.email}"
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi tự động gán achievements: {str(e)}'}), 500
@@ -1115,10 +1127,10 @@ def assign_achievement_automatically(customer_id, achievement_id, reason):
             unlocked_at=datetime.datetime.utcnow()
         )
         db.session.add(customer_achievement)
-        
+
         # Lấy thông tin achievement để tính reward
         achievement = Achievement.query.get(achievement_id)
-        
+
         # Tính SVT reward
         svt_reward = 500  # Default
         if 'Phi công Vàng' in achievement.name:
@@ -1135,7 +1147,7 @@ def assign_achievement_automatically(customer_id, achievement_id, reason):
             svt_reward = 500
         elif 'tiên phong' in achievement.name.lower():
             svt_reward = 600
-        
+
         # Thêm SVT token transaction
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -1146,9 +1158,9 @@ def assign_achievement_automatically(customer_id, achievement_id, reason):
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         print(f"🤖 Auto-assigned '{achievement.name}' to customer {customer_id}: {reason}")
-        
+
     except Exception as e:
         print(f"❌ Error auto-assigning achievement: {e}")
         raise e
@@ -1163,41 +1175,43 @@ def search_customers_for_admin():
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền tìm kiếm khách hàng'}), 403
-        
+
         query_param = request.args.get('q', '').strip()
         limit = int(request.args.get('limit', 20))
-        
+
         if not query_param:
             return jsonify({'error': 'Thiếu từ khóa tìm kiếm'}), 400
-        
+
         # Tìm kiếm theo customer_id hoặc tên
         customers = []
-        
+
         # Tìm theo customer_id nếu là số
         if query_param.isdigit():
             customer_id = int(query_param)
             customer = Customer.query.filter_by(customer_id=customer_id).first()
             if customer:
                 customers.append(customer)
-        
+
         # Tìm theo tên (nếu chưa tìm thấy hoặc không phải số)
         if not customers:
             customers = Customer.query.filter(
                 Customer.name.contains(query_param)
             ).limit(limit).all()
-        
+
         # Chuẩn bị dữ liệu trả về với thống kê
         customer_data = []
         for customer in customers:
             # Lấy thống kê hoạt động
             total_flights = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
-            total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer.customer_id).scalar() or 0
-            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
             total_transactions = HDBankTransaction.query.filter_by(customer_id=customer.customer_id).count()
-            
+
             # Đếm achievements hiện có
             achievement_count = CustomerAchievement.query.filter_by(customer_id=customer.customer_id).count()
-            
+
             customer_data.append({
                 'customer_id': customer.customer_id,
                 'name': customer.name,
@@ -1214,14 +1228,14 @@ def search_customers_for_admin():
                     'achievement_count': achievement_count
                 }
             })
-        
+
         return jsonify({
             'success': True,
             'customers': customer_data,
             'total_found': len(customer_data),
             'search_query': query_param
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi tìm kiếm: {str(e)}'}), 500
 
@@ -1235,16 +1249,16 @@ def auto_assign_achievements_simple():
         user = request.current_user
         if user.role != 'admin':
             return jsonify({'error': 'Chỉ admin mới có quyền tự động gán achievements'}), 403
-        
+
         data = request.get_json()
         customer_id = data.get('customer_id')
-        
+
         if not customer_id:
             return jsonify({'error': 'Thiếu customer_id'}), 400
-        
+
         # Gọi API auto-assign đã có
         return auto_assign_achievements(customer_id)
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi tự động gán: {str(e)}'}), 500
 
@@ -1255,14 +1269,14 @@ def get_marketplace_items_api():
     try:
         partner = request.args.get('partner')  # Lọc theo thương hiệu
         limit = int(request.args.get('limit', 50))
-        
+
         query = MarketplaceItem.query.filter_by(is_active=True)
-        
+
         if partner:
             query = query.filter_by(partner_brand=partner)
-            
+
         items = query.limit(limit).all()
-        
+
         items_data = []
         for item in items:
             items_data.append({
@@ -1275,12 +1289,12 @@ def get_marketplace_items_api():
                 'image_url': item.image_url,
                 'created_at': item.created_at.isoformat()
             })
-        
+
         return jsonify({
             'items': items_data,
             'total': len(items_data)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi khi lấy vật phẩm: {str(e)}'}), 500
 
@@ -1293,38 +1307,38 @@ def purchase_marketplace_item_api():
         data = request.get_json()
         item_id = data.get('item_id')
         quantity = data.get('quantity', 1)
-        
+
         # Lấy customer_id từ user đăng nhập
         user = request.current_user
         if not user.customer_id or not user.customer:
             return jsonify({'error': 'Người dùng chưa có thông tin khách hàng'}), 400
-        
+
         # Get actual business customer_id
         actual_customer_id = user.customer.customer_id
-        
+
         # Kiểm tra vật phẩm
         item = MarketplaceItem.query.get(item_id)
         if not item or not item.is_active:
             return jsonify({'error': 'Vật phẩm không tồn tại hoặc đã ngừng bán'}), 404
-        
+
         if item.quantity < quantity:
             return jsonify({'error': 'Không đủ số lượng'}), 400
-        
+
         total_cost = float(item.price_svt) * quantity
-        
+
         # Kiểm tra số dư SVT (từ token_transactions)
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :customer_id
         """
-        
+
         result = db.session.execute(db.text(token_query), {"customer_id": actual_customer_id})
         row = result.fetchone()
         current_balance = float(row.total_svt) if row and row.total_svt else 0
         if current_balance < total_cost:
             return jsonify({'error': f'Không đủ SVT. Cần {total_cost}, có {current_balance}'}), 400
-        
+
         # Thực hiện giao dịch
         # 1. Trừ SVT
         debit_transaction = TokenTransaction(
@@ -1335,19 +1349,19 @@ def purchase_marketplace_item_api():
             description=f"Mua {quantity}x {item.name}"
         )
         db.session.add(debit_transaction)
-        
+
         # 2. Giảm số lượng vật phẩm
         item.quantity -= quantity
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã mua thành công {quantity}x {item.name}',
             'transaction_id': debit_transaction.id,
             'remaining_svt': current_balance - total_cost
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi khi mua hàng: {str(e)}'}), 500
@@ -1359,15 +1373,15 @@ def get_p2p_listings_api():
     try:
         status = request.args.get('status', 'active')
         limit = int(request.args.get('limit', 20))
-        
+
         query = P2PListing.query.filter_by(status=status)
         listings = query.order_by(P2PListing.created_at.desc()).limit(limit).all()
-        
+
         listings_data = []
         for listing in listings:
             # Lấy thông tin người bán
             seller = Customer.query.filter_by(customer_id=listing.seller_customer_id).first()
-            
+
             listings_data.append({
                 'id': listing.id,
                 'item_name': listing.item_name,
@@ -1380,12 +1394,12 @@ def get_p2p_listings_api():
                 'status': listing.status,
                 'created_at': listing.created_at.isoformat()
             })
-        
+
         return jsonify({
             'listings': listings_data,
             'total': len(listings_data)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi khi lấy tin đăng P2P: {str(e)}'}), 500
 
@@ -1397,26 +1411,26 @@ def create_p2p_listing_api():
     try:
         data = request.get_json()
         user = request.current_user
-        
+
         if not user.customer_id:
             return jsonify({'error': 'Người dùng chưa có thông tin khách hàng'}), 400
-        
+
         listing = P2PListing(
             seller_customer_id=user.customer_id,
             item_name=data.get('item_name'),
             description=data.get('description', ''),
             price_svt=data.get('price_svt')
         )
-        
+
         db.session.add(listing)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'listing_id': listing.id,
             'message': 'Đã tạo tin đăng thành công'
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi khi tạo tin đăng: {str(e)}'}), 500
@@ -1450,7 +1464,7 @@ def register_api():
         # Find max customer_id and increment
         max_customer = Customer.query.order_by(Customer.customer_id.desc()).first()
         next_customer_id = (max_customer.customer_id + 1) if max_customer else 2001
-        
+
         # Create customer record
         customer = Customer(
             customer_id=next_customer_id,
@@ -1476,8 +1490,8 @@ def register_api():
     return jsonify({
         'token': token,
         'user': {
-            'email': user.email, 
-            'name': user.name, 
+            'email': user.email,
+            'name': user.name,
             'role': user.role,
             'customer_id': customer_business_id  # Return business customer_id
         }
@@ -1503,8 +1517,8 @@ def login_api():
     return jsonify({
         'token': token,
         'user': {
-            'email': user.email, 
-            'name': user.name, 
+            'email': user.email,
+            'name': user.name,
             'role': user.role,
             'customer_id': actual_customer_id
         }
@@ -1519,10 +1533,10 @@ def me_api():
     actual_customer_id = None
     if user.customer_id and user.customer:
         actual_customer_id = user.customer.customer_id
-    
+
     return jsonify({
-        'email': user.email, 
-        'name': user.name, 
+        'email': user.email,
+        'name': user.name,
         'role': user.role,
         'customer_id': actual_customer_id
     })
@@ -1695,7 +1709,7 @@ def predict_persona():
         # =============================================================================
         achievements = []
         customer_id = data.get('customer_id', 0)  # Lấy customer_id từ request
-        
+
         # Tạo profile 360° từ input data để kiểm tra thành tựu
         profile = {
             'vietjet_summary': {
@@ -1716,17 +1730,17 @@ def predict_persona():
             try:
                 # Evaluate all achievements using the configuration system
                 earned_achievements = evaluate_all_achievements(profile)
-                
+
                 if earned_achievements:
                     # Get the highest rank from all achievements
                     highest_rank = get_highest_rank_from_achievements(earned_achievements)
-                    
+
                     print(f"🏆 {len(earned_achievements)} thành tựu mới được phát hiện cho khách hàng {customer_id}")
-                    
+
                     # Process each achievement
                     for achievement in earned_achievements:
                         print(f"   - {achievement['title']}: {achievement['description']}")
-                        
+
                         # Add to response
                         achievements.append({
                             'title': achievement['title'],
@@ -1735,7 +1749,7 @@ def predict_persona():
                             'rank': achievement['rank'],
                             'svt_reward': achievement['svt_reward']
                         })
-                        
+
                         # Update NFT on blockchain for each achievement
                         if customer_id:
                             try:
@@ -1744,17 +1758,17 @@ def predict_persona():
                                     new_rank=achievement['rank'],
                                     new_badge=achievement['badge']
                                 )
-                                
+
                                 if tx_hash:
                                     print(f"✅ NFT updated on blockchain: {tx_hash}")
                                     achievements[-1]['blockchain_tx'] = tx_hash
                                 else:
                                     print(f"❌ Blockchain update failed for {achievement['badge']}")
-                                    
+
                             except Exception as blockchain_error:
                                 print(f"❌ Blockchain update error for {achievement['badge']}: {blockchain_error}")
                                 achievements[-1]['blockchain_error'] = str(blockchain_error)
-                    
+
                     # Final rank update with the highest rank achieved
                     if customer_id and earned_achievements:
                         try:
@@ -1767,10 +1781,10 @@ def predict_persona():
                                 print(f"✅ Final rank update to {highest_rank}: {final_tx}")
                         except Exception as e:
                             print(f"❌ Final rank update failed: {e}")
-                            
+
                 else:
                     print(f"ℹ️ Không có thành tựu mới cho khách hàng {customer_id}")
-                    
+
             except Exception as evaluation_error:
                 print(f"❌ Achievement evaluation error: {evaluation_error}")
                 achievements.append({
@@ -1783,7 +1797,7 @@ def predict_persona():
         else:
             # Fallback: Simple achievement check without blockchain
             print("⚠️ Blockchain disabled - using fallback achievement system")
-            
+
             if profile['vietjet_summary']['total_flights_last_year'] > 20:
                 achievements.append({
                     'title': 'Frequent Flyer',
@@ -1838,16 +1852,16 @@ def test_blockchain():
     """Test blockchain integration endpoint."""
     if not BLOCKCHAIN_ENABLED:
         return jsonify({"error": "Blockchain integration not enabled"}), 503
-    
+
     data = request.json or {}
     token_id = data.get('token_id', 0)
     rank = data.get('rank', 'Gold')
     badge = data.get('badge', 'test_badge')
-    
+
     try:
         print(f"🧪 Testing blockchain update: Token {token_id}, Rank: {rank}, Badge: {badge}")
         tx_hash = update_nft_on_blockchain(token_id, rank, badge)
-        
+
         if tx_hash:
             return jsonify({
                 "success": True,
@@ -1859,7 +1873,7 @@ def test_blockchain():
                 "success": False,
                 "message": "Blockchain update failed"
             }), 500
-            
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -1873,14 +1887,14 @@ def simulate_event():
     """Simulate customer achieving VIP status and trigger blockchain updates."""
     if not BLOCKCHAIN_ENABLED:
         return jsonify({"error": "Blockchain integration not enabled"}), 503
-    
+
     data = request.json or {}
     event_type = data.get('event_type', 'vip_upgrade')
     customer_id = data.get('customer_id', 1)
-    
+
     try:
         print(f"🎭 Simulating event: {event_type} for customer {customer_id}")
-        
+
         if event_type == 'vip_upgrade':
             # Simulate VIP customer profile that meets all criteria
             simulated_profile = {
@@ -1892,13 +1906,14 @@ def simulate_event():
                 'total_nights_stayed': 50,  # Long stays for Long Stay Guest
                 'total_resort_spending': 100_000_000  # High spending for Resort Lover
             }
-            
+
             print("🚀 Simulating VIP customer profile:")
             print(f"   Balance: {simulated_profile['avg_balance']:,} VND")
-            print(f"   Flights: {simulated_profile['total_flights']} (Business: {simulated_profile['is_business_flyer']})")
+            print(
+                f"   Flights: {simulated_profile['total_flights']} (Business: {simulated_profile['is_business_flyer']})")
             print(f"   Resort nights: {simulated_profile['total_nights_stayed']}")
             print(f"   Resort spending: {simulated_profile['total_resort_spending']:,} VND")
-            
+
             # Create profile for evaluation
             profile = {
                 'vietjet_summary': {
@@ -1913,28 +1928,28 @@ def simulate_event():
                     'total_nights_stayed': simulated_profile['total_nights_stayed']
                 }
             }
-            
+
             # Evaluate achievements using the same logic as predict_persona
             earned_achievements = evaluate_all_achievements(profile)
-            
+
             if earned_achievements:
                 highest_rank = get_highest_rank_from_achievements(earned_achievements)
-                
+
                 print(f"🏆 {len(earned_achievements)} achievements triggered!")
-                
+
                 blockchain_updates = []
-                
+
                 # Process each achievement
                 for achievement in earned_achievements:
                     print(f"   - {achievement['title']}: {achievement['description']}")
-                    
+
                     try:
                         tx_hash = update_nft_on_blockchain(
                             token_id=customer_id,
                             new_rank=achievement['rank'],
                             new_badge=achievement['badge']
                         )
-                        
+
                         if tx_hash:
                             print(f"     ✅ Blockchain updated: {tx_hash}")
                             blockchain_updates.append({
@@ -1946,10 +1961,10 @@ def simulate_event():
                             })
                         else:
                             print(f"     ❌ Blockchain update failed for {achievement['badge']}")
-                            
+
                     except Exception as blockchain_error:
                         print(f"     ❌ Blockchain error: {blockchain_error}")
-                
+
                 # Final rank update
                 if blockchain_updates:
                     try:
@@ -1969,9 +1984,9 @@ def simulate_event():
                             })
                     except Exception as e:
                         print(f"❌ Final rank update failed: {e}")
-                
+
                 total_svt = sum(update.get('svt_reward', 0) for update in blockchain_updates)
-                
+
                 return jsonify({
                     "success": True,
                     "event_type": event_type,
@@ -1989,7 +2004,7 @@ def simulate_event():
                     "message": "No achievements triggered by simulation",
                     "simulated_profile": simulated_profile
                 })
-        
+
         elif event_type == 'frequent_flyer':
             # Simulate just frequent flyer achievement
             tx_hash = update_nft_on_blockchain(customer_id, "Gold", "frequent_flyer")
@@ -2000,7 +2015,7 @@ def simulate_event():
                 "transaction_hash": tx_hash,
                 "message": f"Simulated Frequent Flyer achievement for customer {customer_id}"
             })
-        
+
         elif event_type == 'high_roller':
             # Simulate high roller achievement
             tx_hash = update_nft_on_blockchain(customer_id, "Diamond", "high_roller")
@@ -2011,14 +2026,14 @@ def simulate_event():
                 "transaction_hash": tx_hash,
                 "message": f"Simulated High Roller achievement for customer {customer_id}"
             })
-        
+
         else:
             return jsonify({
                 "success": False,
                 "error": f"Unknown event type: {event_type}",
                 "available_events": ["vip_upgrade", "frequent_flyer", "high_roller"]
             }), 400
-            
+
     except Exception as e:
         print(f"❌ Simulation error: {e}")
         return jsonify({
@@ -2069,26 +2084,26 @@ def get_user_tokens(user_id):
         # Query token_transactions table to get real SVT balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :user_id
         """
-        
+
         result = db.session.execute(db.text(token_query), {"user_id": user_id})
         row = result.fetchone()
         total_svt = float(row.total_svt) if row and row.total_svt else 0
-        
+
         # Get recent transactions
         recent_query = """
             SELECT tx_hash, transaction_type, amount, description, created_at
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :user_id
             ORDER BY created_at DESC
             LIMIT 10
         """
-        
+
         recent_result = db.session.execute(db.text(recent_query), {"user_id": user_id})
         transactions = []
-        
+
         for row in recent_result:
             transactions.append({
                 "txHash": row.tx_hash[:10] + "...",
@@ -2096,14 +2111,14 @@ def get_user_tokens(user_id):
                 "amount": f"{'+ ' if row.amount > 0 else '- '}{abs(row.amount):,.0f} SVT",
                 "time": row.created_at.strftime("%d/%m/%Y %H:%M") if row.created_at else "N/A"
             })
-        
+
         return jsonify({
             "success": True,
             "user_id": user_id,
             "total_svt": total_svt,
             "transactions": transactions
         })
-        
+
     except Exception as e:
         print(f"❌ Error getting tokens for user {user_id}: {e}")
         return jsonify({
@@ -2125,13 +2140,13 @@ def add_svt_tokens():
         description = data.get('description', 'Mission reward')
         mission_id = data.get('mission_id', '')
         log_blockchain = data.get('log_blockchain', False)
-        
+
         if not customer_id or not amount:
             return jsonify({
                 "success": False,
                 "error": "Missing customer_id or amount"
             }), 400
-        
+
         # Generate blockchain transaction hash with better uniqueness
         import uuid
         import random
@@ -2139,7 +2154,7 @@ def add_svt_tokens():
         unique_id = str(uuid.uuid4()).replace('-', '')[:16]
         random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
         tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]  # Standard length
-        
+
         # Add token transaction record
         new_transaction = TokenTransaction(
             customer_id=customer_id,
@@ -2148,42 +2163,42 @@ def add_svt_tokens():
             description=description,
             tx_hash=tx_hash
         )
-        
+
         db.session.add(new_transaction)
-        
+
         # 🔗 BLOCKCHAIN LOGGING: Update NFT on blockchain if enabled
         blockchain_result = None
         if log_blockchain and BLOCKCHAIN_ENABLED:
             try:
                 # Import blockchain functions
                 from blockchain_simple import update_nft_on_blockchain
-                
+
                 # Log transaction to blockchain
                 blockchain_result = update_nft_on_blockchain(
                     user_id=customer_id,
                     achievements=[f"Mission: {mission_id}"],
                     persona_data={"action": "mission_reward", "amount": amount}
                 )
-                
+
                 print(f"🔗 Blockchain TX logged: {blockchain_result.get('transaction_hash', 'N/A')}")
-                
+
             except Exception as blockchain_error:
                 print(f"⚠️ Blockchain logging failed: {blockchain_error}")
                 # Continue with database transaction even if blockchain fails
-        
+
         db.session.commit()
-        
+
         # Get updated balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :customer_id
         """
-        
+
         result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
         row = result.fetchone()
         new_balance = float(row.total_svt) if row and row.total_svt else 0
-        
+
         response_data = {
             "success": True,
             "message": f"Successfully added {amount} SVT tokens",
@@ -2192,7 +2207,7 @@ def add_svt_tokens():
             "tx_hash": tx_hash,
             "gas_used": 21000 if log_blockchain else 0
         }
-        
+
         # Add blockchain info if available
         if blockchain_result and blockchain_result.get('success'):
             response_data.update({
@@ -2200,9 +2215,9 @@ def add_svt_tokens():
                 "blockchain_gas": blockchain_result.get('gas_used'),
                 "blockchain_status": "confirmed"
             })
-        
+
         return jsonify(response_data)
-        
+
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error adding SVT tokens: {e}")
@@ -2222,17 +2237,17 @@ def test_add_svt_tokens(customer_id):
     try:
         data = request.get_json() or {}
         amount = data.get('amount', 1000)  # Default 1000 SVT
-        
+
         # Generate unique transaction hash
         import time
         import uuid
         import random
-        
+
         timestamp = int(time.time() * 1000000)
         unique_id = str(uuid.uuid4()).replace('-', '')[:16]
         random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
         tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
-        
+
         # Add test transaction
         test_transaction = TokenTransaction(
             customer_id=customer_id,
@@ -2241,21 +2256,21 @@ def test_add_svt_tokens(customer_id):
             description=f'Test tokens for marketplace testing',
             tx_hash=tx_hash
         )
-        
+
         db.session.add(test_transaction)
         db.session.commit()
-        
+
         # Get updated balance
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :customer_id
         """
-        
+
         result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
         row = result.fetchone()
         new_balance = float(row.total_svt) if row and row.total_svt else 0
-        
+
         return jsonify({
             "success": True,
             "message": f"Added {amount} test SVT tokens",
@@ -2263,7 +2278,7 @@ def test_add_svt_tokens(customer_id):
             "transaction_id": test_transaction.id,
             "tx_hash": tx_hash
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -2287,15 +2302,15 @@ def get_customer_missions_api(customer_id):
                 'available_missions': [],
                 'recommended_missions': []
             }), 503
-        
+
         # Lấy thông tin khách hàng từ database
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Tính toán dữ liệu khách hàng cho mission system
         customer_data = get_customer_data_for_missions(customer_id)
-        
+
         # Xác định loại khách hàng dựa trên dữ liệu thực tế
         if customer_data.get('total_transactions', 0) == 0:
             customer_type = 'new'
@@ -2303,14 +2318,14 @@ def get_customer_missions_api(customer_id):
             customer_type = 'vip'
         else:
             customer_type = 'regular'
-        
+
         # Lấy danh sách mission đã hoàn thành
         completed_missions_query = CustomerMission.query.filter_by(
-            customer_id=customer_id, 
+            customer_id=customer_id,
             status='completed'
         ).all()
         completed_missions = [m.mission_id for m in completed_missions_query]
-        
+
         # Sử dụng detailed mission system
         available_missions = detailed_mission_system.get_missions_for_customer(
             customer_id, customer_type, completed_missions
@@ -2318,10 +2333,10 @@ def get_customer_missions_api(customer_id):
         recommendations = detailed_mission_system.get_next_recommended_missions(
             customer_id, customer_type, completed_missions
         )
-        
+
         # Cập nhật database với missions mới từ template
         sync_detailed_missions_to_database(customer_id, recommendations[:5])
-        
+
         return jsonify({
             'success': True,
             'customer_id': customer_id,
@@ -2346,7 +2361,7 @@ def get_customer_missions_api(customer_id):
                 'social_referrals': customer_data.get('successful_referrals', 0)
             }
         })
-        
+
     except Exception as e:
         print(f"❌ Error getting missions for customer {customer_id}: {e}")
         return jsonify({
@@ -2362,36 +2377,37 @@ def start_mission_api(customer_id):
     try:
         data = request.get_json()
         mission_id = data.get('mission_id')
-        
+
         if not mission_id:
             return jsonify({'error': 'Mission ID required'}), 400
-        
+
         # Kiểm tra mission template tồn tại
         mission_template = detailed_mission_system.get_mission_by_id(mission_id)
         if not mission_template:
             return jsonify({'error': 'Mission template not found'}), 404
-        
+
         # Kiểm tra customer type và availability
         customer_data = get_customer_data_for_missions(customer_id)
         customer_type = 'new' if customer_data.get('total_transactions', 0) == 0 else 'regular'
-        
+
         completed_missions_query = CustomerMission.query.filter_by(
-            customer_id=customer_id, 
+            customer_id=customer_id,
             status='completed'
         ).all()
         completed_missions = [m.mission_id for m in completed_missions_query]
-        
+
         # Kiểm tra prerequisites
         prerequisites = mission_template.get('prerequisites', [])
         unmet_prerequisites = [p for p in prerequisites if p not in completed_missions]
-        
+
         if unmet_prerequisites:
             return jsonify({
                 'error': 'Prerequisites not met',
                 'unmet_prerequisites': unmet_prerequisites,
-                'required_missions': [detailed_mission_system.get_mission_by_id(p)['title'] for p in unmet_prerequisites if detailed_mission_system.get_mission_by_id(p)]
+                'required_missions': [detailed_mission_system.get_mission_by_id(p)['title'] for p in unmet_prerequisites
+                                      if detailed_mission_system.get_mission_by_id(p)]
             }), 400
-        
+
         # Kiểm tra customer type phù hợp
         if customer_type not in mission_template.get('customer_types', []):
             return jsonify({
@@ -2399,13 +2415,13 @@ def start_mission_api(customer_id):
                 'customer_type': customer_type,
                 'required_types': mission_template.get('customer_types', [])
             }), 400
-        
+
         # Kiểm tra mission đã tồn tại
         existing_mission = CustomerMission.query.filter_by(
             customer_id=customer_id,
             mission_id=mission_id
         ).first()
-        
+
         if existing_mission:
             if existing_mission.status == 'completed':
                 # Kiểm tra nếu mission có thể lặp lại
@@ -2433,13 +2449,13 @@ def start_mission_api(customer_id):
             # Tạo mission record mới
             category_mapping = {
                 'welcome': 'onboarding',
-                'daily': 'lifestyle', 
+                'daily': 'lifestyle',
                 'financial': 'financial',
                 'travel': 'travel',
                 'social': 'social'
             }
             db_category = category_mapping.get(mission_template['category'], 'lifestyle')
-            
+
             new_mission = CustomerMission(
                 customer_id=customer_id,
                 mission_id=mission_id,
@@ -2457,9 +2473,9 @@ def start_mission_api(customer_id):
                 }
             )
             db.session.add(new_mission)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã bắt đầu nhiệm vụ: {mission_template["title"]}',
@@ -2473,7 +2489,7 @@ def start_mission_api(customer_id):
             'started_at': datetime.datetime.utcnow().isoformat(),
             'is_repeatable': mission_template.get('is_repeatable', False)
         })
-        
+
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error starting mission {mission_id} for customer {customer_id}: {e}")
@@ -2481,7 +2497,7 @@ def start_mission_api(customer_id):
             'error': 'Failed to start mission',
             'details': str(e)
         }), 500
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã bắt đầu nhiệm vụ: {target_mission["title"]}',
@@ -2489,7 +2505,7 @@ def start_mission_api(customer_id):
             'estimated_time': target_mission.get('estimated_time', 'Không xác định'),
             'svt_reward': target_mission['svt_reward']
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -2501,52 +2517,52 @@ def complete_mission_api(customer_id):
     try:
         data = request.get_json()
         mission_id = data.get('mission_id')
-        
+
         if not mission_id:
             return jsonify({'error': 'Mission ID required'}), 400
-        
+
         # Kiểm tra mission record trong database
         mission_record = CustomerMission.query.filter_by(
             customer_id=customer_id,
             mission_id=mission_id
         ).first()
-        
+
         if not mission_record:
             return jsonify({'error': 'Mission not found in database'}), 404
-        
+
         if mission_record.status == 'completed':
             return jsonify({
                 'error': 'Mission already completed',
                 'completed_at': mission_record.completed_at.isoformat() if mission_record.completed_at else None
             }), 400
-        
+
         # Lấy thông tin mission từ detailed system
         mission_template = detailed_mission_system.get_mission_by_id(mission_id)
         if not mission_template:
             return jsonify({'error': 'Mission template not found'}), 404
-        
+
         # Cập nhật status mission
         mission_record.status = 'completed'
         mission_record.completed_at = datetime.datetime.utcnow()
-        
+
         # Tính toán phần thưởng SVT
         svt_reward = mission_template.get('reward_amount', 0)
         bonus_reward = 0
-        
+
         # Kiểm tra bonus rewards (ví dụ: daily login streak)
         if mission_id == 'daily_login':
             bonus_rewards = mission_template.get('bonus_rewards', {})
             # Có thể thêm logic kiểm tra streak ở đây
             # Ví dụ: nếu login 7 ngày liên tiếp thì có bonus
-        
+
         total_reward = svt_reward + bonus_reward
-        
+
         # Tạo transaction hash unique
         timestamp = int(time.time() * 1000000)  # Microsecond precision
         unique_id = str(uuid.uuid4()).replace('-', '')[:16]
         random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(16)])
         tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
-        
+
         # Lưu phần thưởng vào token_transactions
         reward_transaction = TokenTransaction(
             customer_id=customer_id,
@@ -2556,9 +2572,9 @@ def complete_mission_api(customer_id):
             tx_hash=tx_hash,
             created_at=datetime.datetime.utcnow()
         )
-        
+
         db.session.add(reward_transaction)
-        
+
         # Cập nhật mission record với phần thưởng
         mission_record.svt_reward = total_reward
         mission_record.progress_data = {
@@ -2567,20 +2583,20 @@ def complete_mission_api(customer_id):
             'transaction_hash': tx_hash,
             'bonus_applied': bonus_reward > 0
         }
-        
+
         # Commit tất cả thay đổi
         db.session.commit()
-        
+
         # Lấy số dư SVT hiện tại
         token_query = """
             SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :customer_id
         """
         result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
         row = result.fetchone()
         new_balance = float(row.total_svt) if row and row.total_svt else 0
-        
+
         # 🔗 Log to blockchain if enabled
         blockchain_result = None
         if BLOCKCHAIN_ENABLED:
@@ -2594,34 +2610,34 @@ def complete_mission_api(customer_id):
                 print(f"🔗 Mission completion logged to blockchain: {blockchain_result.get('transaction_hash', 'N/A')}")
             except Exception as blockchain_error:
                 print(f"⚠️ Blockchain logging failed: {blockchain_error}")
-        
+
         # Kiểm tra và unlock missions tiếp theo
         next_missions = []
         try:
             # Lấy danh sách completed missions để tính toán next missions
             completed_missions_query = CustomerMission.query.filter_by(
-                customer_id=customer_id, 
+                customer_id=customer_id,
                 status='completed'
             ).all()
             completed_mission_ids = [m.mission_id for m in completed_missions_query]
-            
+
             # Lấy customer type
             customer_data = get_customer_data_for_missions(customer_id)
             customer_type = 'new' if customer_data.get('total_transactions', 0) == 0 else 'regular'
-            
+
             # Get next recommended missions
             recommendations = detailed_mission_system.get_next_recommended_missions(
                 customer_id, customer_type, completed_mission_ids
             )
-            
+
             # Sync new missions to database
             if recommendations:
                 sync_detailed_missions_to_database(customer_id, recommendations[:3])
                 next_missions = [{'id': m['id'], 'title': m['title']} for m in recommendations[:3]]
-                
+
         except Exception as next_mission_error:
             print(f"⚠️ Error getting next missions: {next_mission_error}")
-        
+
         return jsonify({
             'success': True,
             'message': f'Hoàn thành nhiệm vụ thành công: {mission_template["title"]}',
@@ -2635,7 +2651,7 @@ def complete_mission_api(customer_id):
             'next_missions': next_missions,
             'blockchain_logged': blockchain_result is not None and blockchain_result.get('success', False)
         })
-        
+
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error completing mission {mission_id} for customer {customer_id}: {e}")
@@ -2654,24 +2670,24 @@ def get_mission_progress_api(customer_id, mission_id):
             customer_id=customer_id,
             mission_id=mission_id
         ).first()
-        
+
         if not mission_record:
             return jsonify({'error': 'Mission not found'}), 404
-        
+
         # Lấy thông tin mission template
         mission_template = detailed_mission_system.get_mission_by_id(mission_id)
         if not mission_template:
             return jsonify({'error': 'Mission template not found'}), 404
-        
+
         # Tính toán progress
         progress_data = mission_record.progress_data or {}
         target_value = mission_template.get('target_value', 1)
         current_value = progress_data.get('current_value', 0)
-        
+
         # Tính phần trăm hoàn thành
         progress_percentage = min(100, (current_value / target_value) * 100) if target_value > 0 else 0
         is_completed = mission_record.status == 'completed'
-        
+
         return jsonify({
             'success': True,
             'mission_id': mission_id,
@@ -2687,7 +2703,7 @@ def get_mission_progress_api(customer_id, mission_id):
             'instructions': mission_template.get('instructions', []),
             'estimated_time': mission_template.get('estimated_time', '5 phút')
         })
-        
+
     except Exception as e:
         print(f"❌ Error getting mission progress: {e}")
         return jsonify({
@@ -2702,24 +2718,24 @@ def get_mission_leaderboard_api():
     try:
         # Tính toán số missions đã hoàn thành cho mỗi customer
         leaderboard_query = """
-            SELECT 
+            SELECT
                 c.customer_id,
                 c.name,
                 COUNT(cm.id) as completed_missions,
                 COALESCE(SUM(cm.svt_reward), 0) as total_svt_earned,
                 MAX(cm.completed_at) as last_completion
             FROM customers c
-            LEFT JOIN customer_missions cm ON c.customer_id = cm.customer_id 
+            LEFT JOIN customer_missions cm ON c.customer_id = cm.customer_id
                 AND cm.status = 'completed'
             GROUP BY c.customer_id, c.name
             HAVING completed_missions > 0
             ORDER BY completed_missions DESC, total_svt_earned DESC
             LIMIT 10
         """
-        
+
         result = db.session.execute(db.text(leaderboard_query))
         leaderboard = []
-        
+
         for i, row in enumerate(result, 1):
             leaderboard.append({
                 'rank': i,
@@ -2729,13 +2745,13 @@ def get_mission_leaderboard_api():
                 'total_svt_earned': float(row.total_svt_earned),
                 'last_completion': row.last_completion.isoformat() if row.last_completion else None
             })
-        
+
         return jsonify({
             'success': True,
             'leaderboard': leaderboard,
             'total_participants': len(leaderboard)
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2746,36 +2762,36 @@ def update_customer_stats_api(customer_id):
     try:
         data = request.get_json()
         stat_updates = data.get('stats', {})
-        
+
         if not stat_updates:
             return jsonify({'error': 'No stats provided'}), 400
-        
+
         # Update hoặc insert stats
         updated_stats = []
         for stat_key, stat_value in stat_updates.items():
             update_query = """
                 INSERT INTO customer_stats (customer_id, stat_key, stat_value)
                 VALUES (:customer_id, :stat_key, :stat_value)
-                ON DUPLICATE KEY UPDATE 
+                ON DUPLICATE KEY UPDATE
                     stat_value = :stat_value,
                     last_updated = CURRENT_TIMESTAMP
             """
-            
+
             db.session.execute(db.text(update_query), {
                 "customer_id": customer_id,
                 "stat_key": stat_key,
                 "stat_value": stat_value
             })
             updated_stats.append(f"{stat_key}: {stat_value}")
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Updated {len(stat_updates)} stats for customer {customer_id}',
             'updated_stats': updated_stats
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -2788,27 +2804,27 @@ def get_mission_templates_api():
         customer_type = request.args.get('customer_type')
         category = request.args.get('category')
         level = request.args.get('level')
-        
+
         query = "SELECT * FROM mission_templates WHERE is_active = 1"
         params = {}
-        
+
         if customer_type:
             query += " AND customer_type = :customer_type"
             params['customer_type'] = customer_type
-            
+
         if category:
             query += " AND category = :category"
             params['category'] = category
-            
+
         if level:
             query += " AND level = :level"
             params['level'] = level
-        
+
         query += " ORDER BY customer_type, level, category"
-        
+
         result = db.session.execute(db.text(query), params)
         templates = []
-        
+
         for row in result:
             templates.append({
                 'id': row.id,
@@ -2826,13 +2842,13 @@ def get_mission_templates_api():
                 'estimated_time': row.estimated_time,
                 'created_at': row.created_at.isoformat() if row.created_at else None
             })
-        
+
         return jsonify({
             'success': True,
             'templates': templates,
             'total': len(templates)
         })
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2847,33 +2863,33 @@ def get_customer_data_for_missions(customer_id: int) -> dict:
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return {}
-        
+
         # Lấy stats từ customer_stats table
         stats_query = """
-            SELECT stat_key, stat_value 
-            FROM customer_stats 
+            SELECT stat_key, stat_value
+            FROM customer_stats
             WHERE customer_id = :customer_id
         """
         stats_result = db.session.execute(db.text(stats_query), {"customer_id": customer_id})
         stats_dict = {row.stat_key: float(row.stat_value) for row in stats_result}
-        
+
         # Đếm số giao dịch thực tế
         transaction_count = TokenTransaction.query.filter_by(customer_id=customer_id).count()
-        
+
         # Tính tổng chi tiêu thực tế
         spending_query = """
             SELECT COALESCE(SUM(ABS(amount)), 0) as total_spending
-            FROM token_transactions 
+            FROM token_transactions
             WHERE customer_id = :customer_id AND amount < 0
         """
         spending_result = db.session.execute(db.text(spending_query), {"customer_id": customer_id})
         total_spending = float(spending_result.fetchone().total_spending or 0)
-        
+
         # Tính độ hoàn thiện profile
         profile_fields = ['name', 'age', 'gender', 'job', 'city', 'persona_type']
         filled_fields = sum(1 for field in profile_fields if getattr(customer, field))
         profile_completeness = (filled_fields / len(profile_fields)) * 100
-        
+
         # Merge dữ liệu thực tế với stats
         customer_data = {
             'customer_id': customer_id,
@@ -2889,12 +2905,12 @@ def get_customer_data_for_missions(customer_id: int) -> dict:
             'job_filled': bool(customer.job),
             'persona_type_filled': bool(customer.persona_type),
         }
-        
+
         # Thêm stats từ database
         customer_data.update(stats_dict)
-        
+
         return customer_data
-        
+
     except Exception as e:
         print(f"❌ Error getting customer data: {e}")
         return {}
@@ -2908,7 +2924,7 @@ def sync_missions_to_database(customer_id: int, available_missions: list):
                 customer_id=customer_id,
                 mission_id=mission['id']
             ).first()
-            
+
             if not existing:
                 new_mission = CustomerMission(
                     customer_id=customer_id,
@@ -2920,7 +2936,7 @@ def sync_missions_to_database(customer_id: int, available_missions: list):
                     svt_reward=mission['svt_reward']
                 )
                 db.session.add(new_mission)
-        
+
         db.session.commit()
     except Exception as e:
         print(f"❌ Error syncing missions: {e}")
@@ -2933,21 +2949,21 @@ def sync_detailed_missions_to_database(customer_id: int, missions: list):
         # Map category names to database enum values
         category_mapping = {
             'welcome': 'onboarding',
-            'daily': 'lifestyle', 
+            'daily': 'lifestyle',
             'financial': 'financial',
             'travel': 'travel',
             'social': 'social'
         }
-        
+
         for mission in missions:
             existing = CustomerMission.query.filter_by(
                 customer_id=customer_id,
                 mission_id=mission['id']
             ).first()
-            
+
             if not existing:
                 db_category = category_mapping.get(mission['category'], 'lifestyle')
-                
+
                 new_mission = CustomerMission(
                     customer_id=customer_id,
                     mission_id=mission['id'],
@@ -2958,11 +2974,11 @@ def sync_detailed_missions_to_database(customer_id: int, missions: list):
                     svt_reward=mission['reward_amount']
                 )
                 db.session.add(new_mission)
-        
+
         db.session.commit()
-        print(f"✅ Synced {len(missions)} detailed missions for customer {customer_id}")
+        print(f" Synced {len(missions)} detailed missions for customer {customer_id}")
     except Exception as e:
-        print(f"❌ Error syncing detailed missions: {e}")
+        print(f" Error syncing detailed missions: {e}")
         db.session.rollback()
 
 
@@ -2970,14 +2986,14 @@ def create_mission_progress_tracking(customer_id: int, mission_id: str, mission_
     """Tạo progress tracking cho mission"""
     try:
         requirements = mission_data.get('requirements', {})
-        
+
         for req_key, req_value in requirements.items():
             existing = CustomerMissionProgress.query.filter_by(
                 customer_id=customer_id,
                 mission_id=mission_id,
                 requirement_key=req_key
             ).first()
-            
+
             if not existing:
                 progress_record = CustomerMissionProgress(
                     customer_id=customer_id,
@@ -2988,10 +3004,10 @@ def create_mission_progress_tracking(customer_id: int, mission_id: str, mission_
                     is_completed=False
                 )
                 db.session.add(progress_record)
-        
+
         db.session.commit()
     except Exception as e:
-        print(f"❌ Error creating progress tracking: {e}")
+        print(f" Error creating progress tracking: {e}")
         db.session.rollback()
 
 
@@ -3000,7 +3016,7 @@ def determine_customer_level(customer_data: dict) -> str:
     transaction_count = customer_data.get('transaction_count', 0)
     total_spending = customer_data.get('total_spending', 0)
     profile_completeness = customer_data.get('profile_completeness', 0)
-    
+
     if transaction_count >= 50 and total_spending >= 100000000 and profile_completeness >= 90:
         return 'Expert'
     elif transaction_count >= 20 and total_spending >= 50000000 and profile_completeness >= 70:
@@ -3082,75 +3098,22 @@ def get_recommendations(predicted_persona, input_data):
 # TEST ENDPOINTS - For development only
 # =============================================================================
 
-@app.route('/api/test/add-svt', methods=['POST'])
-def test_add_svt():
-    """Test endpoint to add SVT tokens for development"""
-    try:
-        data = request.get_json()
-        customer_id = data.get('customer_id', 2015)  # Default to 2015
-        amount = data.get('amount', 10000)  # Default to 10000 SVT
-        
-        # Generate unique transaction hash
-        import time
-        import uuid
-        import random
-        timestamp = int(time.time() * 1000000)
-        unique_id = str(uuid.uuid4()).replace('-', '')[:16]
-        random_part = ''.join([hex(random.randint(0, 15))[2:] for _ in range(8)])
-        tx_hash = f"0x{unique_id}{random_part}{hex(timestamp)[2:]}"[:66]
-        
-        # Add test transaction
-        test_transaction = TokenTransaction(
-            customer_id=customer_id,
-            amount=amount,
-            transaction_type='test_reward',
-            description=f'Test reward - {amount} SVT tokens',
-            tx_hash=tx_hash
-        )
-        
-        db.session.add(test_transaction)
-        db.session.commit()
-        
-        # Get updated balance
-        token_query = """
-            SELECT COALESCE(SUM(amount), 0) as total_svt
-            FROM token_transactions 
-            WHERE customer_id = :customer_id
-        """
-        
-        result = db.session.execute(db.text(token_query), {"customer_id": customer_id})
-        row = result.fetchone()
-        new_balance = float(row.total_svt) if row and row.total_svt else 0
-        
-        return jsonify({
-            "success": True,
-            "message": f"Added {amount} SVT tokens to customer {customer_id}",
-            "new_balance": new_balance,
-            "transaction_id": test_transaction.id,
-            "tx_hash": tx_hash
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
 
 @app.route('/api/token-transactions/<int:customer_id>', methods=['GET'])
 def get_token_transactions(customer_id):
     """Get token transactions directly from database"""
     try:
         # Get all transactions for this customer
-        transactions = TokenTransaction.query.filter_by(customer_id=customer_id).order_by(TokenTransaction.created_at.desc()).all()
-        
+        transactions = TokenTransaction.query.filter_by(customer_id=customer_id).order_by(
+            TokenTransaction.created_at.desc()).all()
+
         # Calculate total balance
         total_balance = db.session.execute(
-            db.text("SELECT COALESCE(SUM(amount), 0) as total FROM token_transactions WHERE customer_id = :customer_id"),
+            db.text(
+                "SELECT COALESCE(SUM(amount), 0) as total FROM token_transactions WHERE customer_id = :customer_id"),
             {"customer_id": customer_id}
         ).fetchone().total or 0
-        
+
         # Format transactions
         transaction_list = []
         for tx in transactions:
@@ -3163,7 +3126,7 @@ def get_token_transactions(customer_id):
                 "created_at": tx.created_at.strftime('%Y-%m-%d %H:%M:%S') if tx.created_at else None,
                 "block_number": tx.block_number
             })
-        
+
         return jsonify({
             "success": True,
             "customer_id": customer_id,
@@ -3171,7 +3134,7 @@ def get_token_transactions(customer_id):
             "transaction_count": len(transaction_list),
             "transactions": transaction_list
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -3195,16 +3158,16 @@ def vietjet_book_flight():
         ticket_class = data.get('ticket_class', 'economy')
         booking_value = data.get('booking_value', 2500000)
         passengers = data.get('passengers', 1)
-        
+
         if not customer_id:
             return jsonify({
                 "success": False,
                 "message": "customer_id is required"
             }), 400
-        
+
         # Sinh flight_id
         flight_id = f"VJ{int(time.time() * 1000)}"
-        
+
         # Parse flight_date
         if flight_date:
             flight_datetime = datetime.datetime.strptime(flight_date, '%Y-%m-%d')
@@ -3221,7 +3184,7 @@ def vietjet_book_flight():
             booking_value=booking_value * passengers
         )
         db.session.add(new_flight)
-        
+
         # Tính SVT reward dựa trên route
         if origin in ['HAN', 'SGN', 'DAD'] and destination in ['HAN', 'SGN', 'DAD']:
             svt_reward = 500  # Domestic
@@ -3254,7 +3217,7 @@ def vietjet_book_flight():
                 "flight_date": flight_datetime.strftime('%Y-%m-%d')
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -3267,9 +3230,9 @@ def vietjet_book_flight():
 def vietjet_booking_history(customer_id):
     """Lấy lịch sử đặt vé của khách hàng"""
     try:
-        flights = VietjetFlight.query.filter_by(customer_id=customer_id)\
+        flights = VietjetFlight.query.filter_by(customer_id=customer_id) \
             .order_by(VietjetFlight.flight_date.desc()).all()
-        
+
         flight_data = []
         for flight in flights:
             flight_data.append({
@@ -3281,12 +3244,12 @@ def vietjet_booking_history(customer_id):
                 "booking_value": float(flight.booking_value),
                 "created_at": flight.created_at.strftime('%Y-%m-%d %H:%M:%S')
             })
-        
+
         # Tính thống kê
         total_flights = len(flights)
         total_spending = sum(float(f.booking_value) for f in flights)
         business_flights = sum(1 for f in flights if f.ticket_class == 'business')
-        
+
         return jsonify({
             "success": True,
             "customer_id": customer_id,
@@ -3298,7 +3261,7 @@ def vietjet_booking_history(customer_id):
                 "favorite_route": f"{flights[0].origin}-{flights[0].destination}" if flights else "Chưa có"
             }
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -3314,21 +3277,21 @@ def check_customer_has_card(customer_id):
             HDBankTransaction.customer_id == customer_id,
             HDBankTransaction.description.like('%Mở thẻ HDBank%')
         ).count()
-        
+
         # Nếu có transaction mở thẻ, return True
         if card_count > 0:
             return True
-            
+
         # Nếu không có transaction mở thẻ nhưng có transaction HDBank khác
         # (có thể là dữ liệu cũ), tự động tạo transaction mở thẻ
         other_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
         if other_transactions > 0:
             print(f"Auto-creating card opening transaction for customer {customer_id}")
-            
+
             # Tạo transaction mở thẻ tự động
             card_number = f"4{random.randint(100000000000000, 999999999999999)}"
             card_id = f"AUTOCARD{int(time.time())}"
-            
+
             card_opening_tx = HDBankTransaction(
                 customer_id=customer_id,
                 transaction_id=card_id,
@@ -3340,9 +3303,9 @@ def check_customer_has_card(customer_id):
             )
             db.session.add(card_opening_tx)
             db.session.commit()
-            
+
             return True
-            
+
         return False
     except Exception as e:
         print(f"Error in check_customer_has_card: {e}")
@@ -3354,7 +3317,7 @@ def get_customer_card_info(customer_id):
     try:
         # Tìm thẻ trong bảng hdbank_cards
         card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
-        
+
         if card:
             return {
                 "has_card": True,
@@ -3385,13 +3348,13 @@ def auto_create_card_for_existing_customer(customer_id):
                 "success": False,
                 "message": "Khách hàng không tồn tại"
             }), 404
-            
+
         # Kiểm tra đã có thẻ chưa
         existing_card = HDBankTransaction.query.filter(
             HDBankTransaction.customer_id == customer_id,
             HDBankTransaction.description.like('%Mở thẻ HDBank%')
         ).first()
-        
+
         if existing_card:
             return jsonify({
                 "success": False,
@@ -3401,11 +3364,11 @@ def auto_create_card_for_existing_customer(customer_id):
                     "created_date": existing_card.transaction_date.isoformat()
                 }
             })
-        
+
         # Tạo thẻ tự động
         card_number = f"4{random.randint(100000000000000, 999999999999999)}"
         card_id = f"AUTOFIX{int(time.time())}"
-        
+
         card_opening_tx = HDBankTransaction(
             customer_id=customer_id,
             transaction_id=card_id,
@@ -3416,7 +3379,7 @@ def auto_create_card_for_existing_customer(customer_id):
             transaction_date=datetime.datetime.now()
         )
         db.session.add(card_opening_tx)
-        
+
         # Tặng SVT tokens
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -3427,9 +3390,9 @@ def auto_create_card_for_existing_customer(customer_id):
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "success": True,
             "message": f"Đã tự động tạo thẻ cho {customer.name}",
@@ -3443,7 +3406,7 @@ def auto_create_card_for_existing_customer(customer_id):
                 "svt_tokens": 500
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -3458,17 +3421,17 @@ def debug_customer_info(customer_id):
     try:
         # Kiểm tra customer
         customer = Customer.query.filter_by(customer_id=customer_id).first()
-        
+
         # Kiểm tra HDBank transactions
         hdbank_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).all()
         card_transactions = HDBankTransaction.query.filter_by(
             customer_id=customer_id,
             transaction_type="card_opening"
         ).all()
-        
+
         # Kiểm tra user account
         user = User.query.filter_by(customer_id=customer_id).first()
-        
+
         return jsonify({
             "debug_info": {
                 "customer_id": customer_id,
@@ -3488,7 +3451,7 @@ def debug_customer_info(customer_id):
                 "has_card_check": len(card_transactions) > 0
             }
         })
-        
+
     except Exception as e:
         return jsonify({
             "debug_info": {
@@ -3509,10 +3472,10 @@ def hdbank_dashboard(customer_id):
                 "success": False,
                 "message": "Khách hàng không tồn tại"
             }), 404
-        
+
         # Kiểm tra thẻ
         card_info = get_customer_card_info(customer_id)
-        
+
         # Nếu chưa có thẻ, hiển thị giao diện mở thẻ
         if not card_info["has_card"]:
             return jsonify({
@@ -3537,24 +3500,24 @@ def hdbank_dashboard(customer_id):
                 },
                 "available_services": []
             })
-        
+
         # Nếu đã có thẻ, hiển thị dashboard đầy đủ
         total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
         total_spent = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
             HDBankTransaction.customer_id == customer_id,
             HDBankTransaction.amount < 0
         ).scalar() or 0
-        
+
         total_received = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
             HDBankTransaction.customer_id == customer_id,
             HDBankTransaction.amount > 0
         ).scalar() or 0
-        
+
         # Lấy balance từ transaction mới nhất
-        latest_transaction = HDBankTransaction.query.filter_by(customer_id=customer_id)\
+        latest_transaction = HDBankTransaction.query.filter_by(customer_id=customer_id) \
             .order_by(HDBankTransaction.transaction_date.desc()).first()
         current_balance = float(latest_transaction.balance) if latest_transaction else 0
-        
+
         return jsonify({
             "success": True,
             "customer_id": customer_id,
@@ -3584,7 +3547,7 @@ def hdbank_dashboard(customer_id):
                 }
             ]
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -3603,19 +3566,20 @@ def hdbank_service_status(customer_id):
                 "success": False,
                 "message": "Khách hàng không tồn tại"
             }), 404
-        
+
         # Kiểm tra thẻ
         card_info = get_customer_card_info(customer_id)
-        
+
         # Thống kê giao dịch
         total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
-        total_amount = db.session.query(db.func.sum(HDBankTransaction.amount)).filter_by(customer_id=customer_id).scalar() or 0
-        
+        total_amount = db.session.query(db.func.sum(HDBankTransaction.amount)).filter_by(
+            customer_id=customer_id).scalar() or 0
+
         # Lấy giao dịch gần nhất
         recent_transactions = HDBankTransaction.query.filter_by(
             customer_id=customer_id
         ).order_by(HDBankTransaction.transaction_date.desc()).limit(5).all()
-        
+
         recent_list = []
         for tx in recent_transactions:
             recent_list.append({
@@ -3625,7 +3589,7 @@ def hdbank_service_status(customer_id):
                 "description": tx.description,
                 "date": tx.transaction_date.strftime('%Y-%m-%d %H:%M')
             })
-        
+
         return jsonify({
             "success": True,
             "customer_id": customer_id,
@@ -3643,7 +3607,7 @@ def hdbank_service_status(customer_id):
                 "open_card": not card_info["has_card"]
             }
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -3659,13 +3623,13 @@ def hdbank_transfer():
         customer_id = data.get('customer_id')
         amount = data.get('amount', 5000000)  # Default 5 triệu VND
         transfer_type = data.get('transfer_type', 'internal')
-        
+
         if not customer_id:
             return jsonify({
                 "success": False,
                 "message": "customer_id is required"
             }), 400
-        
+
         # Kiểm tra khách hàng có thẻ chưa
         if not check_customer_has_card(customer_id):
             return jsonify({
@@ -3679,10 +3643,10 @@ def hdbank_transfer():
                     "endpoint": "/api/service/hdbank/open-card"
                 }
             }), 403
-        
+
         # Tạo transaction ID
         transaction_id = f"HD{int(time.time())}"
-        
+
         # Thêm bank transaction vào database
         bank_tx = HDBankTransaction(
             customer_id=customer_id,
@@ -3694,10 +3658,10 @@ def hdbank_transfer():
             status="completed"
         )
         db.session.add(bank_tx)
-        
+
         # Tính SVT reward dựa trên số tiền
         svt_reward = max(100, int(amount / 50000))  # 100 SVT minimum, 1 SVT per 50k VND
-        
+
         # Thêm SVT token transaction
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -3708,9 +3672,9 @@ def hdbank_transfer():
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "success": True,
             "message": f"Chuyển khoản {amount:,} VND thành công!",
@@ -3721,7 +3685,7 @@ def hdbank_transfer():
                 "type": transfer_type
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -3738,13 +3702,13 @@ def hdbank_loan():
         customer_id = data.get('customer_id')
         loan_amount = data.get('loan_amount', 500000000)  # Default 500 triệu VND
         loan_type = data.get('loan_type', 'personal')
-        
+
         if not customer_id:
             return jsonify({
                 "success": False,
                 "message": "customer_id is required"
             }), 400
-        
+
         # Kiểm tra khách hàng có thẻ chưa
         if not check_customer_has_card(customer_id):
             return jsonify({
@@ -3758,10 +3722,10 @@ def hdbank_loan():
                     "endpoint": "/api/service/hdbank/open-card"
                 }
             }), 403
-        
+
         # Tạo loan transaction ID
         loan_id = f"LOAN{int(time.time())}"
-        
+
         # Thêm loan transaction vào database
         loan_tx = HDBankTransaction(
             customer_id=customer_id,
@@ -3773,10 +3737,10 @@ def hdbank_loan():
             status="approved"
         )
         db.session.add(loan_tx)
-        
+
         # SVT reward cho khoản vay lớn
         svt_reward = max(1000, int(loan_amount / 500000))  # 1000 SVT minimum, 1 SVT per 500k VND
-        
+
         # Thêm SVT token transaction
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -3787,9 +3751,9 @@ def hdbank_loan():
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "success": True,
             "message": f"Khoản vay {loan_amount:,} VND đã được phê duyệt!",
@@ -3801,7 +3765,7 @@ def hdbank_loan():
                 "interest_rate": "8.5%/năm"
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -3817,13 +3781,13 @@ def hdbank_open_card():
         data = request.get_json()
         customer_id = data.get('customer_id')
         card_type = data.get('card_type', 'classic')  # classic, gold, platinum
-        
+
         if not customer_id:
             return jsonify({
                 "success": False,
                 "message": "customer_id is required"
             }), 400
-        
+
         # Kiểm tra khách hàng có tồn tại không
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
@@ -3831,11 +3795,11 @@ def hdbank_open_card():
                 "success": False,
                 "message": "Khách hàng không tồn tại trong hệ thống"
             }), 404
-        
+
         # Tạo số thẻ ngẫu nhiên
         card_number = f"4{random.randint(100000000000000, 999999999999999)}"
         card_id = f"CARD{int(time.time())}"
-        
+
         # Định nghĩa các loại thẻ và phí
         card_config = {
             'classic': {
@@ -3857,9 +3821,9 @@ def hdbank_open_card():
                 'svt_reward': 2000
             }
         }
-        
+
         card_info = card_config.get(card_type, card_config['classic'])
-        
+
         # Kiểm tra khách hàng đã có thẻ chưa
         existing_card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
         if existing_card:
@@ -3867,13 +3831,14 @@ def hdbank_open_card():
                 "success": False,
                 "message": "Khách hàng đã có thẻ HDBank rồi"
             }), 400
-        
+
         # Get current balance for customer
-        latest_tx = HDBankTransaction.query.filter_by(customer_id=customer_id).order_by(HDBankTransaction.transaction_date.desc()).first()
+        latest_tx = HDBankTransaction.query.filter_by(customer_id=customer_id).order_by(
+            HDBankTransaction.transaction_date.desc()).first()
         current_balance = latest_tx.balance if latest_tx else 0
-        
+
         # Tạo thông tin thẻ trong bảng hdbank_cards
-        expiry_date = datetime.datetime.now() + datetime.timedelta(days=365*4)  # Thẻ hết hạn sau 4 năm
+        expiry_date = datetime.datetime.now() + datetime.timedelta(days=365 * 4)  # Thẻ hết hạn sau 4 năm
         new_card = HDBankCard(
             customer_id=customer_id,
             card_id=card_id,
@@ -3887,7 +3852,7 @@ def hdbank_open_card():
             expiry_date=expiry_date
         )
         db.session.add(new_card)
-        
+
         # Tạo transaction mở thẻ chính thức (cho tất cả loại thẻ)
         card_opening_tx = HDBankTransaction(
             customer_id=customer_id,
@@ -3899,11 +3864,11 @@ def hdbank_open_card():
             transaction_date=datetime.datetime.now()
         )
         db.session.add(card_opening_tx)
-        
+
         # Cập nhật balance sau khi mở thẻ
         if card_type != 'classic':
             current_balance = current_balance - card_info['annual_fee']
-        
+
         # Tạo transaction phí (nếu có phí)
         if card_info['annual_fee'] > 0:
             fee_tx = HDBankTransaction(
@@ -3916,7 +3881,7 @@ def hdbank_open_card():
                 transaction_date=datetime.datetime.now()
             )
             db.session.add(fee_tx)
-        
+
         # Tạo SVT reward cho việc mở thẻ
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -3927,7 +3892,7 @@ def hdbank_open_card():
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         # Nếu là thẻ free (classic), tặng thêm bonus
         if card_type == 'classic':
             new_balance = current_balance + 1000000  # Tặng 1 triệu VND
@@ -3941,12 +3906,12 @@ def hdbank_open_card():
                 transaction_date=datetime.datetime.now()
             )
             db.session.add(welcome_bonus)
-        
+
         db.session.commit()
-        
+
         # Tạo thông tin thẻ trả về
-        expiry_date = datetime.datetime.now() + datetime.timedelta(days=365*4)  # Thẻ hết hạn sau 4 năm
-        
+        expiry_date = datetime.datetime.now() + datetime.timedelta(days=365 * 4)  # Thẻ hết hạn sau 4 năm
+
         return jsonify({
             "success": True,
             "message": f"Mở thẻ {card_info['name']} thành công!",
@@ -3965,7 +3930,7 @@ def hdbank_open_card():
                 "welcome_bonus_vnd": 1000000 if card_type == 'classic' else 0
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -3983,13 +3948,13 @@ def get_customer_cards(customer_id):
             customer_id=customer_id,
             transaction_type="card_opening"
         ).all()
-        
+
         cards = []
         for tx in card_transactions:
             # Parse thông tin thẻ từ description
             description = tx.description
             card_number = description.split("Số thẻ: ")[1] if "Số thẻ: " in description else "****-****-****-0000"
-            
+
             cards.append({
                 "card_id": tx.transaction_id,
                 "card_number": f"****-****-****-{card_number[-4:]}",
@@ -3997,13 +3962,13 @@ def get_customer_cards(customer_id):
                 "opened_date": tx.transaction_date.strftime('%Y-%m-%d'),
                 "status": "active"
             })
-        
+
         return jsonify({
             "success": True,
             "cards": cards,
             "total_cards": len(cards)
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -4033,7 +3998,7 @@ def get_card_types():
                 ]
             },
             "gold": {
-                "name": "HDBank Gold Card", 
+                "name": "HDBank Gold Card",
                 "description": "Thẻ cao cấp với nhiều ưu đãi",
                 "annual_fee": 500000,
                 "credit_limit": 50000000,
@@ -4066,12 +4031,12 @@ def get_card_types():
                 ]
             }
         }
-        
+
         return jsonify({
             "success": True,
             "card_types": card_types
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
@@ -4087,16 +4052,16 @@ def resort_book_room():
         customer_id = data.get('customer_id')
         nights = data.get('nights', 2)
         room_type = data.get('room_type', 'deluxe')
-        
+
         if not customer_id:
             return jsonify({
                 "success": False,
                 "message": "customer_id is required"
             }), 400
-        
+
         # Tạo booking ID
         booking_id = f"RST{int(time.time())}"
-        
+
         # Tính giá phòng
         room_prices = {
             'standard': 2000000,
@@ -4104,7 +4069,7 @@ def resort_book_room():
             'suite': 6000000
         }
         total_price = room_prices.get(room_type, 3500000) * nights
-        
+
         # Thêm resort booking vào database (sử dụng đúng fields của model)
         resort_booking = ResortBooking(
             customer_id=customer_id,
@@ -4115,10 +4080,10 @@ def resort_book_room():
             booking_value=total_price
         )
         db.session.add(resort_booking)
-        
+
         # Tính SVT reward
         svt_reward = nights * 400  # 400 SVT per night
-        
+
         # Thêm SVT token transaction
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -4129,9 +4094,9 @@ def resort_book_room():
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "success": True,
             "message": f"Đặt phòng {room_type} {nights} đêm thành công!",
@@ -4143,7 +4108,7 @@ def resort_book_room():
                 "total_price": total_price
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -4159,16 +4124,16 @@ def resort_book_spa():
         data = request.get_json()
         customer_id = data.get('customer_id')
         spa_type = data.get('spa_type', 'massage')
-        
+
         if not customer_id:
             return jsonify({
                 "success": False,
                 "message": "customer_id is required"
             }), 400
-        
+
         # Tạo spa booking ID
         spa_booking_id = f"SPA{int(time.time())}"
-        
+
         # Tính giá spa
         spa_prices = {
             'massage': 1500000,
@@ -4177,7 +4142,7 @@ def resort_book_spa():
             'premium_package': 3500000
         }
         spa_price = spa_prices.get(spa_type, 1500000)
-        
+
         # Thêm spa booking như một resort booking (sử dụng đúng fields của model)
         spa_booking = ResortBooking(
             customer_id=customer_id,
@@ -4188,10 +4153,10 @@ def resort_book_spa():
             booking_value=spa_price
         )
         db.session.add(spa_booking)
-        
+
         # SVT reward cho spa
         svt_reward = int(spa_price / 5000)  # 1 SVT per 5k VND
-        
+
         # Thêm SVT token transaction
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -4202,9 +4167,9 @@ def resort_book_spa():
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             "success": True,
             "message": f"Đặt dịch vụ {spa_type} thành công!",
@@ -4215,7 +4180,7 @@ def resort_book_spa():
                 "price": spa_price
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -4251,24 +4216,20 @@ def init_app():
 # =============================================================================
 # STATIC ROUTES
 # =============================================================================
-@app.route('/admin/achievements')
-def admin_achievements_page():
-    """Serve admin achievements HTML page"""
-    return send_from_directory('.', 'admin_achievements.html')
 
 @app.route('/admin/achievements/list', methods=['GET'])
 def get_achievements_list():
     """API lấy danh sách achievements cho React component"""
     try:
         achievements = Achievement.query.all()
-        
+
         achievement_list = []
         for achievement in achievements:
             # Đếm số customer đã có achievement này
             customer_count = CustomerAchievement.query.filter_by(
                 achievement_id=achievement.id
             ).count()
-            
+
             # Xác định criteria dựa trên tên achievement
             criteria = {}
             if 'Phi công Đồng' in achievement.name:
@@ -4285,7 +4246,7 @@ def get_achievements_list():
                 criteria = {'resort_nights_required': 10}
             elif 'Người tiên phong' in achievement.name:
                 criteria = {'svt_balance_required': 1000}
-            
+
             achievement_list.append({
                 'id': achievement.id,
                 'name': achievement.name,
@@ -4295,20 +4256,22 @@ def get_achievements_list():
                 'created_at': achievement.created_at.isoformat() if achievement.created_at else None,
                 'criteria': criteria if criteria else None
             })
-        
+
         return jsonify({
             'success': True,
             'achievements': achievement_list,
             'total': len(achievement_list)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi lấy danh sách achievements: {str(e)}'}), 500
+
 
 @app.route('/debug/customer')
 def debug_customer_page():
     """Serve debug customer HTML page"""
     return send_from_directory('.', 'debug_customer.html')
+
 
 @app.route('/admin/customers/search', methods=['GET'])
 def search_customers_for_admin_simple():
@@ -4316,38 +4279,40 @@ def search_customers_for_admin_simple():
     try:
         query_param = request.args.get('q', '').strip()
         limit = int(request.args.get('limit', 20))
-        
+
         if not query_param:
             return jsonify({'error': 'Thiếu từ khóa tìm kiếm'}), 400
-        
+
         # Tìm kiếm theo customer_id hoặc tên
         customers = []
-        
+
         # Tìm theo customer_id nếu là số
         if query_param.isdigit():
             customer_id = int(query_param)
             customer = Customer.query.filter_by(customer_id=customer_id).first()
             if customer:
                 customers.append(customer)
-        
+
         # Tìm theo tên (nếu chưa tìm thấy hoặc không phải số)
         if not customers:
             customers = Customer.query.filter(
                 Customer.name.contains(query_param)
             ).limit(limit).all()
-        
+
         # Chuẩn bị dữ liệu trả về với thống kê
         customer_data = []
         for customer in customers:
             # Lấy thống kê hoạt động
             total_flights = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
-            total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer.customer_id).scalar() or 0
-            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
             total_transactions = HDBankTransaction.query.filter_by(customer_id=customer.customer_id).count()
-            
+
             # Đếm achievements hiện có
             achievement_count = CustomerAchievement.query.filter_by(customer_id=customer.customer_id).count()
-            
+
             customer_data.append({
                 'customer_id': customer.customer_id,
                 'name': customer.name,
@@ -4364,41 +4329,20 @@ def search_customers_for_admin_simple():
                     'achievement_count': achievement_count
                 }
             })
-        
+
         return jsonify({
             'success': True,
             'customers': customer_data,
             'total_found': len(customer_data),
             'search_query': query_param
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi tìm kiếm: {str(e)}'}), 500
 
-@app.route('/debug/customers', methods=['GET'])
-def debug_customers():
-    """Debug endpoint để xem tất cả customers"""
-    try:
-        customers = Customer.query.limit(10).all()
-        customer_list = []
-        for c in customers:
-            flights = VietjetFlight.query.filter_by(customer_id=c.customer_id).count()
-            achievements = CustomerAchievement.query.filter_by(customer_id=c.customer_id).count()
-            customer_list.append({
-                'customer_id': c.customer_id,
-                'name': c.name,
-                'age': c.age,
-                'city': c.city,
-                'flights': flights,
-                'achievements': achievements
-            })
-        
-        return jsonify({
-            'total_customers': Customer.query.count(),
-            'sample_customers': customer_list
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)})
+
+
+
 
 @app.route('/admin/customer/<int:customer_id>/achievements', methods=['GET'])
 def get_customer_achievements_for_admin_simple(customer_id):
@@ -4408,21 +4352,21 @@ def get_customer_achievements_for_admin_simple(customer_id):
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Lấy tất cả achievements có sẵn
         all_achievements = Achievement.query.all()
-        
+
         # Lấy achievements đã có của customer
         customer_achievements = db.session.query(CustomerAchievement).filter_by(
             customer_id=customer_id
         ).all()
-        
+
         achieved_ids = {ca.achievement_id for ca in customer_achievements}
-        
+
         # Phân loại achievements
         achieved_list = []
         available_list = []
-        
+
         for achievement in all_achievements:
             achievement_data = {
                 'id': achievement.id,
@@ -4430,7 +4374,7 @@ def get_customer_achievements_for_admin_simple(customer_id):
                 'description': achievement.description,
                 'badge_image_url': achievement.badge_image_url
             }
-            
+
             if achievement.id in achieved_ids:
                 # Tìm thông tin unlock
                 ca = next(ca for ca in customer_achievements if ca.achievement_id == achievement.id)
@@ -4438,12 +4382,14 @@ def get_customer_achievements_for_admin_simple(customer_id):
                 achieved_list.append(achievement_data)
             else:
                 available_list.append(achievement_data)
-        
+
         # Thống kê hoạt động của customer
         total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
-        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
-        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
-        
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+            customer_id=customer_id).scalar() or 0
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+            customer_id=customer_id).scalar() or 0
+
         return jsonify({
             'success': True,
             'customer': {
@@ -4461,9 +4407,10 @@ def get_customer_achievements_for_admin_simple(customer_id):
                 'avg_balance': float(avg_balance)
             }
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi lấy thông tin: {str(e)}'}), 500
+
 
 @app.route('/admin/assign-achievement', methods=['POST'])
 def assign_achievement_simple():
@@ -4472,15 +4419,15 @@ def assign_achievement_simple():
         data = request.get_json()
         customer_id = data.get('customer_id')
         achievement_id = data.get('achievement_id')
-        
+
         if not customer_id or not achievement_id:
             return jsonify({'error': 'Thiếu customer_id hoặc achievement_id'}), 400
-        
+
         # Kiểm tra customer tồn tại
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Kiểm tra achievement tồn tại
         achievement = Achievement.query.get(achievement_id)
         if not achievement:
@@ -4491,10 +4438,12 @@ def assign_achievement_simple():
             # Lấy số chuyến bay thực tế
             flight_count = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
             # Lấy số dư trung bình thực tế
-            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
             # Lấy số đêm resort
-            resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer.customer_id).scalar() or 0
-            
+            resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
+
             if 'Phi công Đồng' in achievement.name:
                 return flight_count >= 5
             elif 'Phi công Bạc' in achievement.name:
@@ -4510,26 +4459,27 @@ def assign_achievement_simple():
             elif 'Người tiên phong' in achievement.name:
                 return False  # SVT balance chưa implement
             return True  # Cho các achievement khác
-        
+
         if not check_eligibility(achievement, customer):
             # Lấy thông tin hiện tại để hiển thị trong lỗi
             flight_count = VietjetFlight.query.filter_by(customer_id=customer.customer_id).count()
-            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer.customer_id).scalar() or 0
+            avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+                customer_id=customer.customer_id).scalar() or 0
             return jsonify({
                 'error': f'Khách hàng chưa đủ điều kiện cho "{achievement.name}". Hiện tại: {flight_count} chuyến bay, {avg_balance:,.0f} VND'
             }), 400
-        
+
         # Kiểm tra đã có achievement này chưa
         existing = CustomerAchievement.query.filter_by(
             customer_id=customer_id,
             achievement_id=achievement_id
         ).first()
-        
+
         if existing:
             return jsonify({
                 'error': f'Khách hàng đã có achievement "{achievement.name}" rồi'
             }), 400
-        
+
         # Gán achievement cho customer
         customer_achievement = CustomerAchievement(
             customer_id=customer_id,
@@ -4537,7 +4487,7 @@ def assign_achievement_simple():
             unlocked_at=datetime.datetime.utcnow()
         )
         db.session.add(customer_achievement)
-        
+
         # Thêm SVT token reward
         svt_reward = 1000  # Default reward
         if 'Phi công Vàng' in achievement.name:
@@ -4546,7 +4496,7 @@ def assign_achievement_simple():
             svt_reward = 1500
         elif 'VIP' in achievement.name:
             svt_reward = 1500
-        
+
         # Tạo token transaction
         token_tx = TokenTransaction(
             customer_id=customer_id,
@@ -4557,18 +4507,19 @@ def assign_achievement_simple():
             block_number=random.randint(1000000, 2000000)
         )
         db.session.add(token_tx)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã gán thành tựu "{achievement.name}" cho {customer.name}',
             'svt_reward': svt_reward
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi gán thành tựu: {str(e)}'}), 500
+
 
 @app.route('/admin/auto-assign-achievements', methods=['POST'])
 def admin_auto_assign_achievements():
@@ -4576,30 +4527,32 @@ def admin_auto_assign_achievements():
     try:
         data = request.get_json()
         customer_id = data.get('customer_id')
-        
+
         if not customer_id:
             return jsonify({'error': 'Thiếu customer_id'}), 400
-        
+
         # Kiểm tra customer tồn tại
         customer = Customer.query.filter_by(customer_id=customer_id).first()
         if not customer:
             return jsonify({'error': f'Khách hàng {customer_id} không tồn tại'}), 404
-        
+
         # Thu thập dữ liệu thực tế của khách hàng
         total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
-        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(customer_id=customer_id).scalar() or 0
-        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(customer_id=customer_id).scalar() or 0
-        
+        avg_balance = db.session.query(db.func.avg(HDBankTransaction.balance)).filter_by(
+            customer_id=customer_id).scalar() or 0
+        total_resort_nights = db.session.query(db.func.sum(ResortBooking.nights_stayed)).filter_by(
+            customer_id=customer_id).scalar() or 0
+
         # Lấy achievements đã có
         existing_achievements = db.session.query(CustomerAchievement.achievement_id).filter_by(
             customer_id=customer_id
         ).all()
         existing_ids = {ea.achievement_id for ea in existing_achievements}
-        
+
         # Logic tự động gán achievements
         assigned_achievements = []
         total_svt_reward = 0
-        
+
         # 1. Achievements bay
         if total_flights >= 20:
             gold_pilot = Achievement.query.filter_by(name='Phi công Vàng').first()
@@ -4611,7 +4564,7 @@ def admin_auto_assign_achievements():
                     unlocked_at=datetime.datetime.utcnow()
                 )
                 db.session.add(ca)
-                
+
                 # Thêm SVT reward
                 token_tx = TokenTransaction(
                     customer_id=customer_id,
@@ -4622,10 +4575,10 @@ def admin_auto_assign_achievements():
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(token_tx)
-                
+
                 assigned_achievements.append(gold_pilot.name)
                 total_svt_reward += 2000
-        
+
         elif total_flights >= 10:
             silver_pilot = Achievement.query.filter_by(name='Phi công Bạc').first()
             if silver_pilot and silver_pilot.id not in existing_ids:
@@ -4636,7 +4589,7 @@ def admin_auto_assign_achievements():
                     unlocked_at=datetime.datetime.utcnow()
                 )
                 db.session.add(ca)
-                
+
                 # Thêm SVT reward
                 token_tx = TokenTransaction(
                     customer_id=customer_id,
@@ -4647,10 +4600,10 @@ def admin_auto_assign_achievements():
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(token_tx)
-                
+
                 assigned_achievements.append(silver_pilot.name)
                 total_svt_reward += 1500
-        
+
         elif total_flights >= 5:
             bronze_pilot = Achievement.query.filter_by(name='Phi công Đồng').first()
             if bronze_pilot and bronze_pilot.id not in existing_ids:
@@ -4661,7 +4614,7 @@ def admin_auto_assign_achievements():
                     unlocked_at=datetime.datetime.utcnow()
                 )
                 db.session.add(ca)
-                
+
                 # Thêm SVT reward
                 token_tx = TokenTransaction(
                     customer_id=customer_id,
@@ -4672,10 +4625,10 @@ def admin_auto_assign_achievements():
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(token_tx)
-                
+
                 assigned_achievements.append(bronze_pilot.name)
                 total_svt_reward += 1000
-        
+
         # 2. VIP achievement
         if avg_balance >= 100000000:  # ≥ 100 triệu
             vip_achievement = Achievement.query.filter_by(name='Khách hàng VIP').first()
@@ -4687,7 +4640,7 @@ def admin_auto_assign_achievements():
                     unlocked_at=datetime.datetime.utcnow()
                 )
                 db.session.add(ca)
-                
+
                 # Thêm SVT reward
                 token_tx = TokenTransaction(
                     customer_id=customer_id,
@@ -4698,10 +4651,10 @@ def admin_auto_assign_achievements():
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(token_tx)
-                
+
                 assigned_achievements.append(vip_achievement.name)
                 total_svt_reward += 1500
-        
+
         # 3. Du lịch achievement
         if total_resort_nights >= 10:
             traveler_achievement = Achievement.query.filter_by(name='Người du lịch').first()
@@ -4713,7 +4666,7 @@ def admin_auto_assign_achievements():
                     unlocked_at=datetime.datetime.utcnow()
                 )
                 db.session.add(ca)
-                
+
                 # Thêm SVT reward
                 token_tx = TokenTransaction(
                     customer_id=customer_id,
@@ -4724,12 +4677,12 @@ def admin_auto_assign_achievements():
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(token_tx)
-                
+
                 assigned_achievements.append(traveler_achievement.name)
                 total_svt_reward += 800
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': f'Đã tự động gán {len(assigned_achievements)} achievements cho {customer.name}',
@@ -4745,24 +4698,25 @@ def admin_auto_assign_achievements():
                 'total_resort_nights': int(total_resort_nights)
             }
         })
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Lỗi tự động gán achievements: {str(e)}'}), 500
+
 
 @app.route('/admin/achievements', methods=['GET'])
 def get_all_achievements_simple():
     """API lấy tất cả achievements (không cần auth)"""
     try:
         achievements = Achievement.query.all()
-        
+
         achievement_list = []
         for achievement in achievements:
             # Đếm số customer đã có achievement này
             customer_count = CustomerAchievement.query.filter_by(
                 achievement_id=achievement.id
             ).count()
-            
+
             achievement_list.append({
                 'id': achievement.id,
                 'name': achievement.name,
@@ -4771,15 +4725,16 @@ def get_all_achievements_simple():
                 'customer_count': customer_count,
                 'created_at': achievement.created_at.isoformat() if achievement.created_at else None
             })
-        
+
         return jsonify({
             'success': True,
             'achievements': achievement_list,
             'total': len(achievement_list)
         })
-        
+
     except Exception as e:
         return jsonify({'error': f'Lỗi lấy danh sách achievements: {str(e)}'}), 500
+
 
 # =============================================================================
 # MAIN
@@ -4792,3 +4747,4 @@ if __name__ == '__main__':
 
     print("Server đang chạy tại: http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
+
