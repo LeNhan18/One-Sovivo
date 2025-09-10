@@ -2287,6 +2287,93 @@ def test_add_svt_tokens(customer_id):
         }), 500
 
 
+@app.route('/api/test/populate-marketplace', methods=['POST'])
+def populate_marketplace_items():
+    """Test endpoint to populate marketplace with sample items"""
+    try:
+        # Check if items already exist
+        existing_count = MarketplaceItem.query.count()
+        if existing_count > 0:
+            return jsonify({
+                "success": True,
+                "message": f"Marketplace already has {existing_count} items",
+                "existing_items": existing_count
+            })
+
+        # Create sample marketplace items
+        sample_items = [
+            {
+                "name": "Voucher ăn uống 200K",
+                "description": "Voucher giảm giá 200,000 VNĐ cho các nhà hàng đối tác",
+                "price_svt": 95,
+                "quantity": 100,
+                "partner_brand": "HDBank",
+                "image_url": "/images/voucher_food.png"
+            },
+            {
+                "name": "Vé máy bay giảm 500K",
+                "description": "Voucher giảm giá 500,000 VNĐ cho chuyến bay Vietjet",
+                "price_svt": 250,
+                "quantity": 50,
+                "partner_brand": "Vietjet",
+                "image_url": "/images/flight_discount.png"
+            },
+            {
+                "name": "Miễn phí chuyển khoản HDBank",
+                "description": "Miễn phí 10 lần chuyển khoản qua HDBank Mobile",
+                "price_svt": 25,
+                "quantity": 200,
+                "partner_brand": "HDBank",
+                "image_url": "/images/free_transfer.png"
+            },
+            {
+                "name": "Upgrade phòng resort miễn phí",
+                "description": "Nâng cấp miễn phí lên phòng cao cấp tại Sovico Resort",
+                "price_svt": 150,
+                "quantity": 30,
+                "partner_brand": "Sovico",
+                "image_url": "/images/resort_upgrade.png"
+            },
+            {
+                "name": "Cashback 5% HDSaison",
+                "description": "Hoàn tiền 5% cho giao dịch tháng tiếp theo",
+                "price_svt": 75,
+                "quantity": 150,
+                "partner_brand": "HDSaison",
+                "image_url": "/images/cashback.png"
+            }
+        ]
+
+        created_items = []
+        for item_data in sample_items:
+            item = MarketplaceItem(
+                name=item_data["name"],
+                description=item_data["description"],
+                price_svt=item_data["price_svt"],
+                quantity=item_data["quantity"],
+                partner_brand=item_data["partner_brand"],
+                image_url=item_data["image_url"],
+                is_active=True
+            )
+            db.session.add(item)
+            created_items.append(item_data["name"])
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully created {len(created_items)} marketplace items",
+            "created_items": created_items
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 # =============================================================================
 # MISSION PROGRESSION API ENDPOINTS
 # =============================================================================

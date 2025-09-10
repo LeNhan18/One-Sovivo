@@ -76,8 +76,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ customerId: pro
       try {
         const token = localStorage.getItem('auth_token');
         if (!token) {
-          console.log('🔍 No auth token, using fallback customer ID 2015');
-          setCustomerId(2015); // Use 2015 where we have data
+          console.log('🔍 No auth token, using fallback customer ID 1001');
+          setCustomerId(1001); // Use 1001 to match other components
           return;
         }
 
@@ -88,15 +88,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ customerId: pro
         if (response.ok) {
           const user = await response.json();
           console.log('🔍 User from auth:', user);
-          setCustomerId(user.customer_id || 2015);
+          setCustomerId(user.customer_id || 1001); // Use 1001 as fallback
         } else {
-          console.log('🔍 Auth failed, using fallback customer ID 2015');
-          setCustomerId(2015);
+          console.log('🔍 Auth failed, using fallback customer ID 1001');
+          setCustomerId(1001); // Use 1001 to match other components
         }
       } catch (error) {
         console.error('Error fetching customer ID:', error);
-        console.log('🔍 Error in auth, using fallback customer ID 2015');
-        setCustomerId(2015);
+        console.log('🔍 Error in auth, using fallback customer ID 1001');
+        setCustomerId(1001); // Use 1001 to match other components
       }
     };
 
@@ -116,8 +116,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ customerId: pro
           console.log('🔍 Transaction History Data:', data);
 
           if (data.success) {
-            // Set total balance from API
-            setTotalSVT(data.total_balance || 0);
+            // Set total balance from API - use the correct field path
+            setTotalSVT(data.summary?.current_balance || data.total_balance || 0);
 
             // Convert API data to Transaction format
             const convertedTransactions: Transaction[] = data.transactions.map((tx: any) => ({
@@ -129,7 +129,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ customerId: pro
               category: tx.transaction_type || 'general',
               source: getSourceFromType(tx.transaction_type || ''),
               date: tx.created_at || new Date().toISOString(),
-              balance: data.total_balance || 0, // Use total balance for all transactions
+              balance: data.summary?.current_balance || data.total_balance || 0, // Use the correct balance
               blockHash: tx.tx_hash || `0x${Math.random().toString(16).substr(2, 12)}...`,
               confirmations: Math.floor(Math.random() * 50) + 1,
               fee: tx.transaction_type.includes('purchase') ? Math.abs(parseFloat(tx.amount)) * 0.01 : 0

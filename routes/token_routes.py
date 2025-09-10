@@ -46,9 +46,20 @@ def get_user_tokens(customer_id):
             'success': True,
             'customer_id': customer_id,
             'balance': current_balance,
+            'total_svt': current_balance,  # Add this field for frontend compatibility
             'total_earned': total_earned,
             'total_spent': total_spent,
-            'recent_transactions': [
+            'transactions': [  # Also rename to match frontend expectation
+                {
+                    'id': t.id,
+                    'type': t.transaction_type,
+                    'amount': float(t.amount),
+                    'description': t.description,
+                    'created_at': t.created_at.isoformat()
+                }
+                for t in transactions
+            ],
+            'recent_transactions': [  # Keep the old field for backward compatibility
                 {
                     'id': t.id,
                     'type': t.transaction_type,
