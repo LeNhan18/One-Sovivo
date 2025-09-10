@@ -49,13 +49,12 @@ def init_db(app):
     with app.app_context():
         try:
             # Initialize dynamic model modules that define classes at runtime
-            from . import transactions, marketplace, missions, hdbank_card, flights, resorts
+            from . import transactions, missions, hdbank_card, flights, resorts
             transactions.init_db(db)
-            marketplace.init_db(db)
             missions.init_db(db)
             hdbank_card.init_db(db)
-            # flights & resorts are static declarative; just import to register
-            from . import user, customer, achievements, flights as _f, resorts as _r
+            # flights, resorts & marketplace are static declarative; just import to register
+            from . import user, customer, achievements, marketplace, flights as _f, resorts as _r
             # Create all tables
             db.create_all()
             # Apply automatic migrations

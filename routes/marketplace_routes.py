@@ -21,13 +21,12 @@ def get_marketplace_items():
     try:
         items = marketplace_service.get_all_items()
         return jsonify({
-            'success': True,
-            'items': items
+            'items': items,
+            'total': len(items)
         })
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy danh sách marketplace: {str(e)}'
+            'error': f'Lỗi khi lấy vật phẩm: {str(e)}'
         }), 500
 
 
@@ -62,15 +61,14 @@ def purchase_marketplace_item():
 def get_p2p_listings():
     """API để lấy danh sách tin đăng P2P"""
     try:
-        listings = marketplace_service.get_p2p_listings()
+        listings = marketplace_service.get_all_p2p_listings()
         return jsonify({
-            'success': True,
-            'listings': listings
+            'listings': listings,
+            'total': len(listings)
         })
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy danh sách P2P: {str(e)}'
+            'error': f'Lỗi khi lấy tin đăng P2P: {str(e)}'
         }), 500
 
 

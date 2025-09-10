@@ -6,7 +6,10 @@ Marketplace and P2P trading service
 
 import datetime
 import uuid
-from models import db, MarketplaceItem, P2PListing, Customer, TokenTransaction
+from models.database import db
+from models.marketplace import MarketplaceItem, P2PListing
+from models.customer import Customer  
+from models.transactions import TokenTransaction
 
 class MarketplaceService:
     
@@ -14,15 +17,19 @@ class MarketplaceService:
         """Lấy tất cả items có sẵn trong marketplace"""
         try:
             items = MarketplaceItem.query.filter_by(is_active=True).all()
-            return [{
-                'id': item.id,
-                'name': item.name,
-                'description': item.description,
-                'price_svt': float(item.price_svt),
-                'quantity': item.quantity,
-                'partner_brand': item.partner_brand,
-                'image_url': item.image_url
-            } for item in items]
+            items_data = []
+            for item in items:
+                items_data.append({
+                    'id': item.id,
+                    'name': item.name,
+                    'description': item.description,
+                    'price_svt': float(item.price_svt),
+                    'quantity': item.quantity,
+                    'partner_brand': item.partner_brand,
+                    'image_url': item.image_url,
+                    'created_at': item.created_at.isoformat()
+                })
+            return items_data
         except Exception as e:
             print(f"Error getting marketplace items: {e}")
             return []
@@ -79,24 +86,33 @@ class MarketplaceService:
             print(f" Error purchasing item: {e}")
             return {'success': False, 'error': str(e)}
     
-    def get_p2p_listings(self):
+    def get_all_p2p_listings(self):
         """Lấy danh sách tin đăng P2P"""
         try:
-            listings = db.session.query(P2PListing, Customer).join(
-                Customer, P2PListing.seller_customer_id == Customer.customer_id
-            ).filter(P2PListing.status == 'active').all()
+            listings = P2PListing.query.filter_by(status='active').order_by(P2PListing.created_at.desc()).all()
             
-            return [{
-                'id': listing.id,
-                'item_name': listing.item_name,
-                'description': listing.description,
-                'price_svt': float(listing.price_svt),
-                'seller_name': customer.name,
-                'created_at': listing.created_at.strftime('%Y-%m-%d %H:%M:%S')
-            } for listing, customer in listings]
+            listings_data = []
+            for listing in listings:
+                # Lấy thông tin người bán
+                seller = Customer.query.filter_by(customer_id=listing.seller_customer_id).first()
+                
+                listings_data.append({
+                    'id': listing.id,
+                    'item_name': listing.item_name,
+                    'description': listing.description,
+                    'price_svt': float(listing.price_svt),
+                    'seller': {
+                        'customer_id': listing.seller_customer_id,
+                        'name': seller.name if seller else 'Unknown'
+                    },
+                    'status': listing.status,
+                    'created_at': listing.created_at.isoformat()
+                })
+            
+            return listings_data
             
         except Exception as e:
-            print(f" Error getting P2P listings: {e}")
+            print(f"Error getting P2P listings: {e}")
             return []
     
     def create_p2p_listing(self, seller_customer_id, item_name, description, price_svt):
