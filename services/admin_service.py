@@ -18,23 +18,23 @@ class AdminService:
         """Get all available achievements"""
         try:
             Achievement = self.models.get('Achievement')
+            CustomerAchievement = self.models.get('CustomerAchievement')
             if not Achievement:
                 return {'error': 'Achievement model not found'}, 500
                 
             achievements = Achievement.query.all()
             achievement_list = []
             for ach in achievements:
-                achievement_list.append({
-                    'achievement_id': ach.achievement_id,
-                    'name': ach.name,
-                    'description': ach.description,
-                    'category': ach.category,
-                    'criteria': ach.criteria,
-                    'icon': ach.icon,
-                    'is_active': ach.is_active
-                })
+                customer_count = 0
+                if CustomerAchievement:
+                    customer_count = CustomerAchievement.query.filter_by(achievement_id=ach.id).count()
+                
+                achievement_data = ach.to_dict()
+                achievement_data['customer_count'] = customer_count
+                achievement_list.append(achievement_data)
             
             return {
+                'success': True,
                 'achievements': achievement_list,
                 'total': len(achievement_list)
             }
@@ -162,7 +162,6 @@ class AdminService:
         try:
             customer_id = data.get('customer_id')
             achievement_id = data.get('achievement_id')
-            assigned_by = data.get('assigned_by', 'admin')
 
             if not customer_id or not achievement_id:
                 return {'error': 'Thiếu customer_id hoặc achievement_id'}, 400
@@ -175,11 +174,11 @@ class AdminService:
                 return {'error': 'Required models not found'}, 500
 
             # Kiểm tra customer tồn tại
-            customer = Customer.query.get(customer_id)
+            customer = Customer.query.filter_by(customer_id=customer_id).first()
             if not customer:
                 return {'error': f'Không tìm thấy khách hàng với ID {customer_id}'}, 404
 
-            # Kiểm tra achievement tồn tại
+            # Kiểm tra achievement tồn tại - sử dụng Achievement.id
             achievement = Achievement.query.get(achievement_id)
             if not achievement:
                 return {'error': f'Không tìm thấy achievement với ID {achievement_id}'}, 404
@@ -191,14 +190,42 @@ class AdminService:
             ).first()
 
             if existing:
-                return {'error': 'Achievement đã được gán cho khách hàng này'}, 400
+                return {'error': f'Achievement "{achievement.name}" đã được gán cho khách hàng này'}, 400
+
+            # Kiểm tra điều kiện trước khi gán
+            VietjetFlight = self.models.get('VietjetFlight')
+            ResortBooking = self.models.get('ResortBooking')
+            HDBankTransaction = self.models.get('HDBankTransaction')
+            
+            # Get customer stats
+            total_flights = 0
+            total_resort_nights = 0
+            avg_balance = 0
+            
+            if VietjetFlight:
+                total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
+            
+            if ResortBooking:
+                total_resort_nights = self.db.session.query(
+                    self.db.func.sum(ResortBooking.nights_stayed)
+                ).filter_by(customer_id=customer_id).scalar() or 0
+            
+            if HDBankTransaction:
+                avg_balance = self.db.session.query(
+                    self.db.func.avg(HDBankTransaction.balance)
+                ).filter_by(customer_id=customer_id).scalar() or 0
+
+            # Check eligibility
+            if not self._check_achievement_eligibility_by_name(achievement.name, total_flights, avg_balance, total_resort_nights):
+                # Get specific reason
+                eligibility_reason = self._get_eligibility_reason(achievement.name, total_flights, avg_balance, total_resort_nights)
+                return {'error': f'Khách hàng chưa đủ điều kiện cho "{achievement.name}": {eligibility_reason}'}, 400
 
             # Gán achievement
             new_assignment = CustomerAchievement(
                 customer_id=customer_id,
                 achievement_id=achievement_id,
-                assigned_by=assigned_by,
-                assigned_date=self.db.func.now()
+                unlocked_at=self.db.func.now()
             )
 
             self.db.session.add(new_assignment)
@@ -211,8 +238,7 @@ class AdminService:
                     'customer_id': customer_id,
                     'customer_name': customer.name,
                     'achievement_id': achievement_id,
-                    'achievement_name': achievement.name,
-                    'assigned_by': assigned_by
+                    'achievement_name': achievement.name
                 }
             }
         except Exception as e:
@@ -225,67 +251,154 @@ class AdminService:
             Customer = self.models.get('Customer')
             Achievement = self.models.get('Achievement')
             CustomerAchievement = self.models.get('CustomerAchievement')
+            VietjetFlight = self.models.get('VietjetFlight')
+            ResortBooking = self.models.get('ResortBooking')
+            HDBankTransaction = self.models.get('HDBankTransaction')
             
             if not all([Customer, Achievement, CustomerAchievement]):
                 return {'error': 'Required models not found'}, 500
 
-            # Get customer profile with all related data
-            from services.customer_service import CustomerService
-            customer_service = CustomerService(self.db, self.config)
-            customer_service.set_models(self.models)
-            
-            profile = customer_service.get_customer_360_profile(customer_id)
-            if not profile:
+            # Get customer
+            customer = Customer.query.filter_by(customer_id=customer_id).first()
+            if not customer:
                 return {'error': f'Không tìm thấy khách hàng với ID {customer_id}'}, 404
 
+            # Get customer stats
+            total_flights = 0
+            total_resort_nights = 0
+            avg_balance = 0
+            
+            if VietjetFlight:
+                total_flights = VietjetFlight.query.filter_by(customer_id=customer_id).count()
+            
+            if ResortBooking:
+                total_resort_nights = self.db.session.query(
+                    self.db.func.sum(ResortBooking.nights_stayed)
+                ).filter_by(customer_id=customer_id).scalar() or 0
+            
+            if HDBankTransaction:
+                avg_balance = self.db.session.query(
+                    self.db.func.avg(HDBankTransaction.balance)
+                ).filter_by(customer_id=customer_id).scalar() or 0
+
             # Get all available achievements
-            achievements = Achievement.query.filter_by(is_active=True).all()
+            achievements = Achievement.query.all()
             
             # Get currently assigned achievements
             current_achievements = CustomerAchievement.query.filter_by(
                 customer_id=customer_id
             ).all()
+            
+            # Lấy achievement_id từ CustomerAchievement
             current_achievement_ids = [ca.achievement_id for ca in current_achievements]
 
-            # Check eligibility for each achievement
-            eligible_achievements = []
+            # Check eligibility and assign
+            assigned_achievements = []
+            assigned_count = 0
+
             for ach in achievements:
-                if ach.achievement_id in current_achievement_ids:
+                # Achievement có field 'id'
+                ach_id = ach.id
+                if ach_id in current_achievement_ids:
                     continue  # Already assigned
                 
-                if self._check_achievement_eligibility(profile, ach):
-                    eligible_achievements.append(ach)
-
-            # Assign eligible achievements
-            assigned_count = 0
-            for ach in eligible_achievements:
-                try:
-                    new_assignment = CustomerAchievement(
-                        customer_id=customer_id,
-                        achievement_id=ach.achievement_id,
-                        assigned_by='auto_system',
-                        assigned_date=self.db.func.now()
-                    )
-                    self.db.session.add(new_assignment)
-                    assigned_count += 1
-                except Exception as e:
-                    print(f"Error assigning achievement {ach.achievement_id}: {e}")
-                    continue
+                # Check eligibility by name
+                if self._check_achievement_eligibility_by_name(ach.name, total_flights, avg_balance, total_resort_nights):
+                    try:
+                        # Tạo assignment mới - CustomerAchievement.achievement_id = Achievement.id
+                        new_assignment = CustomerAchievement(
+                            customer_id=customer_id,
+                            achievement_id=ach_id,
+                            unlocked_at=self.db.func.now()
+                        )
+                        self.db.session.add(new_assignment)
+                        assigned_achievements.append({
+                            'id': ach_id,
+                            'name': ach.name
+                        })
+                        assigned_count += 1
+                    except Exception as e:
+                        print(f"Error assigning achievement {ach_id}: {e}")
+                        continue
 
             self.db.session.commit()
 
             return {
                 'success': True,
-                'message': f'Đã tự động gán {assigned_count} achievement(s)',
+                'message': f'Đã tự động gán {assigned_count} achievement(s) cho {customer.name}',
                 'assigned_count': assigned_count,
-                'eligible_achievements': [
-                    {'id': ach.achievement_id, 'name': ach.name} 
-                    for ach in eligible_achievements
-                ]
+                'assigned_achievements': assigned_achievements
             }
         except Exception as e:
             self.db.session.rollback()
+            print(f"Error in auto_assign_achievements: {e}")
             return {'error': str(e)}, 500
+
+    def _get_eligibility_reason(self, achievement_name, total_flights, avg_balance, total_resort_nights):
+        """Get detailed reason why customer is/isn't eligible"""
+        name = achievement_name.lower()
+        
+        # Phi công achievements
+        if 'phi công vàng' in name:
+            if total_flights >= 20:
+                return f'Đủ điều kiện: {total_flights}/20 chuyến bay'
+            return f'Thiếu {20 - total_flights} chuyến bay (hiện tại: {total_flights}/20)'
+        elif 'phi công bạc' in name:
+            if total_flights >= 10:
+                return f'Đủ điều kiện: {total_flights}/10 chuyến bay'
+            return f'Thiếu {10 - total_flights} chuyến bay (hiện tại: {total_flights}/10)'
+        elif 'phi công đồng' in name:
+            if total_flights >= 5:
+                return f'Đủ điều kiện: {total_flights}/5 chuyến bay'
+            return f'Thiếu {5 - total_flights} chuyến bay (hiện tại: {total_flights}/5)'
+        
+        # VIP achievement
+        elif 'khách hàng vip' in name or 'vip' in name:
+            if avg_balance >= 100_000_000:
+                return f'Đủ điều kiện: {avg_balance:,.0f} VNĐ'
+            return f'Thiếu {100_000_000 - avg_balance:,.0f} VNĐ (hiện tại: {avg_balance:,.0f}/100,000,000 VNĐ)'
+        
+        # Du lịch achievement
+        elif 'người du lịch' in name or 'du lịch' in name:
+            if total_resort_nights >= 10:
+                return f'Đủ điều kiện: {total_resort_nights}/10 đêm nghỉ dưỡng'
+            return f'Thiếu {10 - total_resort_nights} đêm nghỉ dưỡng (hiện tại: {total_resort_nights}/10)'
+        
+        # SVT achievements
+        elif 'svt' in name:
+            return 'Đủ điều kiện (achievement đặc biệt)'
+        
+        # Default
+        else:
+            return 'Đủ điều kiện (achievement đặc biệt)'
+
+    def _check_achievement_eligibility_by_name(self, achievement_name, total_flights, avg_balance, total_resort_nights):
+        """Check eligibility based on achievement name"""
+        name = achievement_name.lower()
+        
+        # Phi công achievements
+        if 'phi công vàng' in name:
+            return total_flights >= 20
+        elif 'phi công bạc' in name:
+            return total_flights >= 10
+        elif 'phi công đồng' in name:
+            return total_flights >= 5
+        
+        # VIP achievement
+        elif 'khách hàng vip' in name or 'vip' in name:
+            return avg_balance >= 100_000_000
+        
+        # Du lịch achievement
+        elif 'người du lịch' in name or 'du lịch' in name:
+            return total_resort_nights >= 10
+        
+        # SVT achievements (always true for now)
+        elif 'svt' in name:
+            return True
+        
+        # Default: allow other achievements
+        else:
+            return True
 
     def _check_achievement_eligibility(self, profile, achievement):
         """Check if customer is eligible for achievement based on criteria"""
