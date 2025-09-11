@@ -7,91 +7,156 @@ Resort booking service
 import datetime
 import uuid
 import random
-from models import db, Customer, ResortBooking, TokenTransaction
+from models.database import db
+from models.customer import Customer
+from models.resorts import ResortBooking
+import models.transactions as tx_models
+
+
+def _TokenTransaction():
+    return getattr(tx_models, 'TokenTransaction', None)
 
 class ResortService:
     
-    def book_room(self, customer_id, resort_name, booking_date, nights_stayed, booking_value):
-        """Đặt phòng resort"""
+    def book_room(self, customer_id, nights=2, room_type='deluxe'):
+        """Đặt phòng Resort và lưu vào database"""
         try:
-            # Kiểm tra customer tồn tại
-            customer = Customer.query.filter_by(customer_id=customer_id).first()
-            if not customer:
-                return {'success': False, 'error': 'Customer not found'}
-            
-            # Validate input
-            if not all([resort_name, booking_date, nights_stayed, booking_value]):
-                return {'success': False, 'error': 'Missing required booking information'}
-            
-            if nights_stayed <= 0:
-                return {'success': False, 'error': 'Invalid number of nights'}
-            
-            # Parse booking date
-            try:
-                if isinstance(booking_date, str):
-                    booking_date = datetime.datetime.strptime(booking_date, '%Y-%m-%d')
-            except ValueError:
-                return {'success': False, 'error': 'Invalid booking date format. Use YYYY-MM-DD'}
-            
-            # Create resort booking
-            booking = ResortBooking(
-                booking_id=f"RS{uuid.uuid4().hex[:8].upper()}",
-                customer_id=customer_id,
-                resort_name=resort_name,
-                booking_date=booking_date,
-                nights_stayed=nights_stayed,
-                booking_value=booking_value
-            )
-            db.session.add(booking)
-            
-            # Award SVT tokens for booking
-            svt_reward = self._calculate_resort_svt_reward(booking_value, nights_stayed)
-            if svt_reward > 0:
-                svt_tx = TokenTransaction(
-                    customer_id=customer_id,
-                    transaction_type="resort_booking_reward",
-                    amount=svt_reward,
-                    description=f"Thưởng SVT cho đặt phòng {resort_name}",
-                    tx_hash=f"0x{uuid.uuid4().hex}",
-                    block_number=random.randint(1000000, 2000000)
-                )
-                db.session.add(svt_tx)
-            
-            db.session.commit()
-            
-            return {
-                'success': True,
-                'message': f'Đặt phòng thành công tại {resort_name}',
-                'booking_info': {
-                    'booking_id': booking.booking_id,
-                    'resort_name': booking.resort_name,
-                    'booking_date': booking.booking_date.strftime('%Y-%m-%d'),
-                    'nights_stayed': booking.nights_stayed,
-                    'booking_value': float(booking.booking_value)
-                },
-                'svt_reward': svt_reward
+            if not customer_id:
+                return {
+                    "success": False,
+                    "message": "customer_id is required"
+                }
+
+            # Tạo booking ID
+            import time
+            booking_id = f"RST{int(time.time())}"
+
+            # Tính giá phòng
+            room_prices = {
+                'standard': 2000000,
+                'deluxe': 3500000,
+                'suite': 6000000
             }
-            
+            total_price = room_prices.get(room_type, 3500000) * nights
+
+            # Thêm resort booking vào database
+            resort_booking = ResortBooking(
+                customer_id=customer_id,
+                booking_id=booking_id,
+                resort_name=f"Sovico Premium Resort - {room_type.title()} Room",
+                booking_date=datetime.datetime.now(),
+                nights_stayed=nights,
+                booking_value=total_price
+            )
+            db.session.add(resort_booking)
+
+            # Tính SVT reward
+            svt_reward = nights * 400  # 400 SVT per night
+
+            # Thêm SVT token transaction
+            TTx = _TokenTransaction()
+            if not TTx:
+                raise RuntimeError("TokenTransaction model not initialized")
+            token_tx = TTx(
+                customer_id=customer_id,
+                transaction_type="service_reward",
+                amount=svt_reward,
+                description=f"Resort booking reward: {nights} nights {room_type}",
+                tx_hash=f"0x{uuid.uuid4().hex}",
+                block_number=random.randint(1000000, 2000000)
+            )
+            db.session.add(token_tx)
+
+            db.session.commit()
+
+            return {
+                "success": True,
+                "message": f"Đặt phòng {room_type} {nights} đêm thành công!",
+                "booking_id": booking_id,
+                "svt_reward": svt_reward,
+                "booking_details": {
+                    "room_type": room_type,
+                    "nights": nights,
+                    "total_price": total_price
+                }
+            }
+
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error booking resort: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def book_spa(self, customer_id, spa_service, booking_date, booking_value):
-        """Đặt dịch vụ spa"""
+            return {
+                "success": False,
+                "message": f"Lỗi đặt phòng: {str(e)}"
+            }
+
+    def book_spa(self, customer_id, spa_type='massage'):
+        """Đặt dịch vụ Spa và lưu vào database"""
         try:
-            # Đặt spa được coi như booking resort với 1 đêm
-            return self.book_room(
+            if not customer_id:
+                return {
+                    "success": False,
+                    "message": "customer_id is required"
+                }
+
+            # Tạo spa booking ID
+            import time
+            spa_booking_id = f"SPA{int(time.time())}"
+
+            # Tính giá spa
+            spa_prices = {
+                'massage': 1500000,
+                'facial': 1200000,
+                'body_treatment': 2000000,
+                'premium_package': 3500000
+            }
+            spa_price = spa_prices.get(spa_type, 1500000)
+
+            # Thêm spa booking như một resort booking
+            spa_booking = ResortBooking(
                 customer_id=customer_id,
-                resort_name=f"Spa Service: {spa_service}",
-                booking_date=booking_date,
-                nights_stayed=1,
-                booking_value=booking_value
+                booking_id=spa_booking_id,
+                resort_name=f"Sovico Premium Spa - {spa_type.title()}",
+                booking_date=datetime.datetime.now(),
+                nights_stayed=0,  # Spa service, not overnight
+                booking_value=spa_price
             )
-            
+            db.session.add(spa_booking)
+
+            # SVT reward cho spa
+            svt_reward = int(spa_price / 5000)  # 1 SVT per 5k VND
+
+            # Thêm SVT token transaction
+            TTx = _TokenTransaction()
+            if not TTx:
+                raise RuntimeError("TokenTransaction model not initialized")
+            token_tx = TTx(
+                customer_id=customer_id,
+                transaction_type="service_reward",
+                amount=svt_reward,
+                description=f"Spa service reward: {spa_type}",
+                tx_hash=f"0x{uuid.uuid4().hex}",
+                block_number=random.randint(1000000, 2000000)
+            )
+            db.session.add(token_tx)
+
+            db.session.commit()
+
+            return {
+                "success": True,
+                "message": f"Đặt dịch vụ {spa_type} thành công!",
+                "booking_id": spa_booking_id,
+                "svt_reward": svt_reward,
+                "spa_details": {
+                    "service": spa_type,
+                    "price": spa_price
+                }
+            }
+
         except Exception as e:
-            print(f"❌ Error booking spa: {e}")
-            return {'success': False, 'error': str(e)}
+            db.session.rollback()
+            return {
+                "success": False,
+                "message": f"Lỗi đặt spa: {str(e)}"
+            }
     
     def get_booking_history(self, customer_id):
         """Lấy lịch sử đặt phòng của khách hàng"""
@@ -248,10 +313,12 @@ class ResortService:
                 'guests': guests,
                 'availability': availability
             }
-            
+        
         except Exception as e:
-            print(f"❌ Error searching availability: {e}")
-            return {'success': False, 'error': str(e)}
+            return {
+                'success': False,
+                'message': f"Lỗi tìm kiếm: {str(e)}"
+            }
     
     def _calculate_resort_svt_reward(self, booking_value, nights_stayed):
         """Helper: Tính SVT reward cho booking resort"""

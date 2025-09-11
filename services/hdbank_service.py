@@ -8,8 +8,9 @@ import datetime
 import uuid
 import random
 
-# Import only stable pieces; dynamic models accessed lazily from their modules
-from models import db, Customer  # Customer is static (defined with declarative Base in modular setup)
+# Import stable pieces
+from models.database import db
+from models.customer import Customer
 import models.transactions as tx_models
 import models.hdbank_card as card_models
 
@@ -26,26 +27,129 @@ def _HDBankCard():
 
 class HDBankService:
     
-    def get_dashboard_data(self, customer_id):
-        """Lấy dữ liệu dashboard HDBank cho customer"""
+    def get_customer_card_info(self, customer_id):
+        """Lấy thông tin thẻ của khách hàng từ bảng hdbank_cards"""
         try:
-            card_info = self._get_customer_card_info(customer_id)
-            HTx = _HDBankTransaction()
-            if HTx is None:
-                raise RuntimeError('HDBankTransaction model not initialized')
-            transactions = HTx.query.filter_by(
-                customer_id=customer_id
-            ).order_by(HTx.transaction_date.desc()).limit(10).all()
-            stats = self._calculate_account_stats(customer_id)
-            return {
-                'card_info': card_info,
-                'recent_transactions': [self._transaction_to_dict(tx) for tx in transactions],
-                'statistics': stats,
-                'services': self._get_available_services(customer_id)
-            }
+            # Tìm thẻ trong bảng hdbank_cards
+            HDBankCard = _HDBankCard()
+            if HDBankCard is None:
+                return {"has_card": False}
+                
+            card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
+
+            if card:
+                return {
+                    "has_card": True,
+                    "card_id": card.card_id,
+                    "card_name": card.card_name,
+                    "card_number": f"****-****-****-{card.card_number[-4:]}",
+                    "card_type": card.card_type,
+                    "credit_limit": card.credit_limit,
+                    "opened_date": card.opened_date.strftime('%Y-%m-%d'),
+                    "expiry_date": card.expiry_date.strftime('%Y-%m-%d'),
+                    "status": card.status
+                }
+            else:
+                return {"has_card": False}
         except Exception as e:
-            print(f"❌ Error getting HDBank dashboard: {e}")
-            return {}
+            print(f"❌ Error in get_customer_card_info: {e}")
+            return {"has_card": False}
+    
+    def get_dashboard_data(self, customer_id):
+        """Dashboard tổng quan dịch vụ HDBank cho khách hàng"""
+        try:
+            # Kiểm tra khách hàng
+            customer = Customer.query.filter_by(customer_id=customer_id).first()
+            if not customer:
+                return {
+                    "success": False,
+                    "message": "Khách hàng không tồn tại"
+                }
+
+            # Kiểm tra thẻ
+            card_info = self.get_customer_card_info(customer_id)
+
+            # Nếu chưa có thẻ, hiển thị giao diện mở thẻ
+            if not card_info["has_card"]:
+                return {
+                    "success": True,
+                    "customer_id": customer_id,
+                    "customer_name": customer.name,
+                    "has_card": False,
+                    "message": "Chào mừng đến với HDBank! Mở thẻ ngay để sử dụng dịch vụ",
+                    "action_required": {
+                        "type": "open_card",
+                        "title": "🏦 Mở thẻ HDBank miễn phí",
+                        "description": "Nhận ngay 1 triệu VND + 500 SVT Token",
+                        "benefits": [
+                            "💳 Miễn phí thường niên trọn đời",
+                            "💰 Thưởng chào mừng 1 triệu VND",
+                            "🪙 Tặng 500 SVT Token",
+                            "📊 Hạn mức tín dụng 10 triệu VND",
+                            "🔄 Sử dụng dịch vụ chuyển khoản, vay vốn"
+                        ],
+                        "button_text": "Mở thẻ ngay",
+                        "endpoint": "/api/service/hdbank/open-card"
+                    },
+                    "available_services": []
+                }
+
+            # Nếu đã có thẻ, hiển thị dashboard đầy đủ
+            HDBankTransaction = _HDBankTransaction()
+            if HDBankTransaction is None:
+                raise RuntimeError('HDBankTransaction model not initialized')
+                
+            total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
+            total_spent = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
+                HDBankTransaction.customer_id == customer_id,
+                HDBankTransaction.amount < 0
+            ).scalar() or 0
+
+            total_received = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
+                HDBankTransaction.customer_id == customer_id,
+                HDBankTransaction.amount > 0
+            ).scalar() or 0
+
+            # Lấy balance từ transaction mới nhất
+            latest_transaction = HDBankTransaction.query.filter_by(customer_id=customer_id) \
+                .order_by(HDBankTransaction.transaction_date.desc()).first()
+            current_balance = float(latest_transaction.balance) if latest_transaction else 0
+
+            return {
+                "success": True,
+                "customer_id": customer_id,
+                "customer_name": customer.name,
+                "has_card": True,
+                "card_info": card_info,
+                "account_summary": {
+                    "total_transactions": total_transactions,
+                    "total_spent": abs(total_spent),
+                    "total_received": total_received,
+                    "current_balance": current_balance
+                },
+                "available_services": [
+                    {
+                        "type": "transfer",
+                        "title": "💸 Chuyển khoản",
+                        "description": "Chuyển tiền nhanh, nhận SVT Token",
+                        "endpoint": "/api/service/hdbank/transfer",
+                        "icon": "💸"
+                    },
+                    {
+                        "type": "loan",
+                        "title": "💰 Đăng ký vay",
+                        "description": "Vay vốn lãi suất ưu đãi",
+                        "endpoint": "/api/service/hdbank/loan",
+                        "icon": "💰"
+                    }
+                ]
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Lỗi tải dashboard: {str(e)}"
+            }
     
     def get_service_status(self, customer_id):
         """Kiểm tra trạng thái các dịch vụ HDBank"""

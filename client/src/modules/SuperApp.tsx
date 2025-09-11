@@ -116,9 +116,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         console.log('🔍 SuperApp Debug - Customer ID:', customerId);
 
         const response = await fetch(`http://127.0.0.1:5000/customer/${customerId}`)
+        console.log('🔍 SuperApp Debug - API Response Status:', response.status);
         if (response.ok) {
           const customerData = await response.json()
           console.log('🔍 SuperApp Debug - Customer Data:', customerData);
+          console.log('🔍 SuperApp Debug - Vietjet Summary:', customerData.customer?.vietjet_summary);
+          console.log('🔍 SuperApp Debug - HDBank Summary:', customerData.customer?.hdbank_summary);
+          console.log('🔍 SuperApp Debug - Resort Summary:', customerData.customer?.resort_summary);
 
           // Lấy dữ liệu token từ blockchain/database
           const tokenResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}`)
@@ -138,33 +142,34 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           };
 
           const realUserData = {
-            customerId: customerData.basic_info?.customer_id || customerId,
-            name: customerData.basic_info?.name || user.name,
+            customerId: customerData.customer?.customer_id || customerId,
+            name: customerData.customer?.basic_info?.name || user.name,
             memberTier: calculateTier(tokensInfo.total_svt || 0),
             walletAddress: "0x" + customerId.toString().padStart(40, '0'),
             sovicoTokens: tokensInfo.total_svt || 0, // SVT thực từ DB
             services: {
               vietjet: {
-                flights: customerData.vietjet_summary?.total_flights_last_year || 0,
-                miles: (customerData.vietjet_summary?.total_flights_last_year || 0) * 1500
+                flights: customerData.customer?.vietjet_summary?.total_flights_last_year || 0,
+                miles: (customerData.customer?.vietjet_summary?.total_flights_last_year || 0) * 1500
               },
               hdbank: {
-                avg_balance: customerData.hdbank_summary?.average_balance || 0
+                avg_balance: customerData.customer?.hdbank_summary?.average_balance || 0
               },
               resorts: {
-                nights_stayed: customerData.resort_summary?.total_nights_stayed || 0
+                nights_stayed: customerData.customer?.resort_summary?.total_nights_stayed || 0
               }
             },
             transactions: [], // Sẽ load từ token_transactions
             ai_input: {
-              age: customerData.basic_info?.age || 25,
-              avg_balance: customerData.hdbank_summary?.average_balance || 0,
-              total_flights: customerData.vietjet_summary?.total_flights_last_year || 0,
-              is_business_flyer: customerData.vietjet_summary?.is_business_flyer || false,
-              total_nights_stayed: customerData.resort_summary?.total_nights_stayed || 0,
-              total_resort_spending: customerData.resort_summary?.total_spending || 0
+              age: customerData.customer?.basic_info?.age || 25,
+              avg_balance: customerData.customer?.hdbank_summary?.average_balance || 0,
+              total_flights: customerData.customer?.vietjet_summary?.total_flights_last_year || 0,
+              is_business_flyer: customerData.customer?.vietjet_summary?.is_business_flyer || false,
+              total_nights_stayed: customerData.customer?.resort_summary?.total_nights_stayed || 0,
+              total_resort_spending: customerData.customer?.resort_summary?.total_spending || 0
             }
           }
+          console.log('🔍 SuperApp Debug - Final User Data:', realUserData);
           setUserData(realUserData)
 
           // Lấy transaction data cho trang chính

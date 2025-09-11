@@ -23,21 +23,33 @@ _resort_service = None
 def get_hdbank_service():
     global _hdbank_service
     if _hdbank_service is None:
-        _hdbank_service = HDBankService()
+        try:
+            _hdbank_service = HDBankService()
+        except Exception as e:
+            print(f"❌ Error creating HDBankService: {e}")
+            return None
     return _hdbank_service
 
 
 def get_vietjet_service():
     global _vietjet_service
     if _vietjet_service is None:
-        _vietjet_service = VietjetService()
+        try:
+            _vietjet_service = VietjetService()
+        except Exception as e:
+            print(f"❌ Error creating VietjetService: {e}")
+            return None
     return _vietjet_service
 
 
 def get_resort_service():
     global _resort_service
     if _resort_service is None:
-        _resort_service = ResortService()
+        try:
+            _resort_service = ResortService()
+        except Exception as e:
+            print(f"❌ Error creating ResortService: {e}")
+            return None
     return _resort_service
 
 
@@ -49,16 +61,12 @@ def get_resort_service():
 def hdbank_dashboard(customer_id):
     """Dashboard tổng quan dịch vụ HDBank cho khách hàng"""
     try:
-        dashboard_data = get_hdbank_service().get_dashboard_data(customer_id)
-        return jsonify({
-            'success': True,
-            'customer_id': customer_id,
-            'dashboard': dashboard_data
-        })
+        result = get_hdbank_service().get_dashboard_data(customer_id)
+        return jsonify(result)
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy dashboard HDBank: {str(e)}'
+            "success": False,
+            "message": f"Lỗi tải dashboard: {str(e)}"
         }), 500
 
 
@@ -174,27 +182,31 @@ def get_card_types():
 
 @vietjet_bp.route('/book-flight', methods=['POST'])
 def vietjet_book_flight():
-    """Đặt vé máy bay Vietjet"""
+    """Đặt vé máy bay Vietjet và lưu vào database"""
     try:
         data = request.get_json()
-        result = get_vietjet_service().book_flight(
+        service = get_vietjet_service()
+        if service is None:
+            return jsonify({
+                "success": False,
+                "message": "Vietjet service không khả dụng"
+            }), 500
+            
+        result = service.book_flight(
             customer_id=data.get('customer_id'),
-            origin=data.get('origin'),
-            destination=data.get('destination'),
+            origin=data.get('origin', 'HAN'),
+            destination=data.get('destination', 'SGN'),
             flight_date=data.get('flight_date'),
             ticket_class=data.get('ticket_class', 'economy'),
-            booking_value=data.get('booking_value')
+            booking_value=data.get('booking_value', 2500000),
+            passengers=data.get('passengers', 1)
         )
-
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 400
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi đặt vé: {str(e)}'
+            "success": False,
+            "message": f"Lỗi đặt vé: {str(e)}"
         }), 500
 
 
@@ -202,16 +214,12 @@ def vietjet_book_flight():
 def vietjet_history(customer_id):
     """Lấy lịch sử đặt vé của khách hàng"""
     try:
-        history = get_vietjet_service().get_booking_history(customer_id)
-        return jsonify({
-            'success': True,
-            'customer_id': customer_id,
-            'history': history
-        })
+        result = get_vietjet_service().get_booking_history(customer_id)
+        return jsonify(result)
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy lịch sử: {str(e)}'
+            "success": False,
+            "message": f"Lỗi lấy lịch sử: {str(e)}"
         }), 500
 
 
@@ -221,48 +229,50 @@ def vietjet_history(customer_id):
 
 @resort_bp.route('/book-room', methods=['POST'])
 def resort_book_room():
-    """Đặt phòng Resort"""
+    """Đặt phòng Resort và lưu vào database"""
     try:
         data = request.get_json()
-        result = get_resort_service().book_room(
+        service = get_resort_service()
+        if service is None:
+            return jsonify({
+                "success": False,
+                "message": "Resort service không khả dụng"
+            }), 500
+            
+        result = service.book_room(
             customer_id=data.get('customer_id'),
-            resort_name=data.get('resort_name'),
-            booking_date=data.get('booking_date'),
-            nights_stayed=data.get('nights_stayed'),
-            booking_value=data.get('booking_value')
+            nights=data.get('nights', 2),
+            room_type=data.get('room_type', 'deluxe')
         )
-
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 400
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi đặt phòng: {str(e)}'
+            "success": False,
+            "message": f"Lỗi đặt phòng: {str(e)}"
         }), 500
 
 
 @resort_bp.route('/book-spa', methods=['POST'])
 def resort_book_spa():
-    """Đặt dịch vụ Spa"""
+    """Đặt dịch vụ Spa và lưu vào database"""
     try:
         data = request.get_json()
-        result = get_resort_service().book_spa(
+        service = get_resort_service()
+        if service is None:
+            return jsonify({
+                "success": False,
+                "message": "Resort service không khả dụng"
+            }), 500
+            
+        result = service.book_spa(
             customer_id=data.get('customer_id'),
-            spa_service=data.get('spa_service'),
-            booking_date=data.get('booking_date'),
-            booking_value=data.get('booking_value')
+            spa_type=data.get('spa_type', 'massage')
         )
-
-        if result['success']:
-            return jsonify(result)
-        else:
-            return jsonify(result), 400
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi đặt spa: {str(e)}'
+            "success": False,
+            "message": f"Lỗi đặt spa: {str(e)}"
         }), 500
