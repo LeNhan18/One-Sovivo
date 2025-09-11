@@ -96,6 +96,86 @@ const AdminAchievements: React.FC<AdminAchievementsProps> = ({ onBackToDashboard
     return true;
   };
 
+  // Get detailed eligibility reason
+  const getEligibilityReason = (achievementName: string, customer: Customer): string => {
+    const name = achievementName.toLowerCase();
+    const stats = customer.stats || {};
+    
+    // Phi công achievements
+    if (name.includes('phi công vàng')) {
+      const current = stats.flight_count || 0;
+      if (current >= 20) return `Đủ điều kiện: ${current}/20 chuyến bay`;
+      return `Thiếu ${20 - current} chuyến bay (hiện tại: ${current}/20)`;
+    }
+    if (name.includes('phi công bạc')) {
+      const current = stats.flight_count || 0;
+      if (current >= 10) return `Đủ điều kiện: ${current}/10 chuyến bay`;
+      return `Thiếu ${10 - current} chuyến bay (hiện tại: ${current}/10)`;
+    }
+    if (name.includes('phi công đồng')) {
+      const current = stats.flight_count || 0;
+      if (current >= 5) return `Đủ điều kiện: ${current}/5 chuyến bay`;
+      return `Thiếu ${5 - current} chuyến bay (hiện tại: ${current}/5)`;
+    }
+    
+    // VIP achievement
+    if (name.includes('khách hàng vip') || name.includes('vip')) {
+      const current = stats.avg_balance || 0;
+      if (current >= 100_000_000) return `Đủ điều kiện: ${current.toLocaleString()} VNĐ`;
+      return `Thiếu ${(100_000_000 - current).toLocaleString()} VNĐ (hiện tại: ${current.toLocaleString()}/100,000,000 VNĐ)`;
+    }
+    
+    // Du lịch achievement
+    if (name.includes('người du lịch') || name.includes('du lịch')) {
+      const current = stats.resort_nights || 0;
+      if (current >= 10) return `Đủ điều kiện: ${current}/10 đêm nghỉ dưỡng`;
+      return `Thiếu ${10 - current} đêm nghỉ dưỡng (hiện tại: ${current}/10)`;
+    }
+    
+    // SVT achievements
+    if (name.includes('svt')) {
+      return 'Đủ điều kiện (achievement đặc biệt)';
+    }
+    
+    // Default
+    return 'Đủ điều kiện (achievement đặc biệt)';
+  };
+
+  // Check eligibility using backend rules (name-based)
+  const checkEligibilityByName = (achievementName: string, customer: Customer): boolean => {
+    const name = achievementName.toLowerCase();
+    const stats = customer.stats || {};
+    
+    // Phi công achievements
+    if (name.includes('phi công vàng')) {
+      return (stats.flight_count || 0) >= 20;
+    }
+    if (name.includes('phi công bạc')) {
+      return (stats.flight_count || 0) >= 10;
+    }
+    if (name.includes('phi công đồng')) {
+      return (stats.flight_count || 0) >= 5;
+    }
+    
+    // VIP achievement
+    if (name.includes('khách hàng vip') || name.includes('vip')) {
+      return (stats.avg_balance || 0) >= 100_000_000;
+    }
+    
+    // Du lịch achievement
+    if (name.includes('người du lịch') || name.includes('du lịch')) {
+      return (stats.resort_nights || 0) >= 10;
+    }
+    
+    // SVT achievements (always true for now)
+    if (name.includes('svt')) {
+      return true;
+    }
+    
+    // Default: allow other achievements
+    return true;
+  };
+
   const getAchievementRequirements = (achievement: Achievement): string => {
     if (!achievement.criteria) return '';
     
@@ -439,7 +519,8 @@ const AdminAchievements: React.FC<AdminAchievementsProps> = ({ onBackToDashboard
                       {achievements
                         .filter(ach => !customerAchievements.some(ca => ca.achievement_id === ach.id))
                         .map((achievement) => {
-                          const isEligible = checkAchievementEligibility(achievement, selectedCustomer);
+                          const isEligible = checkEligibilityByName(achievement.name, selectedCustomer);
+                          const eligibilityReason = getEligibilityReason(achievement.name, selectedCustomer);
                           const requirements = getAchievementRequirements(achievement);
                           
                           return (
@@ -482,15 +563,9 @@ const AdminAchievements: React.FC<AdminAchievementsProps> = ({ onBackToDashboard
                                 </div>
                               )}
                               
-                              {!isEligible && selectedCustomer && (
-                                <div className="text-xs text-red-600 mt-1">
-                                  <span className="font-medium">Hiện tại:</span>
-                                  {achievement.criteria?.flights_required && 
-                                    ` ${selectedCustomer.stats?.flight_count || 0}/${achievement.criteria.flights_required} chuyến bay`}
-                                  {achievement.criteria?.balance_required && 
-                                    ` ${(selectedCustomer.stats?.avg_balance || 0).toLocaleString()}/${achievement.criteria.balance_required.toLocaleString()} VND`}
-                                </div>
-                              )}
+                              <div className={`text-xs mt-1 ${isEligible ? 'text-green-600' : 'text-red-600'}`}>
+                                <span className="font-medium">Trạng thái:</span> {eligibilityReason}
+                              </div>
                             </div>
                           );
                         })}
