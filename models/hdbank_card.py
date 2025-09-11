@@ -2,12 +2,16 @@
 import datetime
 from flask_sqlalchemy import SQLAlchemy
 
+_initialized = False
 # This will be injected from app.py
 db = None
 HDBankCard = None
 
 def init_db(database):
-    global db, HDBankCard
+    global db, HDBankCard, _initialized
+    if _initialized:
+        return
+    _initialized = True
     db = database
     
     # Define HDBankCard class after db is initialized

@@ -2,10 +2,10 @@
 
 ## Tổng quan kiến trúc Modular cho One-Sovico Platform
 
-### 🎯 Mục tiêu
+###  Mục tiêu
 Tách app.py monolithic thành kiến trúc modular để dễ maintain và scale, giữ nguyên tất cả chức năng.
 
-### 📁 Cấu trúc thư mục đã tạo
+###  Cấu trúc thư mục đã tạo
 
 ```
 z:\One-Sovico\
@@ -32,7 +32,7 @@ z:\One-Sovico\
     └── auth_routes.py         # Auth route blueprint
 ```
 
-### 🔧 Các service đã implement
+###  Các service đã implement
 
 #### 1. AIService (`services/ai_service.py`)
 - Tải và quản lý AI model

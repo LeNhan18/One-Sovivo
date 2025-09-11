@@ -7,6 +7,7 @@ import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
 import { ServiceModal } from '../components/ServiceModal'
 import { AIAgent } from '../components/AIAgent'
+import ImageIcon from '../components/ImageIcon'
 
 type Props = {
   user: AuthUser
@@ -115,9 +116,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         console.log('🔍 SuperApp Debug - Customer ID:', customerId);
 
         const response = await fetch(`http://127.0.0.1:5000/customer/${customerId}`)
+        console.log('🔍 SuperApp Debug - API Response Status:', response.status);
         if (response.ok) {
           const customerData = await response.json()
           console.log('🔍 SuperApp Debug - Customer Data:', customerData);
+          console.log('🔍 SuperApp Debug - Vietjet Summary:', customerData.customer?.vietjet_summary);
+          console.log('🔍 SuperApp Debug - HDBank Summary:', customerData.customer?.hdbank_summary);
+          console.log('🔍 SuperApp Debug - Resort Summary:', customerData.customer?.resort_summary);
 
           // Lấy dữ liệu token từ blockchain/database
           const tokenResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}`)
@@ -137,33 +142,34 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           };
 
           const realUserData = {
-            customerId: customerData.basic_info?.customer_id || customerId,
-            name: customerData.basic_info?.name || user.name,
+            customerId: customerData.customer?.customer_id || customerId,
+            name: customerData.customer?.basic_info?.name || user.name,
             memberTier: calculateTier(tokensInfo.total_svt || 0),
             walletAddress: "0x" + customerId.toString().padStart(40, '0'),
             sovicoTokens: tokensInfo.total_svt || 0, // SVT thực từ DB
             services: {
               vietjet: {
-                flights: customerData.vietjet_summary?.total_flights_last_year || 0,
-                miles: (customerData.vietjet_summary?.total_flights_last_year || 0) * 1500
+                flights: customerData.customer?.vietjet_summary?.total_flights_last_year || 0,
+                miles: (customerData.customer?.vietjet_summary?.total_flights_last_year || 0) * 1500
               },
               hdbank: {
-                avg_balance: customerData.hdbank_summary?.average_balance || 0
+                avg_balance: customerData.customer?.hdbank_summary?.average_balance || 0
               },
               resorts: {
-                nights_stayed: customerData.resort_summary?.total_nights_stayed || 0
+                nights_stayed: customerData.customer?.resort_summary?.total_nights_stayed || 0
               }
             },
             transactions: [], // Sẽ load từ token_transactions
             ai_input: {
-              age: customerData.basic_info?.age || 25,
-              avg_balance: customerData.hdbank_summary?.average_balance || 0,
-              total_flights: customerData.vietjet_summary?.total_flights_last_year || 0,
-              is_business_flyer: customerData.vietjet_summary?.is_business_flyer || false,
-              total_nights_stayed: customerData.resort_summary?.total_nights_stayed || 0,
-              total_resort_spending: customerData.resort_summary?.total_spending || 0
+              age: customerData.customer?.basic_info?.age || 25,
+              avg_balance: customerData.customer?.hdbank_summary?.average_balance || 0,
+              total_flights: customerData.customer?.vietjet_summary?.total_flights_last_year || 0,
+              is_business_flyer: customerData.customer?.vietjet_summary?.is_business_flyer || false,
+              total_nights_stayed: customerData.customer?.resort_summary?.total_nights_stayed || 0,
+              total_resort_spending: customerData.customer?.resort_summary?.total_spending || 0
             }
           }
+          console.log('🔍 SuperApp Debug - Final User Data:', realUserData);
           setUserData(realUserData)
 
           // Lấy transaction data cho trang chính
@@ -539,7 +545,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-500"></div>
               <div className="relative flex items-center space-x-3">
-                <span>🚀</span>
+                <ImageIcon name="unnamed.png" size={18} />
                 <span>Khám phá ngay</span>
                 <span className="group-hover:translate-x-1 transition-transform">→</span>
               </div>
@@ -570,19 +576,19 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
             <div className="grid md:grid-cols-3 gap-8 mb-12">
               <div className="bg-blue-900/40 backdrop-blur-sm rounded-2xl p-6 border border-blue-500/30 hover:bg-blue-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl animate-float">
-                <div className="text-4xl mb-4 animate-bounce">💎</div>
+                <div className="text-4xl mb-4 animate-bounce"><ImageIcon name="sovico.jpg" size={32} rounded={8} /></div>
                 <h3 className="text-xl font-bold text-white mb-2">Sovico Token</h3>
                 <p className="text-blue-200">Đồng tiền số của hệ sinh thái Sovico Group</p>
               </div>
 
               <div className="bg-purple-900/40 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30 hover:bg-purple-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl animate-float delay-200">
-                <div className="text-4xl mb-4 animate-bounce delay-200">🤖</div>
+                <div className="text-4xl mb-4 animate-bounce delay-200"><ImageIcon name="AI.jpg" size={32} rounded={8} /></div>
                 <h3 className="text-xl font-bold text-white mb-2">AI Thông minh</h3>
                 <p className="text-purple-200">Trợ lý AI cá nhân cho mọi giao dịch</p>
               </div>
 
               <div className="bg-green-900/40 backdrop-blur-sm rounded-2xl p-6 border border-green-500/30 hover:bg-green-900/60 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl animate-float delay-500">
-                <div className="text-4xl mb-4 animate-bounce delay-500">⛓️</div>
+                <div className="text-4xl mb-4 animate-bounce delay-500"><ImageIcon name="blockchain.webp" size={32} rounded={8} /></div>
                 <h3 className="text-xl font-bold text-white mb-2">Blockchain</h3>
                 <p className="text-green-200">Bảo mật tuyệt đối với công nghệ blockchain</p>
               </div>
@@ -593,7 +599,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-16 py-5 rounded-2xl font-black text-xl transition-all duration-300 transform hover:scale-110 shadow-2xl hover:shadow-yellow-500/25 animate-glow"
             >
               <span className="flex items-center space-x-3">
-                <span>🚀</span>
+                <ImageIcon name="unnamed.png" size={18} />
                 <span>Bắt đầu trải nghiệm</span>
                 <span className="group-hover:translate-x-2 transition-transform">→</span>
               </span>

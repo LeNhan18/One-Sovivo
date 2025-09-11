@@ -13,6 +13,7 @@ p2p_bp = Blueprint('p2p', __name__, url_prefix='/api/p2p')
 
 marketplace_service = MarketplaceService()
 
+
 # Marketplace routes
 @marketplace_bp.route('/items', methods=['GET'])
 def get_marketplace_items():
@@ -20,14 +21,14 @@ def get_marketplace_items():
     try:
         items = marketplace_service.get_all_items()
         return jsonify({
-            'success': True,
-            'items': items
+            'items': items,
+            'total': len(items)
         })
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy danh sách marketplace: {str(e)}'
+            'error': f'Lỗi khi lấy vật phẩm: {str(e)}'
         }), 500
+
 
 @marketplace_bp.route('/purchase', methods=['POST'])
 @require_auth
@@ -36,39 +37,40 @@ def purchase_marketplace_item():
     try:
         data = request.get_json()
         user = request.current_user
-        
+
         result = marketplace_service.purchase_item(
             customer_id=user.customer.customer_id if user.customer else None,
             item_id=data.get('item_id'),
             quantity=data.get('quantity', 1)
         )
-        
+
         if result['success']:
             return jsonify(result)
         else:
             return jsonify(result), 400
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
             'error': f'Lỗi mua hàng: {str(e)}'
         }), 500
 
+
 # P2P routes
 @p2p_bp.route('/listings', methods=['GET'])
 def get_p2p_listings():
     """API để lấy danh sách tin đăng P2P"""
     try:
-        listings = marketplace_service.get_p2p_listings()
+        listings = marketplace_service.get_all_p2p_listings()
         return jsonify({
-            'success': True,
-            'listings': listings
+            'listings': listings,
+            'total': len(listings)
         })
     except Exception as e:
         return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy danh sách P2P: {str(e)}'
+            'error': f'Lỗi khi lấy tin đăng P2P: {str(e)}'
         }), 500
+
 
 @p2p_bp.route('/create', methods=['POST'])
 @require_auth
@@ -77,19 +79,19 @@ def create_p2p_listing():
     try:
         data = request.get_json()
         user = request.current_user
-        
+
         result = marketplace_service.create_p2p_listing(
             seller_customer_id=user.customer.customer_id if user.customer else None,
             item_name=data.get('item_name'),
             description=data.get('description'),
             price_svt=data.get('price_svt')
         )
-        
+
         if result['success']:
             return jsonify(result)
         else:
             return jsonify(result), 400
-            
+
     except Exception as e:
         return jsonify({
             'success': False,

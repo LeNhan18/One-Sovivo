@@ -7,34 +7,149 @@ HDBank service integration
 import datetime
 import uuid
 import random
-from models import db, Customer, HDBankTransaction, HDBankCard, TokenTransaction
+
+# Import stable pieces
+from models.database import db
+from models.customer import Customer
+import models.transactions as tx_models
+import models.hdbank_card as card_models
+
+# Helper getters to always fetch latest model classes (after init_db they are populated)
+
+def _HDBankTransaction():
+    return getattr(tx_models, 'HDBankTransaction', None)
+
+def _TokenTransaction():
+    return getattr(tx_models, 'TokenTransaction', None)
+
+def _HDBankCard():
+    return getattr(card_models, 'HDBankCard', None)
 
 class HDBankService:
     
-    def get_dashboard_data(self, customer_id):
-        """Lấy dữ liệu dashboard HDBank cho customer"""
+    def get_customer_card_info(self, customer_id):
+        """Lấy thông tin thẻ của khách hàng từ bảng hdbank_cards"""
         try:
-            # Kiểm tra customer có thẻ không
-            card_info = self._get_customer_card_info(customer_id)
-            
-            # Lấy thông tin giao dịch
-            transactions = HDBankTransaction.query.filter_by(
-                customer_id=customer_id
-            ).order_by(HDBankTransaction.transaction_date.desc()).limit(10).all()
-            
-            # Tính toán statistics
-            stats = self._calculate_account_stats(customer_id)
-            
-            return {
-                'card_info': card_info,
-                'recent_transactions': [self._transaction_to_dict(tx) for tx in transactions],
-                'statistics': stats,
-                'services': self._get_available_services(customer_id)
-            }
-            
+            # Tìm thẻ trong bảng hdbank_cards
+            HDBankCard = _HDBankCard()
+            if HDBankCard is None:
+                return {"has_card": False}
+                
+            card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
+
+            if card:
+                return {
+                    "has_card": True,
+                    "card_id": card.card_id,
+                    "card_name": card.card_name,
+                    "card_number": f"****-****-****-{card.card_number[-4:]}",
+                    "card_type": card.card_type,
+                    "credit_limit": card.credit_limit,
+                    "opened_date": card.opened_date.strftime('%Y-%m-%d'),
+                    "expiry_date": card.expiry_date.strftime('%Y-%m-%d'),
+                    "status": card.status
+                }
+            else:
+                return {"has_card": False}
         except Exception as e:
-            print(f"❌ Error getting HDBank dashboard: {e}")
-            return {}
+            print(f"❌ Error in get_customer_card_info: {e}")
+            return {"has_card": False}
+    
+    def get_dashboard_data(self, customer_id):
+        """Dashboard tổng quan dịch vụ HDBank cho khách hàng"""
+        try:
+            # Kiểm tra khách hàng
+            customer = Customer.query.filter_by(customer_id=customer_id).first()
+            if not customer:
+                return {
+                    "success": False,
+                    "message": "Khách hàng không tồn tại"
+                }
+
+            # Kiểm tra thẻ
+            card_info = self.get_customer_card_info(customer_id)
+
+            # Nếu chưa có thẻ, hiển thị giao diện mở thẻ
+            if not card_info["has_card"]:
+                return {
+                    "success": True,
+                    "customer_id": customer_id,
+                    "customer_name": customer.name,
+                    "has_card": False,
+                    "message": "Chào mừng đến với HDBank! Mở thẻ ngay để sử dụng dịch vụ",
+                    "action_required": {
+                        "type": "open_card",
+                        "title": "🏦 Mở thẻ HDBank miễn phí",
+                        "description": "Nhận ngay 1 triệu VND + 500 SVT Token",
+                        "benefits": [
+                            "💳 Miễn phí thường niên trọn đời",
+                            "💰 Thưởng chào mừng 1 triệu VND",
+                            "🪙 Tặng 500 SVT Token",
+                            "📊 Hạn mức tín dụng 10 triệu VND",
+                            "🔄 Sử dụng dịch vụ chuyển khoản, vay vốn"
+                        ],
+                        "button_text": "Mở thẻ ngay",
+                        "endpoint": "/api/service/hdbank/open-card"
+                    },
+                    "available_services": []
+                }
+
+            # Nếu đã có thẻ, hiển thị dashboard đầy đủ
+            HDBankTransaction = _HDBankTransaction()
+            if HDBankTransaction is None:
+                raise RuntimeError('HDBankTransaction model not initialized')
+                
+            total_transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).count()
+            total_spent = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
+                HDBankTransaction.customer_id == customer_id,
+                HDBankTransaction.amount < 0
+            ).scalar() or 0
+
+            total_received = db.session.query(db.func.sum(HDBankTransaction.amount)).filter(
+                HDBankTransaction.customer_id == customer_id,
+                HDBankTransaction.amount > 0
+            ).scalar() or 0
+
+            # Lấy balance từ transaction mới nhất
+            latest_transaction = HDBankTransaction.query.filter_by(customer_id=customer_id) \
+                .order_by(HDBankTransaction.transaction_date.desc()).first()
+            current_balance = float(latest_transaction.balance) if latest_transaction else 0
+
+            return {
+                "success": True,
+                "customer_id": customer_id,
+                "customer_name": customer.name,
+                "has_card": True,
+                "card_info": card_info,
+                "account_summary": {
+                    "total_transactions": total_transactions,
+                    "total_spent": abs(total_spent),
+                    "total_received": total_received,
+                    "current_balance": current_balance
+                },
+                "available_services": [
+                    {
+                        "type": "transfer",
+                        "title": "💸 Chuyển khoản",
+                        "description": "Chuyển tiền nhanh, nhận SVT Token",
+                        "endpoint": "/api/service/hdbank/transfer",
+                        "icon": "💸"
+                    },
+                    {
+                        "type": "loan",
+                        "title": "💰 Đăng ký vay",
+                        "description": "Vay vốn lãi suất ưu đãi",
+                        "endpoint": "/api/service/hdbank/loan",
+                        "icon": "💰"
+                    }
+                ]
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Lỗi tải dashboard: {str(e)}"
+            }
     
     def get_service_status(self, customer_id):
         """Kiểm tra trạng thái các dịch vụ HDBank"""
@@ -61,19 +176,17 @@ class HDBankService:
     def process_transfer(self, from_customer_id, to_account, amount, description=''):
         """Xử lý chuyển khoản"""
         try:
+            HTx = _HDBankTransaction(); TTx = _TokenTransaction()
+            if not HTx or not TTx:
+                return {'success': False, 'error': 'Models not initialized'}
             if not self._check_customer_has_card(from_customer_id):
                 return {'success': False, 'error': 'Customer does not have HDBank card'}
-            
             if amount <= 0:
                 return {'success': False, 'error': 'Invalid transfer amount'}
-            
-            # Kiểm tra số dư (giả lập)
             current_balance = self._get_current_balance(from_customer_id)
             if current_balance < amount:
                 return {'success': False, 'error': 'Insufficient balance'}
-            
-            # Tạo giao dịch chuyển tiền
-            transfer_tx = HDBankTransaction(
+            transfer_tx = HTx(
                 transaction_id=f"TF{uuid.uuid4().hex[:8].upper()}",
                 customer_id=from_customer_id,
                 transaction_date=datetime.datetime.utcnow(),
@@ -83,11 +196,9 @@ class HDBankService:
                 description=f"Chuyển khoản đến {to_account}: {description}"
             )
             db.session.add(transfer_tx)
-            
-            # Thưởng SVT cho giao dịch
             svt_reward = self._calculate_transfer_svt_reward(amount)
             if svt_reward > 0:
-                svt_tx = TokenTransaction(
+                svt_tx = TTx(
                     customer_id=from_customer_id,
                     transaction_type="transfer_reward",
                     amount=svt_reward,
@@ -96,9 +207,7 @@ class HDBankService:
                     block_number=random.randint(1000000, 2000000)
                 )
                 db.session.add(svt_tx)
-            
             db.session.commit()
-            
             return {
                 'success': True,
                 'message': 'Chuyển khoản thành công',
@@ -107,7 +216,6 @@ class HDBankService:
                 'new_balance': current_balance - amount,
                 'svt_reward': svt_reward
             }
-            
         except Exception as e:
             db.session.rollback()
             print(f"❌ Error processing transfer: {e}")
@@ -116,14 +224,14 @@ class HDBankService:
     def apply_loan(self, customer_id, loan_amount, loan_term, loan_purpose=''):
         """Đăng ký vay vốn"""
         try:
+            HTx = _HDBankTransaction(); TTx = _TokenTransaction()
+            if not HTx or not TTx:
+                return {'success': False, 'error': 'Models not initialized'}
             if not self._check_customer_has_card(customer_id):
                 return {'success': False, 'error': 'Customer does not have HDBank card'}
-            
             if loan_amount <= 0:
                 return {'success': False, 'error': 'Invalid loan amount'}
-            
-            # Tạo bản ghi vay (giả lập)
-            loan_tx = HDBankTransaction(
+            loan_tx = HTx(
                 transaction_id=f"LOAN{uuid.uuid4().hex[:8].upper()}",
                 customer_id=customer_id,
                 transaction_date=datetime.datetime.utcnow(),
@@ -133,10 +241,8 @@ class HDBankService:
                 description=f"Giải ngân khoản vay {loan_term} tháng: {loan_purpose}"
             )
             db.session.add(loan_tx)
-            
-            # Thưởng SVT cho việc sử dụng dịch vụ vay
-            svt_reward = 1000  # Fixed reward cho loan
-            svt_tx = TokenTransaction(
+            svt_reward = 1000
+            svt_tx = TTx(
                 customer_id=customer_id,
                 transaction_type="loan_reward",
                 amount=svt_reward,
@@ -145,9 +251,7 @@ class HDBankService:
                 block_number=random.randint(1000000, 2000000)
             )
             db.session.add(svt_tx)
-            
             db.session.commit()
-            
             return {
                 'success': True,
                 'message': f'Đăng ký vay {loan_amount:,.0f} VND thành công',
@@ -156,7 +260,6 @@ class HDBankService:
                 'loan_term': loan_term,
                 'svt_reward': svt_reward
             }
-            
         except Exception as e:
             db.session.rollback()
             print(f"❌ Error applying loan: {e}")
@@ -165,20 +268,16 @@ class HDBankService:
     def open_card(self, customer_id, card_type, card_name=''):
         """Mở thẻ HDBank mới"""
         try:
-            # Kiểm tra customer đã có thẻ chưa
+            HTx = _HDBankTransaction(); TTx = _TokenTransaction(); Card = _HDBankCard()
+            if not HTx or not TTx or not Card:
+                return {'success': False, 'error': 'Models not initialized'}
             if self._check_customer_has_card(customer_id):
                 return {'success': False, 'error': 'Customer already has HDBank card'}
-            
-            # Kiểm tra customer tồn tại
             customer = Customer.query.filter_by(customer_id=customer_id).first()
             if not customer:
                 return {'success': False, 'error': 'Customer not found'}
-            
-            # Tạo thẻ mới
             card_info = self._create_new_card(customer_id, card_type, card_name or f"HDBank {card_type.title()}")
-            
-            # Tạo transaction mở thẻ
-            open_card_tx = HDBankTransaction(
+            open_card_tx = HTx(
                 transaction_id=f"CARD{uuid.uuid4().hex[:8].upper()}",
                 customer_id=customer_id,
                 transaction_date=datetime.datetime.utcnow(),
@@ -188,10 +287,8 @@ class HDBankService:
                 description=f"Mở thẻ HDBank {card_type} - {card_info['card_number']}"
             )
             db.session.add(open_card_tx)
-            
-            # Thưởng SVT cho việc mở thẻ
             svt_reward = 500
-            svt_tx = TokenTransaction(
+            svt_tx = TTx(
                 customer_id=customer_id,
                 transaction_type="card_opening_reward",
                 amount=svt_reward,
@@ -200,16 +297,13 @@ class HDBankService:
                 block_number=random.randint(1000000, 2000000)
             )
             db.session.add(svt_tx)
-            
             db.session.commit()
-            
             return {
                 'success': True,
                 'message': f'Mở thẻ HDBank {card_type} thành công',
                 'card_info': card_info,
                 'svt_reward': svt_reward
             }
-            
         except Exception as e:
             db.session.rollback()
             print(f"❌ Error opening card: {e}")
@@ -218,7 +312,10 @@ class HDBankService:
     def get_customer_cards(self, customer_id):
         """Lấy danh sách thẻ của customer"""
         try:
-            cards = HDBankCard.query.filter_by(customer_id=customer_id).all()
+            Card = _HDBankCard()
+            if not Card:
+                return []
+            cards = Card.query.filter_by(customer_id=customer_id).all()
             return [card.to_dict() for card in cards]
         except Exception as e:
             print(f"❌ Error getting customer cards: {e}")
@@ -253,7 +350,10 @@ class HDBankService:
     def _get_customer_card_info(self, customer_id):
         """Helper: Lấy thông tin thẻ của customer"""
         try:
-            card = HDBankCard.query.filter_by(customer_id=customer_id, status='active').first()
+            Card = _HDBankCard()
+            if not Card:
+                raise RuntimeError('Card model not initialized')
+            card = Card.query.filter_by(customer_id=customer_id, status='active').first()
             return card.to_dict() if card else {'has_card': False}
         except Exception as e:
             print(f"❌ Error getting card info: {e}")
@@ -262,8 +362,10 @@ class HDBankService:
     def _check_customer_has_card(self, customer_id):
         """Helper: Kiểm tra customer có thẻ không"""
         try:
-            card_count = HDBankCard.query.filter_by(customer_id=customer_id, status='active').count()
-            return card_count > 0
+            Card = _HDBankCard()
+            if not Card:
+                return False
+            return Card.query.filter_by(customer_id=customer_id, status='active').count() > 0
         except Exception as e:
             print(f"❌ Error checking card: {e}")
             return False
@@ -271,11 +373,11 @@ class HDBankService:
     def _get_current_balance(self, customer_id):
         """Helper: Lấy số dư hiện tại"""
         try:
-            latest_tx = HDBankTransaction.query.filter_by(
-                customer_id=customer_id
-            ).order_by(HDBankTransaction.transaction_date.desc()).first()
-            
-            return float(latest_tx.balance) if latest_tx else 0
+            HTx = _HDBankTransaction()
+            if not HTx:
+                return 0
+            latest_tx = HTx.query.filter_by(customer_id=customer_id).order_by(HTx.transaction_date.desc()).first()
+            return float(latest_tx.balance) if latest_tx and latest_tx.balance is not None else 0
         except Exception as e:
             print(f"❌ Error getting balance: {e}")
             return 0
@@ -287,22 +389,22 @@ class HDBankService:
             'transaction_date': tx.transaction_date.strftime('%Y-%m-%d %H:%M:%S'),
             'amount': float(tx.amount),
             'transaction_type': tx.transaction_type,
-            'balance': float(tx.balance),
+            'balance': float(tx.balance) if tx.balance is not None else 0,
             'description': tx.description
         }
     
     def _calculate_account_stats(self, customer_id):
         """Helper: Tính toán thống kê tài khoản"""
         try:
-            transactions = HDBankTransaction.query.filter_by(customer_id=customer_id).all()
-            
+            HTx = _HDBankTransaction()
+            if not HTx:
+                return {'total_transactions': 0, 'current_balance': 0}
+            transactions = HTx.query.filter_by(customer_id=customer_id).all()
             if not transactions:
                 return {'total_transactions': 0, 'current_balance': 0}
-            
-            current_balance = float(transactions[-1].balance) if transactions else 0
+            current_balance = float(transactions[-1].balance) if transactions[-1].balance is not None else 0
             total_credit = sum(float(tx.amount) for tx in transactions if tx.transaction_type == 'credit')
             total_debit = sum(abs(float(tx.amount)) for tx in transactions if tx.transaction_type == 'debit')
-            
             return {
                 'total_transactions': len(transactions),
                 'current_balance': current_balance,
@@ -334,6 +436,9 @@ class HDBankService:
     def _create_new_card(self, customer_id, card_type, card_name):
         """Helper: Tạo thẻ mới trong database"""
         try:
+            Card = _HDBankCard()
+            if not Card:
+                raise RuntimeError('Card model not initialized')
             # Generate card number
             card_number = f"4567{random.randint(1000, 9999)}{random.randint(1000, 9999)}{random.randint(1000, 9999)}"
             
@@ -346,7 +451,7 @@ class HDBankService:
             
             config = card_configs.get(card_type, card_configs['classic'])
             
-            card = HDBankCard(
+            card = Card(
                 customer_id=customer_id,
                 card_id=f"HD{uuid.uuid4().hex[:8].upper()}",
                 card_number=card_number,

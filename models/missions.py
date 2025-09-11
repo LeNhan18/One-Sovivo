@@ -2,6 +2,8 @@
 import datetime
 from flask_sqlalchemy import SQLAlchemy
 
+_initialized = False
+
 # This will be injected from app.py
 db = None
 CustomerMission = None
@@ -9,7 +11,10 @@ CustomerMissionProgress = None
 
 
 def init_db(database):
-    global db, CustomerMission, CustomerMissionProgress
+    global db, CustomerMission, CustomerMissionProgress, _initialized
+    if _initialized:
+        return
+    _initialized = True
     db = database
     
     # Define classes after db is initialized

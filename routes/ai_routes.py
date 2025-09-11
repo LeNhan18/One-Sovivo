@@ -2,9 +2,11 @@
 """
 AI prediction routes blueprint
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_from_directory
+import os
+import datetime
 
-ai_bp = Blueprint('ai', __name__)
+ai_bp = Blueprint('ai', __name__, url_prefix='/ai')
 
 # Import service instances will be injected later
 ai_service = None
@@ -23,3 +25,28 @@ def predict_persona():
     data = request.json or {}
     result = ai_service.predict_with_achievements(data)
     return jsonify(result)
+
+@ai_bp.route('/metrics/<filename>')
+def get_metric_chart(filename):
+    """Serve metric charts from model directory"""
+    from flask import current_app
+    try:
+        model_dir = current_app.config.get('MODEL_DIR', 'dl_model')
+        return send_from_directory(model_dir, filename)
+    except Exception as e:
+        return jsonify({'error': f'File not found: {str(e)}'}), 404
+
+@ai_bp.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'ai_service_available': ai_service is not None,
+            'timestamp': str(datetime.datetime.utcnow())
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
