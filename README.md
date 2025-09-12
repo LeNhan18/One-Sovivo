@@ -1,13 +1,14 @@
 # One-Sovico Platform
 
-🏦 **Hệ thống AI phân tích khách hàng thông minh** cho hệ sinh thái tài chính Sovico
+ **Hệ thống AI phân tích khách hàng thông minh** cho hệ sinh thái tài chính Sovico
 
-## 🎯 Tổng quan
+##  Tổng quan
 
 One-Sovico Platform bao gồm 2 ứng dụng chính:
 
 ### 1. 🧠 AI Insight Dashboard (Dành cho Chuyên viên/BGK)
 - **Mục đích**: Phòng điều khiển phân tích khách hàng với AI
+
 - **Đối tượng**: Ban Giám khảo, chuyên viên HDBank
 - **Tính năng**:
   - Tìm kiếm và phân tích khách hàng 360°
@@ -16,7 +17,7 @@ One-Sovico Platform bao gồm 2 ứng dụng chính:
   - Trực quan hóa hiệu suất Model AI
   - Hệ thống Achievement và NFT tự động
 
-### 2. 📱 One-Sovico Super App (Dành cho Khách hàng)
+### 2.  One-Sovico Super App (Dành cho Khách hàng)
 - **Mục đích**: Siêu ứng dụng quản lý dịch vụ tài chính
 - **Đối tượng**: Khách hàng cuối
 - **Tính năng**:
@@ -27,6 +28,8 @@ One-Sovico Platform bao gồm 2 ứng dụng chính:
   - Lịch sử giao dịch Blockchain minh bạch
 
 ## 🏗️ Kiến trúc Modular Clean
+
+
 
 ### 📁 Cấu trúc dự án
 
@@ -77,7 +80,7 @@ z:\One-Sovico\
 └── dl_model/                  # 🧠 AI Model directory
 ```
 
-## 🚀 Cài đặt và Chạy
+##  Cài đặt và Chạy
 
 ### Bước 1: Cài đặt MySQL
 ```bash
@@ -133,7 +136,7 @@ npm run dev
 - **Build Tool**: Vite
 - **AI Integration**: Google Gemini API
 
-## 🔐 Demo Accounts
+##  Demo Accounts
 
 ### Chuyên viên (Dashboard)
 - **Email**: `admin@hdbank.com.vn`
@@ -143,7 +146,7 @@ npm run dev
 - **Email**: `khachhang@gmail.com`
 - **Password**: `123456`
 
-## 📊 API Endpoints
+##  API Endpoints
 
 ### 🔐 Authentication
 - `POST /auth/login` - Đăng nhập
@@ -398,6 +401,7 @@ logging.basicConfig(level=logging.DEBUG)
    - Solution: Kiểm tra `dl_model/` directory
    - Fallback: Mock model sẽ được sử dụng
 
+
 3. **"Database connection failed"**
    - Solution: Kiểm tra MySQL service đang chạy
    - Check: Database credentials trong `config.py`
@@ -445,3 +449,4 @@ npm run dev
 **Last Updated**: September 13, 2025  
 **Architecture**: Modular Clean Architecture  
 **Author**: One-Sovico Development Team
+
