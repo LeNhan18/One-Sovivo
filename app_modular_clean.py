@@ -107,15 +107,15 @@ def initialize_route_services(app):
             # Load AI model để service có thể predict
             try:
                 ai_service.load_model()
-                print("✅ AI model loaded successfully")
+                print(" AI model loaded successfully")
             except Exception as e:
-                print(f"⚠️ Warning: AI model loading failed: {e}")
+                print(f" Warning: AI model loading failed: {e}")
                 # Tạo mock model nếu load thất bại
                 try:
                     ai_service.create_mock_model()
-                    print("✅ AI mock model created successfully")
+                    print(" AI mock model created successfully")
                 except Exception as e2:
-                    print(f"❌ Warning: AI mock model creation failed: {e2}")
+                    print(f" Warning: AI mock model creation failed: {e2}")
             
             # Set model classes for services that need them
             try:
@@ -143,7 +143,7 @@ def initialize_route_services(app):
                 admin_service.set_models(model_classes)
                 
             except Exception as e:
-                print(f"⚠️ Warning: Could not load all model classes: {e}")
+                print(f"️ Warning: Could not load all model classes: {e}")
             
             # Create service instances dict
             service_instances = {
@@ -169,12 +169,19 @@ def initialize_route_services(app):
                 from routes.admin_routes import init_admin_routes
                 init_admin_routes(service_instances)
             except Exception as e:
-                print(f"⚠️ Warning: Could not initialize admin routes: {e}")
+                print(f"️ Warning: Could not initialize admin routes: {e}")
                 
-            print("✅ Route services initialized successfully")
+            # Initialize AI chat routes
+            try:
+                from routes.ai_chat_routes import ai_chat_bp
+                print(" AI Chat routes available")
+            except Exception as e:
+                print(f"️ Warning: Could not initialize AI chat routes: {e}")
+                
+            print(" Route services initialized successfully")
             
         except Exception as e:
-            print(f"❌ Warning: Route service initialization failed: {e}")
+            print(f" Warning: Route service initialization failed: {e}")
             import traceback
             traceback.print_exc()
 
@@ -433,7 +440,7 @@ def init_app_data():
     """Initialize application data and services"""
     with app.app_context():
         try:
-            print("🚀 Initializing One-Sovico Platform (Modular)...")
+            print(" Initializing One-Sovico Platform (Modular)...")
 
             # Get database instance
             from models import db
@@ -443,60 +450,60 @@ def init_app_data():
                 from services.ai_service import AIService
                 ai_service = AIService(app.config)
                 ai_service.load_model()  # Use correct method name
-                print("✅ AI service initialized")
+                print("AI service initialized")
             except Exception as e:
-                print(f"❌ AI service initialization failed: {e}")
+                print(f" AI service initialization failed: {e}")
 
             # Initialize default marketplace items
             try:
                 from services.marketplace_service import MarketplaceService
                 marketplace_service = MarketplaceService()
                 # Add any default marketplace setup here
-                print("✅ Marketplace service initialized")
+                print(" Marketplace service initialized")
             except Exception as e:
-                print(f"❌ Marketplace service initialization failed: {e}")
+                print(f" Marketplace service initialization failed: {e}")
 
             # Initialize customer service
             try:
                 from services.customer_service import CustomerService
                 customer_service = CustomerService(db, app.config)
-                print("✅ Customer service initialized")
+                print(" Customer service initialized")
             except Exception as e:
-                print(f"❌ Customer service initialization failed: {e}")
+                print(f" Customer service initialization failed: {e}")
 
             # Initialize admin service
             try:
                 from services.admin_service import AdminService
                 admin_service = AdminService(db, app.config)
-                print("✅ Admin service initialized")
+                print(" Admin service initialized")
             except Exception as e:
-                print(f"❌ Admin service initialization failed: {e}")
+                print(f" Admin service initialization failed: {e}")
 
-            print("🎉 Application initialization completed")
+            print(" Application initialization completed")
 
         except Exception as e:
-            print(f"💥 Application initialization failed: {e}")
+            print(f" Application initialization failed: {e}")
             raise e
 
 
 if __name__ == '__main__':
     print("=" * 80)
-    print("🚀 One-Sovico Platform - Modular Architecture")
+    print(" One-Sovico Platform - Modular Architecture")
     print("=" * 80)
-    print(f"📊 Database: {Config.get_database_url()}")
-    print(f"⛓️  Blockchain: {'Enabled' if BLOCKCHAIN_ENABLED else 'Disabled'}")
-    print(f"🎯 Missions: {'Enabled' if MISSION_SYSTEM_ENABLED else 'Disabled'}")
+    print(f" Database: {Config.get_database_url()}")
+    print(f"⛓  Blockchain: {'Enabled' if BLOCKCHAIN_ENABLED else 'Disabled'}")
+    print(f" Missions: {'Enabled' if MISSION_SYSTEM_ENABLED else 'Disabled'}")
     print("=" * 80)
 
     # Initialize app data
     init_app_data()
 
-    print("🌐 Server starting at: http://127.0.0.1:5000")
-    print("📚 API Documentation available at: /health")
-    print("🔧 Admin Panel: /admin/achievements")
-    print("🤖 AI Prediction: /ai/predict")
-    print("👤 Customer Profile: /customer/<id>")
-    print("🏆 NFT Achievements: /api/nft/<id>/achievements")
+    print(" Server starting at: http://127.0.0.1:5000")
+    print(" API Documentation available at: /health")
+    print(" Admin Panel: /admin/achievements")
+    print(" AI Prediction: /ai/predict")
+    print(" Customer Profile: /customer/<id>")
+    print(" NFT Achievements: /api/nft/<id>/achievements")
     print("=" * 80)
 
     # Run the application

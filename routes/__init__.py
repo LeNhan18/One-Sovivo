@@ -24,6 +24,12 @@ try:
 except ImportError:
     BLOCKCHAIN_ROUTES_AVAILABLE = False
 
+try:
+    from .ai_chat_routes import ai_chat_bp
+    AI_CHAT_AVAILABLE = True
+except ImportError:
+    AI_CHAT_AVAILABLE = False
+
 __all__ = [
     'auth_bp', 'customer_bp', 'admin_bp', 'ai_bp',
     'marketplace_bp', 'p2p_bp', 'mission_bp',
@@ -60,5 +66,9 @@ def register_blueprints(app):
     if BLOCKCHAIN_ROUTES_AVAILABLE:
         app.register_blueprint(blockchain_bp)
         print("✅ Blockchain routes registered")
+    
+    if AI_CHAT_AVAILABLE:
+        app.register_blueprint(ai_chat_bp)
+        print("✅ AI Chat routes registered")
     
     return True

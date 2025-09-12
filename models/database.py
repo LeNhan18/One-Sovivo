@@ -6,11 +6,18 @@ Database initialization and configuration
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
+from config import Config
 
 # Initialize database and bcrypt
 db = SQLAlchemy()
 bcrypt = Bcrypt()
+
+def get_db_connection():
+    """Get a direct database connection for raw SQL queries"""
+    from flask import current_app
+    # Use SQLAlchemy's engine to get raw connection
+    return current_app.extensions['sqlalchemy'].db.engine.raw_connection()
 
 def _auto_migrate_hdbank_transactions():
     """Ensure hdbank_transactions table has required columns / enum values."""
