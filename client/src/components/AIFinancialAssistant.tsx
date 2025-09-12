@@ -709,54 +709,56 @@ const AIFinancialAssistant: React.FC = () => {
       return result
     }
 
-    // Look for specific date patterns - improved regex
+    // Look for specific date patterns - prioritize Vietnamese formats
     const datePatterns = [
-      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,          // DD/MM/YYYY
-      /(\d{1,2})-(\d{1,2})-(\d{4})/,           // DD-MM-YYYY
-      /(\d{1,2})\.(\d{1,2})\.(\d{4})/,         // DD.MM.YYYY
-      /ngay\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // ngày DD/MM/YYYY
-      /ngay\s+(\d{1,2})-(\d{1,2})-(\d{4})/,    // ngày DD-MM-YYYY
-      /ngay\s+(\d{1,2})\/(\d{1,2})/,           // ngày DD/MM (current year)
-      /ngay\s+(\d{1,2})-(\d{1,2})/,            // ngày DD-MM (current year)
-      /(\d{1,2})\/(\d{1,2})/,                  // DD/MM (current year)
-      /(\d{1,2})-(\d{1,2})/,                   // DD-MM (current year)
-      /(\d{1,2})\s*thang\s*(\d{1,2})/,         // DD tháng MM
-      /ngay\s*(\d{1,2})\s*thang\s*(\d{1,2})/,  // ngày DD tháng MM
+      // Vietnamese "tháng" patterns first (most natural)
+      /ngay\s+(\d{1,2})\s+thang\s+(\d{1,2})/,          // ngày DD tháng MM
+      /(\d{1,2})\s+thang\s+(\d{1,2})/,                 // DD tháng MM
+      /ngay\s+(\d{1,2})\s*\/\s*(\d{1,2})/,             // ngày DD/MM
+      /ngay\s+(\d{1,2})\s*-\s*(\d{1,2})/,              // ngày DD-MM
+      // Full date patterns
+      /(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})/,     // DD/MM/YYYY
+      /(\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4})/,       // DD-MM-YYYY
+      /ngay\s+(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})/, // ngày DD/MM/YYYY
+      /ngay\s+(\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4})/, // ngày DD-MM-YYYY
+      // Short patterns (fallback)
+      /(\d{1,2})\s*\/\s*(\d{1,2})/,                    // DD/MM
+      /(\d{1,2})\s*-\s*(\d{1,2})/,                     // DD-MM
     ]
 
     for (const pattern of datePatterns) {
       const match = normalizedText.match(pattern)
       if (match) {
+        console.log(`🔍 Pattern matched: ${pattern.source} -> ${match[0]}`) // Debug
         let day, month, year
         
+        // Parse based on pattern type - prioritize "tháng" patterns
         if (pattern.source.includes('thang')) {
-          // Pattern with "tháng"
-          if (pattern.source.includes('ngay')) {
-            // "ngày DD tháng MM"
-            day = match[1]
-            month = match[2]
-          } else {
-            // "DD tháng MM"
-            day = match[1]
-            month = match[2]
-          }
+          // "DD tháng MM" or "ngày DD tháng MM"
+          day = match[1]
+          month = match[2]
           year = new Date().getFullYear()
+          console.log(`📝 Vietnamese pattern: ${day} tháng ${month}`) // Debug
         } else if (pattern.source.includes('ngay')) {
-          // Pattern with "ngày"
+          // "ngày DD/MM" or "ngày DD/MM/YYYY"  
           day = match[1]
           month = match[2]
           year = match[3] || new Date().getFullYear()
+          console.log(`📝 Ngày pattern: ngày ${day}/${month}`) // Debug
         } else {
           // Standard DD/MM patterns
           day = match[1]
           month = match[2]
           year = match[3] || new Date().getFullYear()
+          console.log(`📝 Standard pattern: ${day}/${month}`) // Debug
         }
         
         // Validate date ranges
         const dayNum = parseInt(day)
         const monthNum = parseInt(month)
         const yearNum = parseInt(year.toString())
+        
+        console.log(`🔍 Parsed: day=${day}, month=${month}, year=${year}`) // Debug
         
         if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= new Date().getFullYear()) {
           const result = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`
@@ -778,6 +780,65 @@ const AIFinancialAssistant: React.FC = () => {
 
     console.log(`❌ No valid date found`) // Debug
     return null
+  }
+
+  // Extract recipient from text for transfers
+  const extractRecipient = (text: string): { name?: string, account?: string } => {
+    console.log('👤 Extracting recipient from:', text) // Debug
+    
+    // Normalize text
+    const normalizedText = text.toLowerCase()
+      .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
+      .replace(/è|é|ẻ|ẽ|ẹ|ê|ề|ế|ể|ễ|ệ/g, 'e')
+      .replace(/ì|í|ỉ|ĩ|ị/g, 'i')
+      .replace(/ò|ó|ỏ|õ|ọ|ô|ồ|ố|ổ|ỗ|ộ|ơ|ờ|ớ|ở|ỡ|ợ/g, 'o')
+      .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
+      .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
+      .replace(/đ/g, 'd')
+
+    const recipient: { name?: string, account?: string } = {}
+
+    // Extract account number patterns
+    const accountPatterns = [
+      /so\s*(?:tai\s*khoan\s*)?(\d{8,20})/g,
+      /tai\s*khoan\s*(\d{8,20})/g,
+      /stk\s*(\d{8,20})/g,
+      /(\d{10,20})/g  // fallback for long numbers
+    ]
+    
+    for (const pattern of accountPatterns) {
+      const match = pattern.exec(normalizedText)
+      if (match) {
+        recipient.account = match[1]
+        console.log('✅ Found account:', recipient.account)
+        break
+      }
+    }
+
+    // Extract recipient name patterns
+    const namePatterns = [
+      /chuyen.*?cho\s+(.+?)(?:\s+so|\s+tai|\s+\d|$)/i,
+      /gui.*?cho\s+(.+?)(?:\s+so|\s+tai|\s+\d|$)/i,
+      /chuyen.*?den\s+(.+?)(?:\s+so|\s+tai|\s+\d|$)/i,
+      /cho\s+(.+?)(?:\s+so|\s+tai|\s+\d|$)/i
+    ]
+    
+    for (const pattern of namePatterns) {
+      const match = text.match(pattern)
+      if (match) {
+        let name = match[1].trim()
+        // Clean up common prefixes
+        name = name.replace(/^(anh|chi|co|chu|ba|ong|ba)\s+/i, '')
+        name = name.replace(/\s+(so|tai|khoan).*$/i, '')
+        if (name.length > 1 && name.length < 50) {
+          recipient.name = name
+          console.log('✅ Found recipient name:', recipient.name)
+          break
+        }
+      }
+    }
+
+    return recipient
   }
 
   // Extract passenger count from text

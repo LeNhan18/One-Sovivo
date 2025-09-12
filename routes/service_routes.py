@@ -92,11 +92,30 @@ def hdbank_transfer():
     """Thực hiện chuyển khoản HDBank"""
     try:
         data = request.get_json() or {}
+        
+        # Support both legacy format and AI Assistant format
+        from_customer_id = data.get('from_customer_id') or data.get('customer_id')
+        to_account = data.get('to_account') or data.get('recipient_account') or "DEMO_TRANSFER_ACCOUNT"
+        amount = data.get('amount')
+        description = data.get('description', '') or data.get('purpose', '') or "Chuyển tiền qua AI Assistant"
+        
+        if not from_customer_id:
+            return jsonify({
+                'success': False,
+                'error': 'Missing from_customer_id or customer_id'
+            }), 400
+            
+        if not amount:
+            return jsonify({
+                'success': False,
+                'error': 'Missing amount'
+            }), 400
+        
         result = get_hdbank_service().process_transfer(
-            from_customer_id=data.get('from_customer_id'),
-            to_account=data.get('to_account'),
-            amount=data.get('amount'),
-            description=data.get('description', '')
+            from_customer_id=from_customer_id,
+            to_account=to_account,
+            amount=amount,
+            description=description
         )
         return (jsonify(result), 200) if result.get('success') else (jsonify(result), 400)
     except Exception as e:
@@ -196,7 +215,7 @@ def vietjet_book_flight():
             customer_id=data.get('customer_id'),
             origin=data.get('origin', 'HAN'),
             destination=data.get('destination', 'SGN'),
-            flight_date=data.get('flight_date'),
+            flight_date=data.get('flight_date') or data.get('departure_date'),  # Support both field names
             ticket_class=data.get('ticket_class', 'economy'),
             booking_value=data.get('booking_value', 2500000),
             passengers=data.get('passengers', 1)
