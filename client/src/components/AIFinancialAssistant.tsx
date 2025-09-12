@@ -10,6 +10,15 @@ interface Message {
   actions?: ServiceAction[];
 }
 
+interface ChatHistory {
+  id: string;
+  customer_id: number;
+  messages: Message[];
+  created_at: Date;
+  updated_at: Date;
+  title?: string;
+}
+
 interface ServiceAction {
   id: string
   service: 'vietjet' | 'hdbank' | 'resort'
@@ -54,7 +63,7 @@ const AIFinancialAssistant: React.FC = () => {
     {
       id: '1',
       type: 'ai',
-      content: '🤖 **Chào bạn! Tôi là AI AGENT của Sovico** - Không chỉ tư vấn mà còn thực hiện dịch vụ!\n\n⚡ **AGENT MODE - THỰC THI TỰ ĐỘNG:**\n• ✈️ **Đặt vé máy bay Vietjet tức thì** khi có đủ thông tin\n• 🏦 **Xử lý giao dịch HDBank ngay lập tức**\n• 🏨 **Đặt phòng resort tự động**\n• � **Chuyển khoản, vay vốn tức thì**\n• 💎 **Tối ưu SVT và phân tích tài chính**\n\n🚀 **CÁCH ĐẶT VÉ AGENT (Tự động thực hiện):**\n• "Đặt vé từ **Hà Nội** đi **Phú Quốc** ngày **20/10** cho **2 người**" → Agent đặt ngay!\n• "Bay từ **TP.HCM** đến **Singapore** **ngày mai**" → Agent thực hiện tức thì!\n\n� **LỢI ÍCH AGENT:**\n• ⚡ Không cần confirm - Agent thực hiện ngay\n• 🎯 Chủ động hoàn tất tất cả bước\n• 🚀 Nhanh chóng, hiệu quả\n• 💎 Tự động cộng SVT rewards\n\n**Agent sẵn sàng phục vụ! Hãy yêu cầu bất cứ điều gì!** 🎯',
+      content: ' **Chào bạn! Tôi là AI AGENT của Sovico** - Không chỉ tư vấn mà còn thực hiện dịch vụ!\n\n⚡ **AGENT MODE - THỰC THI TỰ ĐỘNG:**\n• ✈️ **Đặt vé máy bay Vietjet tức thì** khi có đủ thông tin\n• 🏦 **Xử lý giao dịch HDBank ngay lập tức**\n• 🏨 **Đặt phòng resort tự động**\n• � **Chuyển khoản, vay vốn tức thì**\n• 💎 **Tối ưu SVT và phân tích tài chính**\n\n🚀 **CÁCH ĐẶT VÉ AGENT (Tự động thực hiện):**\n• "Đặt vé từ **Hà Nội** đi **Phú Quốc** ngày **20/10** cho **2 người**" → Agent đặt ngay!\n• "Bay từ **TP.HCM** đến **Singapore** **ngày mai**" → Agent thực hiện tức thì!\n\n� **LỢI ÍCH AGENT:**\n• ⚡ Không cần confirm - Agent thực hiện ngay\n• 🎯 Chủ động hoàn tất tất cả bước\n• 🚀 Nhanh chóng, hiệu quả\n• 💎 Tự động cộng SVT rewards\n\n**Agent sẵn sàng phục vụ! Hãy yêu cầu bất cứ điều gì!** 🎯',
       timestamp: new Date()
     }
   ]);
@@ -63,6 +72,9 @@ const AIFinancialAssistant: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [useGemini, setUseGemini] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch user profile data
@@ -119,43 +131,53 @@ const AIFinancialAssistant: React.FC = () => {
   }, [messages]);
 
   const predefinedQuestions = [
-    "Agent đặt vé từ Hà Nội đi Phú Quốc ngày 25/10 cho 2 người",
+    "Đặt vé từ Sài Gòn đi Phú Quốc ngày 25/10 cho 2 người",
+    "Agent đặt vé từ TP.HCM đi Đà Nẵng ngày mai",
+    "Bay từ Hà Nội đến Singapore ngày 15/12 cho 1 người",
     "Agent mở thẻ Visa Platinum HDBank với thu nhập cao",
     "Agent phân tích profile tài chính và đề xuất chiến lược", 
     "Agent vay 500 triệu để mua nhà ngay",
-    "Agent đặt phòng resort 3 đêm tức thì",
-    "Agent chuyển khoản 10 triệu cho bạn",
-    "Agent nâng cấp lên Diamond với SVT"
+    "Agent đặt phòng resort 3 đêm tức thì"
   ];
 
   // AI Intent Recognition - Phân tích ý định từ text
   const analyzeIntent = (text: string): ServiceAction[] => {
     const normalizedText = text.toLowerCase()
+      .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
+      .replace(/è|é|ẻ|ẽ|ẹ|ê|ề|ế|ể|ễ|ệ/g, 'e')
+      .replace(/ì|í|ỉ|ĩ|ị/g, 'i')
+      .replace(/ò|ó|ỏ|õ|ọ|ô|ồ|ố|ổ|ỗ|ộ|ơ|ờ|ớ|ở|ỡ|ợ/g, 'o')
+      .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
+      .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
+      .replace(/đ/g, 'd')
+    
     const actions: ServiceAction[] = []
 
     console.log('🔍 Analyzing intent for:', normalizedText) // Debug
+    console.log('🔍 Original text:', text) // Debug original text
 
     // Flight booking intents - Yêu cầu thông tin đầy đủ
-    if (normalizedText.includes('vé máy bay') || normalizedText.includes('đặt vé') || 
-        normalizedText.includes('bay') || normalizedText.includes('chuyến bay') ||
-        normalizedText.includes('vietjet') || normalizedText.includes('máy bay') ||
-        (normalizedText.includes('đi') && (normalizedText.includes('vé') || normalizedText.includes('bay'))) ||
+    if (normalizedText.includes('ve may bay') || normalizedText.includes('dat ve') || 
+        normalizedText.includes('bay') || normalizedText.includes('chuyen bay') ||
+        normalizedText.includes('vietjet') || normalizedText.includes('may bay') ||
+        (normalizedText.includes('di') && (normalizedText.includes('ve') || normalizedText.includes('bay'))) ||
         normalizedText.includes('book flight') || normalizedText.includes('flight') ||
         normalizedText.includes('agent')) {
       
       console.log('✈️ Flight booking intent detected') // Debug
       
-      // Kiểm tra xem có đủ thông tin chi tiết không
-      const hasOrigin = extractLocation(normalizedText, 'origin')
-      const hasDestination = extractLocation(normalizedText, 'destination')
-      const hasDate = extractDate(normalizedText)
-      const hasPassengerCount = extractPassengerCount(normalizedText)
+      // Extract information từ text gốc (không normalize để giữ chính xác)
+      const hasOrigin = extractLocation(text, 'origin')
+      const hasDestination = extractLocation(text, 'destination')  
+      const hasDate = extractDate(text)
+      const hasPassengerCount = extractPassengerCount(text)
       
       console.log('📍 Origin:', hasOrigin, 'Destination:', hasDestination, 'Date:', hasDate, 'Passengers:', hasPassengerCount) // Debug
       
       // Nếu thiếu thông tin, không tạo action mà sẽ yêu cầu thông tin
       if (!hasOrigin || !hasDestination || !hasDate) {
         console.log('❌ Missing flight information - not creating action') // Debug
+        console.log('Missing info:', !hasOrigin ? 'origin' : '', !hasDestination ? 'destination' : '', !hasDate ? 'date' : '')
         return [] // Không tạo action, để AI hỏi thông tin
       }
       
@@ -169,16 +191,16 @@ const AIFinancialAssistant: React.FC = () => {
           destination: hasDestination,
           departure_date: hasDate,
           passenger_count: hasPassengerCount || 1,
-          flight_type: normalizedText.includes('quốc tế') || normalizedText.includes('nước ngoài') ? 'international' : 'domestic',
-          ticket_class: normalizedText.includes('thương gia') || normalizedText.includes('business') ? 'business' : 'economy'
+          flight_type: normalizedText.includes('quoc te') || normalizedText.includes('nuoc ngoai') ? 'international' : 'domestic',
+          ticket_class: normalizedText.includes('thuong gia') || normalizedText.includes('business') ? 'business' : 'economy'
         },
         status: 'pending'
       })
     }
 
     // Banking intents
-    if (normalizedText.includes('vay') || normalizedText.includes('khoản vay') || 
-        normalizedText.includes('vay tiền')) {
+    if (normalizedText.includes('vay') || normalizedText.includes('khoan vay') || 
+        normalizedText.includes('vay tien')) {
       const amount = extractAmount(normalizedText, 'loan')
       actions.push({
         id: `loan_${Date.now()}`,
@@ -186,7 +208,7 @@ const AIFinancialAssistant: React.FC = () => {
         action: 'loan',
         params: {
           loan_amount: amount,
-          loan_type: normalizedText.includes('nhà') ? 'home' : 
+          loan_type: normalizedText.includes('nha') ? 'home' : 
                     normalizedText.includes('xe') ? 'car' : 
                     normalizedText.includes('kinh doanh') ? 'business' : 'personal'
         },
@@ -195,16 +217,16 @@ const AIFinancialAssistant: React.FC = () => {
     }
 
     // Card opening intents - Mở thẻ ngân hàng
-    if (normalizedText.includes('mở thẻ') || normalizedText.includes('làm thẻ') || 
-        normalizedText.includes('đăng ký thẻ') || normalizedText.includes('tạo thẻ') ||
-        normalizedText.includes('thẻ tín dụng') || normalizedText.includes('thẻ visa') ||
+    if (normalizedText.includes('mo the') || normalizedText.includes('lam the') || 
+        normalizedText.includes('dang ky the') || normalizedText.includes('tao the') ||
+        normalizedText.includes('the tin dung') || normalizedText.includes('the visa') ||
         normalizedText.includes('open card') || normalizedText.includes('credit card')) {
       
       // Determine card type from text
       let cardType = 'classic'
-      if (normalizedText.includes('platinum') || normalizedText.includes('bạch kim')) cardType = 'platinum'
-      else if (normalizedText.includes('gold') || normalizedText.includes('vàng')) cardType = 'gold'
-      else if (normalizedText.includes('signature') || normalizedText.includes('cao cấp')) cardType = 'signature'
+      if (normalizedText.includes('platinum') || normalizedText.includes('bach kim')) cardType = 'platinum'
+      else if (normalizedText.includes('gold') || normalizedText.includes('vang')) cardType = 'gold'
+      else if (normalizedText.includes('signature') || normalizedText.includes('cao cap')) cardType = 'signature'
       else if (normalizedText.includes('vietjet')) cardType = 'vietjet'
       
       actions.push({
@@ -213,15 +235,15 @@ const AIFinancialAssistant: React.FC = () => {
         action: 'open_card',
         params: {
           card_type: cardType,
-          income_verification: normalizedText.includes('thu nhập cao') || normalizedText.includes('lương cao'),
-          delivery_method: normalizedText.includes('nhận tại nhà') ? 'home' : 'branch'
+          income_verification: normalizedText.includes('thu nhap cao') || normalizedText.includes('luong cao'),
+          delivery_method: normalizedText.includes('nhan tai nha') ? 'home' : 'branch'
         },
         status: 'pending'
       })
     }
 
-    if (normalizedText.includes('chuyển khoản') || normalizedText.includes('chuyển tiền') ||
-        normalizedText.includes('gửi tiền')) {
+    if (normalizedText.includes('chuyen khoan') || normalizedText.includes('chuyen tien') ||
+        normalizedText.includes('gui tien')) {
       const amount = extractAmount(normalizedText, 'transfer')
       actions.push({
         id: `transfer_${Date.now()}`,
@@ -229,15 +251,15 @@ const AIFinancialAssistant: React.FC = () => {
         action: 'transfer',
         params: {
           amount: amount,
-          transfer_type: normalizedText.includes('nước ngoài') || normalizedText.includes('quốc tế') ? 'international' : 'internal'
+          transfer_type: normalizedText.includes('nuoc ngoai') || normalizedText.includes('quoc te') ? 'international' : 'internal'
         },
         status: 'pending'
       })
     }
 
     // Hotel/Resort intents
-    if (normalizedText.includes('khách sạn') || normalizedText.includes('đặt phòng') || 
-        normalizedText.includes('resort') || normalizedText.includes('nghỉ dưỡng')) {
+    if (normalizedText.includes('khach san') || normalizedText.includes('dat phong') || 
+        normalizedText.includes('resort') || normalizedText.includes('nghi duong')) {
       const nights = extractNights(normalizedText)
       actions.push({
         id: `hotel_${Date.now()}`,
@@ -245,7 +267,7 @@ const AIFinancialAssistant: React.FC = () => {
         action: 'book_room',
         params: {
           nights: nights,
-          room_type: normalizedText.includes('cao cấp') || normalizedText.includes('suite') ? 'suite' :
+          room_type: normalizedText.includes('cao cap') || normalizedText.includes('suite') ? 'suite' :
                     normalizedText.includes('deluxe') ? 'deluxe' : 'standard'
         },
         status: 'pending'
@@ -254,14 +276,14 @@ const AIFinancialAssistant: React.FC = () => {
 
     // Spa intents
     if (normalizedText.includes('spa') || normalizedText.includes('massage') || 
-        normalizedText.includes('thư giãn')) {
+        normalizedText.includes('thu gian')) {
       actions.push({
         id: `spa_${Date.now()}`,
         service: 'resort',
         action: 'spa_booking',
         params: {
-          spa_type: normalizedText.includes('cao cấp') ? 'premium_package' :
-                   normalizedText.includes('mặt') ? 'facial' :
+          spa_type: normalizedText.includes('cao cap') ? 'premium_package' :
+                   normalizedText.includes('mat') ? 'facial' :
                    normalizedText.includes('body') ? 'body_treatment' : 'massage'
         },
         status: 'pending'
@@ -297,7 +319,7 @@ const AIFinancialAssistant: React.FC = () => {
 
   // Extract location from text - Enhanced version
   const extractLocation = (text: string, type: 'origin' | 'destination'): string | null => {
-    // Normalize Vietnamese characters
+    // Normalize Vietnamese characters more comprehensively
     const normalizedText = text.toLowerCase()
       .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
       .replace(/è|é|ẻ|ẽ|ẹ|ê|ề|ế|ể|ễ|ệ/g, 'e')
@@ -307,20 +329,24 @@ const AIFinancialAssistant: React.FC = () => {
       .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
       .replace(/đ/g, 'd')
     
-    console.log('🔍 Extracting location from:', normalizedText) // Debug
+    console.log(`🔍 Extracting ${type} location from:`, normalizedText) // Debug
     
     const locations = {
       'ha noi': 'HAN',
       'hanoi': 'HAN',
       'thu do': 'HAN',
       'sai gon': 'SGN', 
+      'saigon': 'SGN',
       'ho chi minh': 'SGN',
       'tphcm': 'SGN',
-      'saigon': 'SGN',
+      'tp hcm': 'SGN',
+      'tp.hcm': 'SGN',
+      'hcm': 'SGN',
       'da nang': 'DAD',
       'danang': 'DAD',
       'phu quoc': 'PQC',
       'phuquoc': 'PQC',
+      'dao phu quoc': 'PQC',
       'nha trang': 'CXR',
       'nhatrang': 'CXR',
       'cam ranh': 'CXR',
@@ -337,29 +363,26 @@ const AIFinancialAssistant: React.FC = () => {
       'thai lan': 'BKK'
     }
 
-    // Strategy 1: Direct location match
-    for (const [name, code] of Object.entries(locations)) {
-      if (normalizedText.includes(name)) {
-        console.log(`✅ Found location (direct): ${name} -> ${code}`) // Debug
-        return code
-      }
-    }
-    
-    // Strategy 2: Pattern matching for Vietnamese structure
+    // Strategy 1: Pattern matching first for better accuracy
     if (type === 'origin') {
-      // Look for "từ X" or "từ X đi" patterns
-      const patterns = [
-        /tu\s+([a-z\s]+?)(?:\s+di\s+|\s+den\s+|$)/,
-        /dat\s+ve\s+tu\s+([a-z\s]+?)(?:\s+di\s+|\s+den\s+)/
+      // Look for "từ X" patterns - more specific patterns first
+      const originPatterns = [
+        /tu\s+([^di]+?)\s+di/,  // "từ X đi" - most specific
+        /ve\s+tu\s+([^di]+?)\s+di/,  // "vé từ X đi"
+        /dat\s+ve\s+tu\s+([^di]+?)\s+di/,  // "đặt vé từ X đi"
+        /bay\s+tu\s+([^di]+?)\s+di/,  // "bay từ X đi"
+        /tu\s+([a-z\s]+?)(?:\s+den|\s+$)/,  // "từ X đến" or end of string
       ]
       
-      for (const pattern of patterns) {
+      for (const pattern of originPatterns) {
         const match = normalizedText.match(pattern)
         if (match) {
           const location = match[1].trim()
-          console.log(`🔍 Found origin pattern: "${location}"`) // Debug
+          console.log(`🔍 Found origin pattern: "${match[0]}" -> location: "${location}"`) // Debug
+          
+          // Find matching location
           for (const [name, code] of Object.entries(locations)) {
-            if (location.includes(name)) {
+            if (location.includes(name) || name.includes(location)) {
               console.log(`✅ Matched origin: ${name} -> ${code}`) // Debug
               return code
             }
@@ -367,19 +390,23 @@ const AIFinancialAssistant: React.FC = () => {
         }
       }
     } else {
-      // Look for "đi X" or "đến X" patterns
-      const patterns = [
-        /(?:di|den)\s+([a-z\s]+?)(?:\s+ngay|\s+\d|$)/,
-        /(?:di|den)\s+([a-z\s]+?)(?:\s+cho|\s+ve)/
+      // Look for "đi X" or "đến X" patterns - destination
+      const destPatterns = [
+        /di\s+([^ngay\d]+?)(?:\s+ngay|\s+\d|$)/,  // "đi X ngày" or "đi X" at end
+        /den\s+([^ngay\d]+?)(?:\s+ngay|\s+\d|$)/,  // "đến X ngày" or "đến X" at end  
+        /di\s+([a-z\s]+?)(?:\s+cho|\s+ve|\s+$)/,  // "đi X cho" or "đi X vé" or end
+        /den\s+([a-z\s]+?)(?:\s+cho|\s+ve|\s+$)/, // "đến X cho" or "đến X vé" or end
       ]
       
-      for (const pattern of patterns) {
+      for (const pattern of destPatterns) {
         const match = normalizedText.match(pattern)
         if (match) {
           const location = match[1].trim()
-          console.log(`🔍 Found destination pattern: "${location}"`) // Debug
+          console.log(`🔍 Found destination pattern: "${match[0]}" -> location: "${location}"`) // Debug
+          
+          // Find matching location
           for (const [name, code] of Object.entries(locations)) {
-            if (location.includes(name)) {
+            if (location.includes(name) || name.includes(location)) {
               console.log(`✅ Matched destination: ${name} -> ${code}`) // Debug
               return code
             }
@@ -387,8 +414,16 @@ const AIFinancialAssistant: React.FC = () => {
         }
       }
     }
+
+    // Strategy 2: Direct location match (fallback)
+    for (const [name, code] of Object.entries(locations)) {
+      if (normalizedText.includes(name)) {
+        console.log(`✅ Found location (direct fallback): ${name} -> ${code}`) // Debug
+        return code
+      }
+    }
     
-    console.log(`❌ No location found for type: ${type}`) // Debug
+    console.log(`❌ No ${type} location found`) // Debug
     return null
   }
 
@@ -398,59 +433,31 @@ const AIFinancialAssistant: React.FC = () => {
     
     // Normalize text for better matching
     const normalizedText = text.toLowerCase()
+      .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
+      .replace(/è|é|ẻ|ẽ|ẹ|ê|ề|ế|ể|ễ|ệ/g, 'e')
+      .replace(/ì|í|ỉ|ĩ|ị/g, 'i')
+      .replace(/ò|ó|ỏ|õ|ọ|ô|ồ|ố|ổ|ỗ|ộ|ơ|ờ|ớ|ở|ỡ|ợ/g, 'o')
+      .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
+      .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
+      .replace(/đ/g, 'd')
     
-    // Tìm pattern ngày tháng
-    const datePatterns = [
-      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // DD/MM/YYYY
-      /(\d{1,2})-(\d{1,2})-(\d{4})/,   // DD-MM-YYYY
-      /(\d{1,2})\/(\d{1,2})/,          // DD/MM (current year)
-      /(\d{1,2})-(\d{1,2})/,           // DD-MM (current year)
-      /ngay\s+(\d{1,2})\/(\d{1,2})/,   // ngày DD/MM
-      /ngay\s+(\d{1,2})-(\d{1,2})/,    // ngày DD-MM
-      /(\d{1,2})\s+(thang\s+)?(\d{1,2})/,  // DD tháng MM
-    ]
-
-    for (const pattern of datePatterns) {
-      const match = normalizedText.match(pattern)
-      if (match) {
-        let day, month, year
-        
-        if (pattern.source.includes('ngay')) {
-          // Pattern with "ngày"
-          day = match[1]
-          month = match[2]
-          year = new Date().getFullYear()
-        } else if (pattern.source.includes('thang')) {
-          // Pattern with "tháng"
-          day = match[1]
-          month = match[3]
-          year = new Date().getFullYear()
-        } else {
-          // Standard DD/MM patterns
-          day = match[1]
-          month = match[2]
-          year = match[3] || new Date().getFullYear()
-        }
-        
-        const result = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-        console.log(`✅ Found date pattern: ${match[0]} -> ${result}`) // Debug
-        return result
-      }
-    }
-
-    // Tìm từ khóa ngày
+    // Check for special keywords first (more reliable)
     const today = new Date()
-    if (normalizedText.includes('hom nay') || normalizedText.includes('hôm nay')) {
+    if (normalizedText.includes('hom nay') || normalizedText.includes('bay hom nay')) {
       const result = today.toISOString().split('T')[0]
       console.log(`✅ Found "hôm nay" -> ${result}`) // Debug
       return result
-    } else if (normalizedText.includes('ngay mai') || normalizedText.includes('ngày mai')) {
+    } 
+    
+    if (normalizedText.includes('ngay mai') || normalizedText.includes('bay ngay mai')) {
       const tomorrow = new Date(today)
       tomorrow.setDate(today.getDate() + 1)
       const result = tomorrow.toISOString().split('T')[0]
       console.log(`✅ Found "ngày mai" -> ${result}`) // Debug
       return result
-    } else if (normalizedText.includes('tuan sau') || normalizedText.includes('tuần sau')) {
+    }
+    
+    if (normalizedText.includes('tuan sau') || normalizedText.includes('tuan toi')) {
       const nextWeek = new Date(today)
       nextWeek.setDate(today.getDate() + 7)
       const result = nextWeek.toISOString().split('T')[0]
@@ -458,7 +465,74 @@ const AIFinancialAssistant: React.FC = () => {
       return result
     }
 
-    console.log(`❌ No date found`) // Debug
+    // Look for specific date patterns - improved regex
+    const datePatterns = [
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,          // DD/MM/YYYY
+      /(\d{1,2})-(\d{1,2})-(\d{4})/,           // DD-MM-YYYY
+      /(\d{1,2})\.(\d{1,2})\.(\d{4})/,         // DD.MM.YYYY
+      /ngay\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // ngày DD/MM/YYYY
+      /ngay\s+(\d{1,2})-(\d{1,2})-(\d{4})/,    // ngày DD-MM-YYYY
+      /ngay\s+(\d{1,2})\/(\d{1,2})/,           // ngày DD/MM (current year)
+      /ngay\s+(\d{1,2})-(\d{1,2})/,            // ngày DD-MM (current year)
+      /(\d{1,2})\/(\d{1,2})/,                  // DD/MM (current year)
+      /(\d{1,2})-(\d{1,2})/,                   // DD-MM (current year)
+      /(\d{1,2})\s*thang\s*(\d{1,2})/,         // DD tháng MM
+      /ngay\s*(\d{1,2})\s*thang\s*(\d{1,2})/,  // ngày DD tháng MM
+    ]
+
+    for (const pattern of datePatterns) {
+      const match = normalizedText.match(pattern)
+      if (match) {
+        let day, month, year
+        
+        if (pattern.source.includes('thang')) {
+          // Pattern with "tháng"
+          if (pattern.source.includes('ngay')) {
+            // "ngày DD tháng MM"
+            day = match[1]
+            month = match[2]
+          } else {
+            // "DD tháng MM"
+            day = match[1]
+            month = match[2]
+          }
+          year = new Date().getFullYear()
+        } else if (pattern.source.includes('ngay')) {
+          // Pattern with "ngày"
+          day = match[1]
+          month = match[2]
+          year = match[3] || new Date().getFullYear()
+        } else {
+          // Standard DD/MM patterns
+          day = match[1]
+          month = match[2]
+          year = match[3] || new Date().getFullYear()
+        }
+        
+        // Validate date ranges
+        const dayNum = parseInt(day)
+        const monthNum = parseInt(month)
+        const yearNum = parseInt(year.toString())
+        
+        if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= new Date().getFullYear()) {
+          const result = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`
+          console.log(`✅ Found date pattern: ${match[0]} -> ${result}`) // Debug
+          
+          // Additional validation: check if date is not in the past
+          const parsedDate = new Date(result)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0) // Reset time to compare dates only
+          
+          if (parsedDate >= today) {
+            return result
+          } else {
+            console.log(`⚠️ Date ${result} is in the past, skipping`) // Debug
+          }
+        }
+      }
+    }
+
+    console.log(`❌ No valid date found`) // Debug
     return null
   }
 
@@ -466,7 +540,17 @@ const AIFinancialAssistant: React.FC = () => {
   const extractPassengerCount = (text: string): number => {
     console.log('👥 Extracting passenger count from:', text) // Debug
     
-    const passengerMatch = text.match(/(\d+)\s*(nguoi|khach|hanh khach|người|khách|hành khách)/)
+    // Normalize text
+    const normalizedText = text.toLowerCase()
+      .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
+      .replace(/è|é|ẻ|ẽ|ẹ|ê|ề|ế|ể|ễ|ệ/g, 'e')
+      .replace(/ì|í|ỉ|ĩ|ị/g, 'i')
+      .replace(/ò|ó|ỏ|õ|ọ|ô|ồ|ố|ổ|ỗ|ộ|ơ|ờ|ớ|ở|ỡ|ợ/g, 'o')
+      .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
+      .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
+      .replace(/đ/g, 'd')
+    
+    const passengerMatch = normalizedText.match(/(\d+)\s*(nguoi|khach|hanh khach|ve)/)
     if (passengerMatch) {
       const count = parseInt(passengerMatch[1])
       console.log(`✅ Found passenger count: ${count}`) // Debug
@@ -474,19 +558,19 @@ const AIFinancialAssistant: React.FC = () => {
     }
     
     // Tìm từ khóa số lượng
-    if (text.includes('hai nguoi') || text.includes('hai người') || text.includes('2 nguoi') || text.includes('2 người')) {
+    if (normalizedText.includes('hai nguoi') || normalizedText.includes('2 nguoi') || normalizedText.includes('cho 2')) {
       console.log(`✅ Found "hai người" -> 2`) // Debug
       return 2
     }
-    if (text.includes('ba nguoi') || text.includes('ba người') || text.includes('3 nguoi') || text.includes('3 người')) {
+    if (normalizedText.includes('ba nguoi') || normalizedText.includes('3 nguoi') || normalizedText.includes('cho 3')) {
       console.log(`✅ Found "ba người" -> 3`) // Debug
       return 3
     }
-    if (text.includes('bon nguoi') || text.includes('bốn người') || text.includes('4 nguoi') || text.includes('4 người')) {
+    if (normalizedText.includes('bon nguoi') || normalizedText.includes('4 nguoi') || normalizedText.includes('cho 4')) {
       console.log(`✅ Found "bốn người" -> 4`) // Debug
       return 4
     }
-    if (text.includes('gia dinh') || text.includes('gia đình')) {
+    if (normalizedText.includes('gia dinh')) {
       console.log(`✅ Found "gia đình" -> 4`) // Debug
       return 4 // Giả định gia đình 4 người
     }
@@ -607,7 +691,7 @@ const AIFinancialAssistant: React.FC = () => {
     
     for (const modelName of modelNames) {
       try {
-        console.log(`🤖 Trying Gemini model: ${modelName}`);
+        console.log(` Trying Gemini model: ${modelName}`);
         
         // Try each model
         const currentModel = genAI.getGenerativeModel({ model: modelName });
