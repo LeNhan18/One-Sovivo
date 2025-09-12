@@ -171,6 +171,13 @@ def initialize_route_services(app):
             except Exception as e:
                 print(f"⚠️ Warning: Could not initialize admin routes: {e}")
                 
+            # Initialize AI chat routes
+            try:
+                from routes.ai_chat_routes import ai_chat_bp
+                print("✅ AI Chat routes available")
+            except Exception as e:
+                print(f"⚠️ Warning: Could not initialize AI chat routes: {e}")
+                
             print("✅ Route services initialized successfully")
             
         except Exception as e:
