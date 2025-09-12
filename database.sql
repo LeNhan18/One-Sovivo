@@ -149,3 +149,59 @@ INSERT INTO token_transactions (tx_hash, customer_id, transaction_type, amount, 
 ('0xghi789...', 1002, 'Thưởng hạng Vàng HDBank', 1000.00, 'Đạt hạng thành viên Vàng', 1003),
 ('0xjkl012...', 1003, 'Tích điểm mua sắm', 200.00, 'Thanh toán qua HDBank App', 1004),
 ('0xmno345...', 1004, 'Tích điểm Vietjet', 850.00, 'Bay business class SGN-SIN', 1005);
+
+-- AI Chat History Tables
+-- Bảng AI Chat History
+CREATE TABLE ai_chat_history (
+    id VARCHAR(50) PRIMARY KEY,
+    customer_id INT NOT NULL,
+    title VARCHAR(200),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE CASCADE,
+    INDEX idx_customer_updated (customer_id, updated_at DESC),
+    INDEX idx_customer_active (customer_id, is_active)
+);
+
+-- Bảng AI Chat Messages
+CREATE TABLE ai_chat_messages (
+    id VARCHAR(50) PRIMARY KEY,
+    chat_id VARCHAR(50) NOT NULL,
+    message_type ENUM('user', 'ai', 'system') NOT NULL,
+    content TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    actions JSON,
+    FOREIGN KEY (chat_id) REFERENCES ai_chat_history(id) ON DELETE CASCADE,
+    INDEX idx_chat_timestamp (chat_id, timestamp)
+);
+
+-- Bảng AI Service Actions (để track actions được thực hiện)
+CREATE TABLE ai_service_actions (
+    id VARCHAR(50) PRIMARY KEY,
+    chat_id VARCHAR(50) NOT NULL,
+    message_id VARCHAR(50) NOT NULL,
+    service_type ENUM('vietjet', 'hdbank', 'resort') NOT NULL,
+    action_type VARCHAR(50) NOT NULL,
+    params JSON,
+    status ENUM('pending', 'executing', 'completed', 'failed') DEFAULT 'pending',
+    result JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (chat_id) REFERENCES ai_chat_history(id) ON DELETE CASCADE,
+    FOREIGN KEY (message_id) REFERENCES ai_chat_messages(id) ON DELETE CASCADE,
+    INDEX idx_chat_status (chat_id, status),
+    INDEX idx_service_action (service_type, action_type)
+);
+
+-- Sample AI Chat Data
+INSERT INTO ai_chat_history (id, customer_id, title, created_at, updated_at) VALUES
+('chat_1001_001', 1001, '✈️ Đặt vé máy bay', '2024-12-01 09:00:00', '2024-12-01 09:15:00'),
+('chat_1001_002', 1001, '💳 Dịch vụ thẻ tín dụng', '2024-12-02 14:30:00', '2024-12-02 14:45:00'),
+('chat_1002_001', 1002, '📈 Tư vấn đầu tư', '2024-12-01 16:20:00', '2024-12-01 16:35:00');
+
+INSERT INTO ai_chat_messages (id, chat_id, message_type, content, timestamp) VALUES
+('msg_001', 'chat_1001_001', 'user', 'Đặt vé từ Sài Gòn đi Phú Quốc ngày 25/10 cho 2 người', '2024-12-01 09:00:00'),
+('msg_002', 'chat_1001_001', 'ai', 'Agent đang xử lý đặt vé máy bay cho bạn...', '2024-12-01 09:01:00'),
+('msg_003', 'chat_1001_002', 'user', 'Tôi muốn mở thẻ tín dụng HDBank', '2024-12-02 14:30:00'),
+('msg_004', 'chat_1001_002', 'ai', 'Tôi sẽ giúp bạn mở thẻ tín dụng HDBank...', '2024-12-02 14:31:00');

@@ -112,6 +112,9 @@ const AIFinancialAssistant: React.FC = () => {
             monthlyIncome: 20000000, // Default 20M VND
             investmentGoals: ['Tiết kiệm', 'Đầu tư an toàn']
           });
+
+          // Load chat history for this user
+          await loadChatHistory(userData.customer_id);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -120,6 +123,247 @@ const AIFinancialAssistant: React.FC = () => {
 
     fetchUserProfile();
   }, []);
+
+  // Load chat history from API
+  const loadChatHistory = async (customerId: number) => {
+    try {
+      // Get from API
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`http://127.0.0.1:5000/api/chat/history/${customerId}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const serverHistory: ChatHistory[] = data.chats.map((chat: any) => ({
+            id: chat.id,
+            customer_id: chat.customer_id,
+            messages: chat.messages.map((msg: any) => ({
+              id: msg.id,
+              type: msg.message_type,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp),
+              actions: msg.actions
+            })),
+            created_at: new Date(chat.created_at),
+            updated_at: new Date(chat.updated_at),
+            title: chat.title
+          }));
+          
+          setChatHistory(serverHistory);
+          
+          // Also save to localStorage as backup
+          localStorage.setItem(`chat_history_${customerId}`, JSON.stringify(serverHistory));
+          
+          // Load the most recent chat if exists
+          if (serverHistory.length > 0) {
+            const latestChat = serverHistory[0];
+            setCurrentChatId(latestChat.id);
+          }
+          
+          return;
+        }
+      }
+      
+      // Fallback to localStorage if API fails
+      console.log('API failed, falling back to localStorage');
+      const localHistory = localStorage.getItem(`chat_history_${customerId}`);
+      if (localHistory) {
+        const parsedHistory: ChatHistory[] = JSON.parse(localHistory);
+        setChatHistory(parsedHistory);
+        
+        if (parsedHistory.length > 0) {
+          const latestChat = parsedHistory[0];
+          setCurrentChatId(latestChat.id);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+      
+      // Fallback to localStorage on error
+      try {
+        const localHistory = localStorage.getItem(`chat_history_${customerId}`);
+        if (localHistory) {
+          const parsedHistory: ChatHistory[] = JSON.parse(localHistory);
+          setChatHistory(parsedHistory);
+          
+          if (parsedHistory.length > 0) {
+            const latestChat = parsedHistory[0];
+            setCurrentChatId(latestChat.id);
+          }
+        }
+      } catch (localError) {
+        console.error('Error loading from localStorage:', localError);
+      }
+    }
+  };
+
+  // Save chat to history
+  const saveChatToHistory = async (messages: Message[]) => {
+    if (!userProfile || messages.length <= 1) return; // Don't save empty chats
+
+    const chatId = currentChatId || `chat_${Date.now()}`;
+    const chatTitle = generateChatTitle(messages);
+    
+    const chatData: ChatHistory = {
+      id: chatId,
+      customer_id: userProfile.customer_id,
+      messages: messages,
+      created_at: currentChatId ? chatHistory.find(c => c.id === currentChatId)?.created_at || new Date() : new Date(),
+      updated_at: new Date(),
+      title: chatTitle
+    };
+
+    try {
+      // Save to API first
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch('http://127.0.0.1:5000/api/chat/save', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(chatData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ Chat saved to server successfully');
+          
+          // Update local state
+          let updatedHistory = [...chatHistory];
+          const existingIndex = updatedHistory.findIndex(c => c.id === chatId);
+          
+          if (existingIndex >= 0) {
+            updatedHistory[existingIndex] = chatData;
+          } else {
+            updatedHistory.unshift(chatData);
+            setCurrentChatId(chatId);
+          }
+          
+          updatedHistory = updatedHistory.slice(0, 50);
+          setChatHistory(updatedHistory);
+          
+          // Also save to localStorage as backup
+          localStorage.setItem(`chat_history_${userProfile.customer_id}`, JSON.stringify(updatedHistory));
+          
+          return;
+        }
+      }
+      
+      throw new Error('API save failed');
+      
+    } catch (error) {
+      console.error('Error saving to API, falling back to localStorage:', error);
+      
+      // Fallback to localStorage
+      try {
+        let updatedHistory = [...chatHistory];
+        const existingIndex = updatedHistory.findIndex(c => c.id === chatId);
+        
+        if (existingIndex >= 0) {
+          updatedHistory[existingIndex] = chatData;
+        } else {
+          updatedHistory.unshift(chatData);
+          setCurrentChatId(chatId);
+        }
+        
+        updatedHistory = updatedHistory.slice(0, 50);
+        setChatHistory(updatedHistory);
+        localStorage.setItem(`chat_history_${userProfile.customer_id}`, JSON.stringify(updatedHistory));
+        
+        console.log('💾 Chat saved to localStorage as fallback');
+      } catch (localError) {
+        console.error('Error saving to localStorage:', localError);
+      }
+    }
+  };
+
+  // Generate chat title from messages
+  const generateChatTitle = (messages: Message[]): string => {
+    const userMessages = messages.filter(m => m.type === 'user');
+    if (userMessages.length === 0) return 'Cuộc trò chuyện mới';
+    
+    const firstMessage = userMessages[0].content;
+    // Extract key words for title
+    if (firstMessage.toLowerCase().includes('vé máy bay') || firstMessage.toLowerCase().includes('đặt vé')) {
+      return '✈️ Đặt vé máy bay';
+    } else if (firstMessage.toLowerCase().includes('thẻ tín dụng') || firstMessage.toLowerCase().includes('mở thẻ')) {
+      return '💳 Dịch vụ thẻ tín dụng';
+    } else if (firstMessage.toLowerCase().includes('vay') || firstMessage.toLowerCase().includes('khoản vay')) {
+      return '💰 Tư vấn vay vốn';
+    } else if (firstMessage.toLowerCase().includes('đầu tư') || firstMessage.toLowerCase().includes('investment')) {
+      return '📈 Tư vấn đầu tư';
+    } else if (firstMessage.toLowerCase().includes('resort') || firstMessage.toLowerCase().includes('đặt phòng')) {
+      return '🏨 Đặt phòng Resort';
+    } else {
+      // Truncate to 30 characters
+      return firstMessage.length > 30 ? firstMessage.substring(0, 30) + '...' : firstMessage;
+    }
+  };
+
+  // Start new chat
+  const startNewChat = () => {
+    setMessages([{
+      id: '1',
+      type: 'ai',
+      content: ' **Chào bạn! Tôi là AI AGENT của Sovico** - Không chỉ tư vấn mà còn thực hiện dịch vụ!\n\n⚡ **AGENT MODE - THỰC THI TỰ ĐỘNG:**\n• ✈️ **Đặt vé máy bay Vietjet tức thì** khi có đủ thông tin\n• 🏦 **Xử lý giao dịch HDBank ngay lập tức**\n• 🏨 **Đặt phòng resort tự động**\n• � **Chuyển khoản, vay vốn tức thì**\n• 💎 **Tối ưu SVT và phân tích tài chính**\n\n🚀 **CÁCH ĐẶT VÉ AGENT (Tự động thực hiện):**\n• "Đặt vé từ **Hà Nội** đi **Phú Quốc** ngày **20/10** cho **2 người**" → Agent đặt ngay!\n• "Bay từ **TP.HCM** đến **Singapore** **ngày mai**" → Agent thực hiện tức thì!\n\n� **LỢI ÍCH AGENT:**\n• ⚡ Không cần confirm - Agent thực hiện ngay\n• 🎯 Chủ động hoàn tất tất cả bước\n• 🚀 Nhanh chóng, hiệu quả\n• 💎 Tự động cộng SVT rewards\n\n**Agent sẵn sàng phục vụ! Hãy yêu cầu bất cứ điều gì!** 🎯',
+      timestamp: new Date()
+    }]);
+    setCurrentChatId(null);
+    setShowHistory(false);
+  };
+
+  // Load specific chat
+  const loadChat = (chat: ChatHistory) => {
+    setMessages(chat.messages);
+    setCurrentChatId(chat.id);
+    setShowHistory(false);
+  };
+
+  // Delete chat
+  const deleteChat = async (chatId: string) => {
+    if (!userProfile) return;
+    
+    try {
+      // Delete from API first
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`http://127.0.0.1:5000/api/chat/${chatId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ Chat deleted from server successfully');
+        }
+      } else {
+        console.log('⚠️ API delete failed, continuing with local delete');
+      }
+    } catch (error) {
+      console.error('Error deleting from API:', error);
+    }
+    
+    // Always update local state regardless of API result
+    const updatedHistory = chatHistory.filter(c => c.id !== chatId);
+    setChatHistory(updatedHistory);
+    localStorage.setItem(`chat_history_${userProfile.customer_id}`, JSON.stringify(updatedHistory));
+    
+    // If deleting current chat, start new one
+    if (currentChatId === chatId) {
+      startNewChat();
+    }
+  };
 
 
   const scrollToBottom = () => {
@@ -1026,7 +1270,8 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
 
     const currentInput = inputMessage;
     setInputMessage('');
@@ -1083,7 +1328,13 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
         actions: actions.length > 0 ? actions : undefined
       };
 
-      setMessages(prev => [...prev, aiMessage]);
+      const finalMessages = [...newMessages, aiMessage];
+      setMessages(finalMessages);
+      
+      // Save to chat history after AI responds
+      setTimeout(() => {
+        saveChatToHistory(finalMessages);
+      }, 1000);
       
       // Nếu có actions, thực hiện chúng sau khi AI đã trả lời
       if (actions.length > 0) {
@@ -1113,7 +1364,14 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
         content: errorMessage,
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorResponse]);
+      
+      const finalMessages = [...newMessages, errorResponse];
+      setMessages(finalMessages);
+      
+      // Save error to history too
+      setTimeout(() => {
+        saveChatToHistory(finalMessages);
+      }, 1000);
     }
 
     setIsLoading(false);
@@ -1124,214 +1382,290 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0D1117] text-white">
-      {/* Header */}
-      <div className="bg-[#161B22] border-b border-gray-700 p-4">
-        <div className="flex items-center">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-3">
-            <span className="text-lg">🤖</span>
-          </div>
-          <div className="flex-1">
-            <h2 className="font-bold text-lg">AI Financial Advisor</h2>
-            <p className="text-sm text-gray-400">
-              {useGemini ? 'Powered by Google Gemini AI' : 'Powered by Sovico Intelligence'}
-              {userProfile && (
-                <span className="ml-2 text-blue-400">
-                  • {userProfile.name} • {userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
+    <div className="flex h-full bg-[#0D1117] text-white">
+      {/* Chat History Sidebar */}
+      {showHistory && (
+        <div className="w-80 bg-[#161B22] border-r border-gray-700 flex flex-col">
+          <div className="p-4 border-b border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg">💬 Lịch sử chat</h3>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
             <button
-              onClick={() => setUseGemini(!useGemini)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                useGemini 
-                  ? 'bg-purple-600 text-white' 
-                  : 'bg-gray-600 text-gray-300'
-              }`}
+              onClick={startNewChat}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
             >
-              {useGemini ? '🧠 Gemini AI' : '🔧 Local AI'}
+              ➕ Chat mới
             </button>
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-900 text-green-300">
-              <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-              Online
-            </span>
-
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {chatHistory.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                <div className="text-4xl mb-2">💭</div>
+                <div>Chưa có lịch sử chat</div>
+              </div>
+            ) : (
+              chatHistory.map((chat) => (
+                <div 
+                  key={chat.id} 
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors group ${
+                    currentChatId === chat.id 
+                      ? 'bg-blue-600/20 border-blue-500' 
+                      : 'bg-gray-800/50 border-gray-600 hover:bg-gray-700/50'
+                  }`}
+                  onClick={() => loadChat(chat)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm text-white mb-1">
+                        {chat.title}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(chat.updated_at).toLocaleDateString('vi-VN')} • {chat.messages.length} tin nhắn
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Xóa cuộc trò chuyện này?')) {
+                          deleteChat(chat.id);
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all ml-2"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* User Profile Indicator */}
-      {userProfile && (
-        <div className="bg-[#161B22] border-b border-gray-700 p-3">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-400">📊 Profile:</span>
-              <span className="text-blue-400">{userProfile.name}</span>
-              <span className="text-gray-500">|</span>
-              <span className="text-purple-400">{userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT</span>
-              <span className="text-gray-500">|</span>
-              <span className={`font-medium ${
-                userProfile.sovicoTokens >= 200000 ? 'text-purple-400' :
-                userProfile.sovicoTokens >= 50000 ? 'text-yellow-400' :
-                userProfile.sovicoTokens >= 10000 ? 'text-gray-300' : 'text-orange-400'
-              }`}>
-                {userProfile.sovicoTokens >= 200000 ? '💎 Diamond' :
-                 userProfile.sovicoTokens >= 50000 ? '🥇 Gold' :
-                 userProfile.sovicoTokens >= 10000 ? '🥈 Silver' : '🥉 Bronze'}
+      {/* Main Chat Area */}
+      <div className="flex flex-col flex-1">
+        {/* Header */}
+        <div className="bg-[#161B22] border-b border-gray-700 p-4">
+          <div className="flex items-center">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="mr-3 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              title="Lịch sử chat"
+            >
+              📚
+            </button>
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mr-3">
+              <span className="text-lg">🤖</span>
+            </div>
+            <div className="flex-1">
+              <h2 className="font-bold text-lg">AI Financial Advisor</h2>
+              <p className="text-sm text-gray-400">
+                {useGemini ? 'Powered by Google Gemini AI' : 'Powered by Sovico Intelligence'}
+                {userProfile && (
+                  <span className="ml-2 text-blue-400">
+                    • {userProfile.name} • {userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setUseGemini(!useGemini)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  useGemini 
+                    ? 'bg-purple-600 text-white' 
+                    : 'bg-gray-600 text-gray-300'
+                }`}
+              >
+                {useGemini ? '🧠 Gemini AI' : '🔧 Local AI'}
+              </button>
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-900 text-green-300">
+                <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+                Online
               </span>
             </div>
-            <div className="text-gray-500 text-xs">
-              {userProfile.totalTransactions} giao dịch
-            </div>
           </div>
         </div>
-      )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+        {/* User Profile Indicator */}
+        {userProfile && (
+          <div className="bg-[#161B22] border-b border-gray-700 p-3">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-4">
+                <span className="text-gray-400">📊 Profile:</span>
+                <span className="text-blue-400">{userProfile.name}</span>
+                <span className="text-gray-500">|</span>
+                <span className="text-purple-400">{userProfile.sovicoTokens.toLocaleString('vi-VN')} SVT</span>
+                <span className="text-gray-500">|</span>
+                <span className={`font-medium ${
+                  userProfile.sovicoTokens >= 200000 ? 'text-purple-400' :
+                  userProfile.sovicoTokens >= 50000 ? 'text-yellow-400' :
+                  userProfile.sovicoTokens >= 10000 ? 'text-gray-300' : 'text-orange-400'
+                }`}>
+                  {userProfile.sovicoTokens >= 200000 ? '💎 Diamond' :
+                   userProfile.sovicoTokens >= 50000 ? '🥇 Gold' :
+                   userProfile.sovicoTokens >= 10000 ? '🥈 Silver' : '🥉 Bronze'}
+                </span>
+              </div>
+              <div className="text-gray-500 text-xs">
+                {userProfile.totalTransactions} giao dịch
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((message) => (
             <div
-              className={`max-w-[80%] rounded-lg p-4 ${
-                message.type === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-[#161B22] border border-gray-700'
-              }`}
+              key={message.id}
+              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className="whitespace-pre-line text-sm">
-                {message.content}
-              </div>
-              
-              {/* Display service actions if available */}
-              {message.actions && message.actions.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <div className="text-xs font-semibold text-purple-400">🔧 Tiến trình thực hiện:</div>
-                  {message.actions.map((action) => (
-                    <div key={action.id} className="flex items-center space-x-2 p-2 bg-gray-800 rounded text-xs">
-                      <span>{getActionStatusIcon(action.status)}</span>
-                      <span className="flex-1">
-                        {action.service === 'vietjet' && '✈️ Vietjet Air'}
-                        {action.service === 'hdbank' && '🏦 HDBank'}
-                        {action.service === 'resort' && '🏨 Resort'}
-                        {' - '}
-                        {action.action === 'book_flight' && 'Đặt vé máy bay'}
-                        {action.action === 'loan' && 'Vay tiền'}
-                        {action.action === 'transfer' && 'Chuyển khoản'}
-                        {action.action === 'book_room' && 'Đặt phòng'}
-                        {action.action === 'spa_booking' && 'Đặt Spa'}
-                      </span>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        action.status === 'completed' ? 'bg-green-600' :
-                        action.status === 'executing' ? 'bg-yellow-600' :
-                        action.status === 'failed' ? 'bg-red-600' : 'bg-gray-600'
-                      }`}>
-                        {action.status === 'pending' && 'Chờ xử lý'}
-                        {action.status === 'executing' && 'Đang thực hiện'}
-                        {action.status === 'completed' && 'Hoàn thành'}
-                        {action.status === 'failed' && 'Thất bại'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <div className="text-xs opacity-70 mt-2">
-                {message.timestamp.toLocaleTimeString('vi-VN', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
-              </div>
-
-            </div>
-          </div>
-        ))}
-      
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
-              <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                </div>
-                <span className="text-sm text-gray-400">AI đang suy nghĩ...</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isProcessing && (
-          <div className="flex justify-start">
-            <div className="bg-[#161B22] border border-purple-600 rounded-lg p-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm text-purple-400">🤖 Đang thực hiện dịch vụ...</span>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      {/* Quick Questions */}
-      {messages.length <= 1 && (
-        <div className="p-4 border-t border-gray-700">
-          <p className="text-sm text-gray-400 mb-3">💡 Câu hỏi gợi ý:</p>
-          <div className="grid grid-cols-1 gap-2">
-            {predefinedQuestions.map((question, index) => (
-              <button
-                key={index}
-                onClick={() => handleQuestionClick(question)}
-                className="text-left p-3 bg-[#161B22] hover:bg-[#1F2937] rounded-lg text-sm border border-gray-700 hover:border-blue-500 transition-colors"
+              <div
+                className={`max-w-[80%] rounded-lg p-4 ${
+                  message.type === 'user'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-[#161B22] border border-gray-700'
+                }`}
               >
-                {question}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+                <div className="whitespace-pre-line text-sm">
+                  {message.content}
+                </div>
+                
+                {/* Display service actions if available */}
+                {message.actions && message.actions.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <div className="text-xs font-semibold text-purple-400">🔧 Tiến trình thực hiện:</div>
+                    {message.actions.map((action) => (
+                      <div key={action.id} className="flex items-center space-x-2 p-2 bg-gray-800 rounded text-xs">
+                        <span>{getActionStatusIcon(action.status)}</span>
+                        <span className="flex-1">
+                          {action.service === 'vietjet' && '✈️ Vietjet Air'}
+                          {action.service === 'hdbank' && '🏦 HDBank'}
+                          {action.service === 'resort' && '🏨 Resort'}
+                          {' - '}
+                          {action.action === 'book_flight' && 'Đặt vé máy bay'}
+                          {action.action === 'loan' && 'Vay tiền'}
+                          {action.action === 'transfer' && 'Chuyển khoản'}
+                          {action.action === 'book_room' && 'Đặt phòng'}
+                          {action.action === 'spa_booking' && 'Đặt Spa'}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          action.status === 'completed' ? 'bg-green-600' :
+                          action.status === 'executing' ? 'bg-yellow-600' :
+                          action.status === 'failed' ? 'bg-red-600' : 'bg-gray-600'
+                        }`}>
+                          {action.status === 'pending' && 'Chờ xử lý'}
+                          {action.status === 'executing' && 'Đang thực hiện'}
+                          {action.status === 'completed' && 'Hoàn thành'}
+                          {action.status === 'failed' && 'Thất bại'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="text-xs opacity-70 mt-2">
+                  {message.timestamp.toLocaleTimeString('vi-VN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </div>
 
-      {/* Input */}
-      <div className="bg-[#161B22] border-t border-gray-700 p-4">
-        <div className="flex space-x-3">
-          <input
-            type="text"
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Hỏi AI về tài chính, đầu tư, tiết kiệm..."
-            className="flex-1 bg-[#0D1117] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isLoading || isProcessing}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            {isLoading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : isProcessing ? (
-              <div className="w-5 h-5 border-2 border-purple-300 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              '📤'
-            )}
-          </button>
+              </div>
+            </div>
+          ))}
+        
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                  <span className="text-sm text-gray-400">AI đang suy nghĩ...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isProcessing && (
+            <div className="flex justify-start">
+              <div className="bg-[#161B22] border border-purple-600 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm text-purple-400">🤖 Đang thực hiện dịch vụ...</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
         
-        <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
-          <span>🔒 Cuộc trò chuyện được mã hóa end-to-end</span>
-          <div className="flex items-center space-x-4">
-            <span>💰 Miễn phí cho khách hàng Sovico</span>
-            {useGemini && (
-              <span className="bg-purple-900 text-purple-300 px-2 py-1 rounded">
-                ⚡ Gemini AI Active
-              </span>
-            )}
+        {/* Quick Questions */}
+        {messages.length <= 1 && (
+          <div className="p-4 border-t border-gray-700">
+            <p className="text-sm text-gray-400 mb-3">💡 Câu hỏi gợi ý:</p>
+            <div className="grid grid-cols-1 gap-2">
+              {predefinedQuestions.map((question, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleQuestionClick(question)}
+                  className="text-left p-3 bg-[#161B22] hover:bg-[#1F2937] rounded-lg text-sm border border-gray-700 hover:border-blue-500 transition-colors"
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Input */}
+        <div className="bg-[#161B22] border-t border-gray-700 p-4">
+          <div className="flex space-x-3">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              placeholder="Hỏi AI về tài chính, đầu tư, tiết kiệm..."
+              className="flex-1 bg-[#0D1117] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              disabled={isLoading}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim() || isLoading || isProcessing}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : isProcessing ? (
+                <div className="w-5 h-5 border-2 border-purple-300 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                '📤'
+              )}
+            </button>
+          </div>
+          
+          <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
+            <span>🔒 Cuộc trò chuyện được mã hóa end-to-end</span>
+            <div className="flex items-center space-x-4">
+              <span>💰 Miễn phí cho khách hàng Sovico</span>
+              {useGemini && (
+                <span className="bg-purple-900 text-purple-300 px-2 py-1 rounded">
+                  ⚡ Gemini AI Active
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
