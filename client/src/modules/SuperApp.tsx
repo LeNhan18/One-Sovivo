@@ -116,13 +116,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         console.log('🔍 SuperApp Debug - Customer ID:', customerId);
 
         const response = await fetch(`http://127.0.0.1:5000/customer/${customerId}`)
-        console.log('🔍 SuperApp Debug - API Response Status:', response.status);
+        console.log('SuperApp Debug - API Response Status:', response.status);
         if (response.ok) {
           const customerData = await response.json()
-          console.log('🔍 SuperApp Debug - Customer Data:', customerData);
-          console.log('🔍 SuperApp Debug - Vietjet Summary:', customerData.customer?.vietjet_summary);
-          console.log('🔍 SuperApp Debug - HDBank Summary:', customerData.customer?.hdbank_summary);
-          console.log('🔍 SuperApp Debug - Resort Summary:', customerData.customer?.resort_summary);
+          console.log(' SuperApp Debug - Customer Data:', customerData);
+          console.log(' SuperApp Debug - Vietjet Summary:', customerData.customer?.vietjet_summary);
+          console.log(' SuperApp Debug - HDBank Summary:', customerData.customer?.hdbank_summary);
+          console.log(' SuperApp Debug - Resort Summary:', customerData.customer?.resort_summary);
 
           // Lấy dữ liệu token từ blockchain/database
           const tokenResponse = await fetch(`http://127.0.0.1:5000/api/nft/${customerId}`)
@@ -328,7 +328,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     { 
       id: 'ai-assistant', 
       label: 'AI Advisor', 
-      description: 'Tư vấn đầu tư thông minh',
+      description: 'Hệ thống AI ',
       bgImage: './Image/AI.jpg',
     },
     { 
@@ -806,7 +806,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         {/* Sovico Group Investment Ecosystem */}
         <div>
           <h2 className="text-2xl font-bold mb-6 text-white flex items-center space-x-3">
-            <span className="text-3xl">🏢</span>
             <span className="bg-gradient-to-r from-blue-400 to-slate-300 bg-clip-text text-transparent">
               Hệ sinh thái Sovico Group
             </span>
@@ -844,7 +843,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                   {/* Hover Effect Indicator */}
                   <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="w-8 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto rounded-full"></div>
-                  </div>
+                  </div>h
                 </div>
                 
                 {/* Professional Shine Effect */}
@@ -867,13 +866,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               </span>
             </h2>
             <div className="flex space-x-3">
-              <button
-                onClick={() => setShowAIAgent(true)}
-                className="group bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center space-x-2"
-              >
-                <span className="text-lg group-hover:scale-110 transition-transform">�</span>
-                <span>AI Agent</span>
-              </button>
+              {/*<button*/}
+              {/*  onClick={() => setShowAIAgent(true)}*/}
+              {/*  className="group bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center space-x-2"*/}
+              {/*>*/}
+              {/*  <span className="text-lg group-hover:scale-110 transition-transform">�</span>*/}
+              {/*  <span>AI Agent</span>*/}
+              {/*</button>*/}
             </div>
           </div>
           
@@ -929,11 +928,12 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         </div>
         
         {/* Enhanced AI Recommendations */}
+        {/* Xử lý hệ thong goi y AI */}
         <div>
           <h2 className="text-2xl font-bold mb-6 text-white flex items-center space-x-3">
-            <span className="text-3xl">🤖</span>
+            <span className="text-3xl"></span>
             <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              Tư vấn AI cá nhân
+              Hệ thống đề xuất model Deep Learning
             </span>
             <button 
               onClick={() => setActiveSection('ai-assistant')}
@@ -952,7 +952,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
          {/* Recent SVT Activity */}
         <div>
           <h2 className="text-xl font-bold mb-4 text-white flex items-center space-x-2">
-            <span>⛓️</span>
             <span>Hoạt động SVT gần đây</span>
             <button 
               onClick={() => setActiveSection('history')}
@@ -1178,7 +1177,6 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ title, descript
       <div className="flex-1">
         <div className="flex items-center space-x-3 mb-3">
           <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
-            🤖
           </div>
           <h3 className="font-bold text-white text-lg drop-shadow-md">{title}</h3>
         </div>

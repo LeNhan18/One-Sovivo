@@ -74,9 +74,9 @@ class VietjetService:
 
             # Tính SVT reward dựa trên route
             if origin in ["HAN", "SGN", "DAD"] and destination in ["HAN", "SGN", "DAD"]:
-                svt_reward = 500  # Domestic
+                svt_reward = 50  # Domestic
             else:
-                svt_reward = 1200  # International
+                svt_reward = 200  # International
 
             # Thêm SVT token transaction (dynamic model access)
             TTx = _TokenTransaction()
