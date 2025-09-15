@@ -66,6 +66,7 @@ class VietjetService:
                 ticket_class=ticket_class,
                 booking_value=booking_value * passengers,
             )
+
             print(f"🔍 VietjetFlight object created: {new_flight}")
             print(f"🔍 About to add to db.session...")
 
@@ -78,11 +79,13 @@ class VietjetService:
             else:
                 svt_reward = 200  # International
 
+            if origin == destination:
+                return {"success": False, "message": "Điểm khởi hành và điểm đến không thể giống nhau"}
+
             # Thêm SVT token transaction (dynamic model access)
             TTx = _TokenTransaction()
             if not TTx:
                 raise RuntimeError("TokenTransaction model not initialized")
-
             token_tx = TTx(
                 customer_id=customer_id,
                 transaction_type="service_reward",
@@ -111,7 +114,7 @@ class VietjetService:
 
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error booking flight: {repr(e)}")
+            print(f"Error booking flight: {repr(e)}")
             return {"success": False, "message": f"Lỗi đặt vé: {str(e)}"}
 
     def get_booking_history(self, customer_id):
@@ -153,7 +156,7 @@ class VietjetService:
             }
 
         except Exception as e:
-            print(f"❌ Error getting booking history: {e}")
+            print(f"Error getting booking history: {e}")
             return {"success": False, "message": f"Lỗi lấy lịch sử: {str(e)}"}
 
     def get_flight_routes(self):
