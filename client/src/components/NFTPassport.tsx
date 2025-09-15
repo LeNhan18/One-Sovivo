@@ -1,5 +1,29 @@
 import React, { useState, useEffect } from 'react';
 
+// QR Code generator function
+const generateQRCode = (tokenId: number, metadata: NFTMetadata | null, size: number = 128): string => {
+  // Create QR code content with NFT passport information
+  const qrContent = JSON.stringify({
+    tokenId: tokenId,
+    name: metadata?.name || `NFT Passport #${tokenId}`,
+    network: 'Sovico Chain',
+    type: 'NFT_PASSPORT',
+    url: `${window.location.origin}/nft/${tokenId}`
+  });
+  
+  // Using QR Server API for generating QR codes
+  const baseUrl = 'https://api.qrserver.com/v1/create-qr-code/';
+  const params = new URLSearchParams({
+    size: `${size}x${size}`,
+    data: qrContent,
+    format: 'png',
+    bgcolor: '161B22',
+    color: 'ffffff',
+    qzone: '2'
+  });
+  return `${baseUrl}?${params.toString()}`;
+};
+
 
 interface NFTMetadata {
   name: string;
@@ -27,11 +51,11 @@ interface NFTPassportProps {
 
 const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }) => {
   const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
-
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [svtBalance, setSvtBalance] = useState(0);
+  const [showQRCode, setShowQRCode] = useState(false);
 
   useEffect(() => {
     fetchNFTData();
@@ -277,6 +301,32 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
               🔗 View on Blockchain
             </button>
           </div>
+        </div>
+
+        {/* QR Code Section */}
+        <div className="mt-6 pt-6 border-t border-gray-700">
+          <div className="flex justify-center">
+            <button
+              onClick={() => setShowQRCode(!showQRCode)}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center gap-2"
+            >
+              <span className="text-lg">📱</span>
+              {showQRCode ? 'Ẩn QR Code' : 'Hiển thị QR Code'}
+            </button>
+          </div>
+
+          {showQRCode && (
+            <div className="mt-4 flex flex-col items-center bg-white p-4 rounded-lg">
+              <img
+                src={generateQRCode(tokenId, metadata)}
+                alt="NFT Passport QR Code"
+                className="w-32 h-32 border-2 border-gray-300 rounded-lg"
+              />
+              <p className="text-sm text-gray-600 mt-2 text-center">
+                Mã QR cho NFT Passport #{tokenId}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Metadata Footer */}
