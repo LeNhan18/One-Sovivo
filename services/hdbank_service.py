@@ -241,7 +241,7 @@ class HDBankService:
                 description=f"Giải ngân khoản vay {loan_term} tháng: {loan_purpose}"
             )
             db.session.add(loan_tx)
-            svt_reward = 1000
+            svt_reward = 200
             svt_tx = TTx(
                 customer_id=customer_id,
                 transaction_type="loan_reward",
@@ -262,7 +262,7 @@ class HDBankService:
             }
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error applying loan: {e}")
+            print(f" Error applying loan: {e}")
             return {'success': False, 'error': str(e)}
     
     def open_card(self, customer_id, card_type, card_name=''):
