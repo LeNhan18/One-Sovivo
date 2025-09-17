@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import BlockchainExplorer from './BlockchainExplorer';
 
 // QR Code generator function
 const generateQRCode = (tokenId: number, metadata: NFTMetadata | null, size: number = 128): string => {
@@ -56,6 +57,7 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
   const [error, setError] = useState<string | null>(null);
   const [svtBalance, setSvtBalance] = useState(0);
   const [showQRCode, setShowQRCode] = useState(false);
+  const [showBlockchainExplorer, setShowBlockchainExplorer] = useState(false);
 
   useEffect(() => {
     fetchNFTData();
@@ -297,7 +299,10 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
             <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
               🎨 Customize
             </button>
-            <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <button 
+              onClick={() => setShowBlockchainExplorer(true)}
+              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
               🔗 View on Blockchain
             </button>
           </div>
@@ -337,6 +342,14 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
           </div>
         </div>
       </div>
+
+      {/* Blockchain Explorer Modal */}
+      <BlockchainExplorer
+        isOpen={showBlockchainExplorer}
+        onClose={() => setShowBlockchainExplorer(false)}
+        tokenId={tokenId}
+        metadata={metadata}
+      />
     </div>
   );
 };
