@@ -563,9 +563,6 @@ const SVTWallet: React.FC = () => {
           <div>
             <p className="text-purple-200 text-sm">Số dư hiện tại</p>
             <p className="text-4xl font-bold">{svtBalance.toLocaleString('vi-VN')} SVT</p>
-            <p className="text-purple-200 text-sm mt-1">
-              ≈ {(svtBalance * 1000).toLocaleString('vi-VN')} VND
-            </p>
           </div>
           <div className="text-6xl">🪙</div>
         </div>

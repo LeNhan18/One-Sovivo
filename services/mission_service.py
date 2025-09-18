@@ -46,7 +46,7 @@ class MissionService:
                 return available_missions
                 
         except Exception as e:
-            print(f"❌ Error getting missions: {e}")
+            print(f" Error getting missions: {e}")
             return []
     
     def start_mission(self, customer_id, mission_id):
@@ -79,7 +79,7 @@ class MissionService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error starting mission: {e}")
+            print(f"Error starting mission: {e}")
             return {'success': False, 'error': str(e)}
     
     def complete_mission(self, customer_id, mission_id):
@@ -129,7 +129,7 @@ class MissionService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error completing mission: {e}")
+            print(f" Error completing mission: {e}")
             return {'success': False, 'error': str(e)}
     
     def get_mission_progress(self, customer_id, mission_id):
@@ -152,7 +152,7 @@ class MissionService:
             return progress
             
         except Exception as e:
-            print(f"❌ Error getting mission progress: {e}")
+            print(f" Error getting mission progress: {e}")
             return {}
     
     def get_leaderboard(self):
@@ -184,7 +184,7 @@ class MissionService:
             return leaderboard
             
         except Exception as e:
-            print(f"❌ Error getting leaderboard: {e}")
+            print(f" Error getting leaderboard: {e}")
             return []
     
     def update_customer_stats(self, customer_id, stats_data):
@@ -214,7 +214,7 @@ class MissionService:
             
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error updating customer stats: {e}")
+            print(f"Error updating customer stats: {e}")
             return {'success': False, 'error': str(e)}
     
     def get_mission_templates(self):
@@ -225,7 +225,7 @@ class MissionService:
             else:
                 return self._get_default_mission_templates()
         except Exception as e:
-            print(f"❌ Error getting mission templates: {e}")
+            print(f" Error getting mission templates: {e}")
             return []
     
     def _get_customer_data_for_missions(self, customer_id):
@@ -257,7 +257,7 @@ class MissionService:
             }
             
         except Exception as e:
-            print(f"❌ Error getting customer data: {e}")
+            print(f" Error getting customer data: {e}")
             return {}
     
     def _sync_missions_to_database(self, customer_id, missions):
@@ -283,7 +283,7 @@ class MissionService:
             
             db.session.commit()
         except Exception as e:
-            print(f"❌ Error syncing missions: {e}")
+            print(f" Error syncing missions: {e}")
             db.session.rollback()
     
     def _sync_detailed_missions_to_database(self, customer_id, missions):
@@ -321,7 +321,7 @@ class MissionService:
             
             db.session.commit()
         except Exception as e:
-            print(f"❌ Error syncing detailed missions: {e}")
+            print(f" Error syncing detailed missions: {e}")
             db.session.rollback()
     
     def _create_mission_progress_tracking(self, customer_id, mission_id, mission_data):
@@ -349,7 +349,7 @@ class MissionService:
             
             db.session.commit()
         except Exception as e:
-            print(f"❌ Error creating progress tracking: {e}")
+            print(f" Error creating progress tracking: {e}")
             db.session.rollback()
     
     def _check_mission_completion(self, customer_id, mission_id):
@@ -366,7 +366,7 @@ class MissionService:
             return all(record.is_completed for record in progress_records)
             
         except Exception as e:
-            print(f"❌ Error checking mission completion: {e}")
+            print(f" Error checking mission completion: {e}")
             return False
     
     def _get_default_missions(self, customer_id):

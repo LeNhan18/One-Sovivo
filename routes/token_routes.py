@@ -76,11 +76,6 @@ def get_user_tokens(customer_id):
         print(f"Error in get_user_tokens: {e}")
         print(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'Lỗi lấy token balance: {str(e)}'
-        }), 500
 
 
 @token_bp.route('/add', methods=['POST'])

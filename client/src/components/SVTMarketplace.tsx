@@ -266,7 +266,7 @@ const SVTMarketplace: React.FC = () => {
         </div>
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 rounded-lg">
           <p className="text-purple-200 text-sm">Số dư của bạn</p>
-          <p className="text-2xl font-bold">{userSVT.toLocaleString('vi-VN')} SVT</p>
+8          <p className="text-2xl font-bold">{(userSVT || 0).toLocaleString('vi-VN')} SVT</p>
         </div>
       </div>
 

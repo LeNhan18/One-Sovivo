@@ -8,8 +8,7 @@ import datetime
 import uuid
 from models.database import db
 from models.marketplace import MarketplaceItem, P2PListing
-from models.customer import Customer  
-from models.transactions import TokenTransaction
+from models.customer import Customer
 
 class MarketplaceService:
     
@@ -58,16 +57,27 @@ class MarketplaceService:
                 return {'success': False, 'error': 'Insufficient SVT balance'}
             
             # Thực hiện giao dịch
-            # Trừ SVT từ customer
-            debit_tx = TokenTransaction(
-                customer_id=customer_id,
-                transaction_type="marketplace_purchase",
-                amount=-total_cost,
-                description=f"Mua {quantity}x {item.name}",
-                tx_hash=f"0x{uuid.uuid4().hex}",
-                block_number=1000000
-            )
-            db.session.add(debit_tx)
+            # Sử dụng SQLAlchemy ORM để tạo transaction record
+            try:
+                from models.transactions import TokenTransaction
+
+                # Tạo transaction record mới
+                transaction = TokenTransaction(
+                    customer_id=customer_id,
+                    transaction_type="marketplace_purchase",
+                    amount=-total_cost,
+                    description=f"Mua {quantity}x {item.name}",
+                    tx_hash=f"0x{uuid.uuid4().hex}",
+                    block_number=1000000
+                )
+
+                db.session.add(transaction)
+                db.session.flush()  # Flush để đảm bảo transaction được tạo trước khi commit
+
+            except Exception as tx_error:
+                print(f"❌ Error creating transaction: {tx_error}")
+                db.session.rollback()
+                return {'success': False, 'error': 'Failed to process payment'}
             
             # Giảm số lượng item
             item.quantity -= quantity
@@ -149,8 +159,35 @@ class MarketplaceService:
     def _get_customer_svt_balance(self, customer_id):
         """Helper: Tính số dư SVT của customer"""
         try:
+            # Use SQLAlchemy ORM instead of raw SQL for better error handling
+            from models.transactions import TokenTransaction
+
+            # Get all transactions for this customer
             transactions = TokenTransaction.query.filter_by(customer_id=customer_id).all()
-            return sum(float(tx.amount) for tx in transactions)
+
+            # Calculate balance
+            balance = sum(float(t.amount) for t in transactions)
+
+            print(f"✅ Customer {customer_id} SVT balance: {balance}")
+            return balance
+
         except Exception as e:
             print(f"❌ Error getting SVT balance: {e}")
-            return 0
+            # Fallback to raw SQL if ORM fails
+            try:
+                from models.database import get_db_connection
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COALESCE(SUM(amount), 0) FROM token_transactions WHERE customer_id = %s",
+                    (customer_id,)
+                )
+                result = cursor.fetchone()
+                balance = float(result[0]) if result and result[0] is not None else 0
+                cursor.close()
+                conn.close()
+                print(f"✅ Fallback - Customer {customer_id} SVT balance: {balance}")
+                return balance
+            except Exception as fallback_error:
+                print(f"❌ Fallback also failed: {fallback_error}")
+                return 0
