@@ -208,7 +208,7 @@ class NFTService:
             }
             
         except Exception as e:
-            print(f"❌ Error evaluating achievements: {e}")
+            print(f"Error evaluating achievements: {e}")
             return {'success': False, 'error': str(e)}
     
     def _calculate_customer_rank(self, achievements):
@@ -237,5 +237,5 @@ class NFTService:
                 return 'Bronze'
                 
         except Exception as e:
-            print(f"❌ Error calculating rank: {e}")
+            print(f"Error calculating rank: {e}")
             return 'Bronze'
