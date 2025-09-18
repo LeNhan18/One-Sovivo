@@ -683,8 +683,7 @@ const SVTWallet: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {achievements.map(achievement => (
-              <div key={achievement.id} className="bg-[#161B22] border border-gray-700 rounded-lg p-4 text-center">
-                <div className="text-4xl mb-3">{achievement.icon}</div>
+              <div key={achievement.id} className="bg-gradient-to-br from-violet-500 to-violet-950 rounded-xl p-6 text-white">
                 <h3 className="font-bold text-white mb-2">{achievement.name}</h3>
                 <p className="text-gray-400 text-sm mb-3">{achievement.description}</p>
                 <p className="text-xs text-gray-500">Đạt được: {achievement.earnedDate}</p>
