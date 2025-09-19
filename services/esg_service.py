@@ -1,11 +1,11 @@
-# services/esg_service.py
+# services/esg_service_fixed.py
 # -*- coding: utf-8 -*-
 """
-ESG Service - Business logic for ESG programs and contributions
+ESG Service - Business logic for ESG programs and contributions (Fixed version)
 """
 
 from sqlalchemy import text
-from models.database import get_db_connection
+from models.database import db
 from datetime import datetime
 import logging
 
@@ -16,42 +16,36 @@ class ESGService:
     def get_all_programs(status=None, category=None):
         """Get all ESG programs with optional filtering"""
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            
-            query = "SELECT * FROM esg_programs WHERE 1=1"
-            params = []
-            
-            if status:
-                query += " AND status = %s"
-                params.append(status)
+            with db.engine.connect() as conn:
+                query = text("SELECT * FROM esg_programs WHERE 1=1" + 
+                           (" AND status = :status" if status else "") +
+                           (" AND category = :category" if category else "") +
+                           " ORDER BY created_at DESC")
                 
-            if category:
-                query += " AND category = %s"
-                params.append(category)
+                params = {}
+                if status:
+                    params['status'] = status
+                if category:
+                    params['category'] = category
                 
-            query += " ORDER BY created_at DESC"
-            
-            cursor.execute(query, params)
-            programs = cursor.fetchall()
-            
-            # Convert decimal fields to float
-            for program in programs:
-                if program['target_amount']:
-                    program['target_amount'] = float(program['target_amount'])
-                if program['current_amount']:
-                    program['current_amount'] = float(program['current_amount'])
-                    
-                # Calculate progress percentage
-                if program['target_amount'] and program['target_amount'] > 0:
-                    program['progress_percentage'] = min(100, (program['current_amount'] / program['target_amount']) * 100)
-                else:
-                    program['progress_percentage'] = 0
-            
-            cursor.close()
-            conn.close()
-            return programs
-            
+                result = conn.execute(query, params)
+                programs = [dict(row._mapping) for row in result]
+                
+                # Convert decimal fields to float
+                for program in programs:
+                    if program['target_amount']:
+                        program['target_amount'] = float(program['target_amount'])
+                    if program['current_amount']:
+                        program['current_amount'] = float(program['current_amount'])
+                        
+                    # Calculate progress percentage
+                    if program['target_amount'] and program['target_amount'] > 0:
+                        program['progress_percentage'] = min(100, (program['current_amount'] / program['target_amount']) * 100)
+                    else:
+                        program['progress_percentage'] = 0
+                
+                return programs
+                
         except Exception as e:
             logger.error(f"Error getting ESG programs: {e}")
             return []
@@ -60,185 +54,209 @@ class ESGService:
     def get_program_by_id(program_id):
         """Get specific ESG program by ID"""
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            
-            cursor.execute("SELECT * FROM esg_programs WHERE id = %s", (program_id,))
-            program = cursor.fetchone()
-            
-            if program:
-                # Convert decimal fields
-                if program['target_amount']:
-                    program['target_amount'] = float(program['target_amount'])
-                if program['current_amount']:
-                    program['current_amount'] = float(program['current_amount'])
+            with db.engine.connect() as conn:
+                query = text("SELECT * FROM esg_programs WHERE id = :program_id")
+                result = conn.execute(query, {'program_id': program_id})
+                program = result.fetchone()
+                
+                if program:
+                    program_dict = dict(program._mapping)
+                    if program_dict['target_amount']:
+                        program_dict['target_amount'] = float(program_dict['target_amount'])
+                    if program_dict['current_amount']:
+                        program_dict['current_amount'] = float(program_dict['current_amount'])
+                        
+                    # Calculate progress percentage
+                    if program_dict['target_amount'] and program_dict['target_amount'] > 0:
+                        program_dict['progress_percentage'] = min(100, (program_dict['current_amount'] / program_dict['target_amount']) * 100)
+                    else:
+                        program_dict['progress_percentage'] = 0
+                        
+                    return program_dict
                     
-                # Calculate progress
-                if program['target_amount'] and program['target_amount'] > 0:
-                    program['progress_percentage'] = min(100, (program['current_amount'] / program['target_amount']) * 100)
-                else:
-                    program['progress_percentage'] = 0
-            
-            cursor.close()
-            conn.close()
-            return program
-            
+                return None
+                
         except Exception as e:
-            logger.error(f"Error getting ESG program {program_id}: {e}")
-            return None
-
-    @staticmethod
-    def create_contribution(program_id, user_id, amount, svt_amount=0):
-        """Create a new ESG contribution"""
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # Insert contribution
-            cursor.execute("""
-                INSERT INTO esg_contributions 
-                (program_id, user_id, amount, svt_amount, status, contribution_date)
-                VALUES (%s, %s, %s, %s, 'completed', NOW())
-            """, (program_id, user_id, amount, svt_amount))
-            
-            contribution_id = cursor.lastrowid
-            
-            # Update program current amount
-            cursor.execute("""
-                UPDATE esg_programs 
-                SET current_amount = current_amount + %s,
-                    updated_at = NOW()
-                WHERE id = %s
-            """, (amount, program_id))
-            
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-            return contribution_id
-            
-        except Exception as e:
-            logger.error(f"Error creating ESG contribution: {e}")
-            if 'conn' in locals():
-                conn.rollback()
-                conn.close()
+            logger.error(f"Error getting ESG program by ID: {e}")
             return None
 
     @staticmethod
     def get_user_contributions(user_id, limit=10):
         """Get user's ESG contributions"""
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            
-            cursor.execute("""
-                SELECT c.*, p.name as program_name, p.category as program_category
-                FROM esg_contributions c
-                JOIN esg_programs p ON c.program_id = p.id
-                WHERE c.user_id = %s
-                ORDER BY c.contribution_date DESC
-                LIMIT %s
-            """, (user_id, limit))
-            
-            contributions = cursor.fetchall()
-            
-            # Convert decimal fields
-            for contrib in contributions:
-                contrib['amount'] = float(contrib['amount'])
-                contrib['svt_amount'] = float(contrib['svt_amount'])
-            
-            cursor.close()
-            conn.close()
-            return contributions
-            
+            with db.engine.connect() as conn:
+                query = text("""
+                    SELECT c.*, p.name as program_name, p.category as program_category
+                    FROM esg_contributions c
+                    JOIN esg_programs p ON c.program_id = p.id
+                    WHERE c.user_id = :user_id
+                    ORDER BY c.contribution_date DESC
+                    LIMIT :limit
+                """)
+                
+                result = conn.execute(query, {'user_id': user_id, 'limit': limit})
+                contributions = [dict(row._mapping) for row in result]
+                
+                # Convert decimal fields to float
+                for contribution in contributions:
+                    if contribution['amount']:
+                        contribution['amount'] = float(contribution['amount'])
+                    if contribution['svt_amount']:
+                        contribution['svt_amount'] = float(contribution['svt_amount'])
+                
+                return contributions
+                
         except Exception as e:
             logger.error(f"Error getting user contributions: {e}")
             return []
 
     @staticmethod
-    def get_program_contributions(program_id, limit=20):
-        """Get contributions for a specific program"""
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            
-            cursor.execute("""
-                SELECT c.*, u.username
-                FROM esg_contributions c
-                LEFT JOIN users u ON c.user_id = u.id
-                WHERE c.program_id = %s
-                ORDER BY c.contribution_date DESC
-                LIMIT %s
-            """, (program_id, limit))
-            
-            contributions = cursor.fetchall()
-            
-            # Convert decimal fields
-            for contrib in contributions:
-                contrib['amount'] = float(contrib['amount'])
-                contrib['svt_amount'] = float(contrib['svt_amount'])
-            
-            cursor.close()
-            conn.close()
-            return contributions
-            
-        except Exception as e:
-            logger.error(f"Error getting program contributions: {e}")
-            return []
-
-    @staticmethod
     def get_esg_stats():
-        """Get overall ESG statistics"""
+        """Get ESG statistics"""
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            
-            # Total programs by category
-            cursor.execute("""
-                SELECT 
-                    category,
-                    COUNT(*) as program_count,
-                    SUM(target_amount) as total_target,
-                    SUM(current_amount) as total_raised
-                FROM esg_programs 
-                WHERE status = 'active'
-                GROUP BY category
-            """)
-            category_stats = cursor.fetchall()
-            
-            # Overall stats
-            cursor.execute("""
-                SELECT 
-                    COUNT(DISTINCT p.id) as total_programs,
-                    COUNT(DISTINCT c.user_id) as total_contributors,
-                    SUM(c.amount) as total_contributions,
-                    SUM(c.svt_amount) as total_svt_distributed
-                FROM esg_programs p
-                LEFT JOIN esg_contributions c ON p.id = c.program_id
-                WHERE p.status = 'active'
-            """)
-            overall_stats = cursor.fetchone()
-            
-            # Convert decimal fields
-            for stat in category_stats:
-                stat['total_target'] = float(stat['total_target'] or 0)
-                stat['total_raised'] = float(stat['total_raised'] or 0)
-            
-            if overall_stats:
-                overall_stats['total_contributions'] = float(overall_stats['total_contributions'] or 0)
-                overall_stats['total_svt_distributed'] = float(overall_stats['total_svt_distributed'] or 0)
-            
-            cursor.close()
-            conn.close()
-            
-            return {
-                'category_stats': category_stats,
-                'overall_stats': overall_stats
-            }
-            
+            with db.engine.connect() as conn:
+                # Get category statistics
+                category_query = text("""
+                    SELECT 
+                        category,
+                        COUNT(*) as program_count,
+                        SUM(target_amount) as total_target,
+                        SUM(current_amount) as total_raised
+                    FROM esg_programs 
+                    WHERE status = 'active'
+                    GROUP BY category
+                """)
+                
+                category_result = conn.execute(category_query)
+                category_stats = []
+                for row in category_result:
+                    row_dict = dict(row._mapping)
+                    row_dict['total_target'] = float(row_dict['total_target'] or 0)
+                    row_dict['total_raised'] = float(row_dict['total_raised'] or 0)
+                    category_stats.append(row_dict)
+                
+                # Get overall statistics
+                overall_query = text("""
+                    SELECT 
+                        COUNT(DISTINCT p.id) as total_programs,
+                        COUNT(DISTINCT c.user_id) as total_contributors,
+                        COUNT(c.id) as total_contributions,
+                        SUM(c.svt_amount) as total_svt_distributed
+                    FROM esg_programs p
+                    LEFT JOIN esg_contributions c ON p.id = c.program_id
+                    WHERE p.status = 'active'
+                """)
+                
+                overall_result = conn.execute(overall_query)
+                overall_row = overall_result.fetchone()
+                overall_stats = dict(overall_row._mapping) if overall_row else {}
+                
+                # Convert to proper types
+                for key in overall_stats:
+                    if overall_stats[key] is None:
+                        overall_stats[key] = 0
+                    elif key == 'total_svt_distributed':
+                        overall_stats[key] = float(overall_stats[key])
+                
+                return {
+                    'category_stats': category_stats,
+                    'overall_stats': overall_stats
+                }
+                
         except Exception as e:
             logger.error(f"Error getting ESG stats: {e}")
             return {
                 'category_stats': [],
                 'overall_stats': {}
+            }
+
+    @staticmethod
+    def create_contribution(program_id, user_id, amount, svt_amount=0):
+        """Create a new ESG contribution"""
+        try:
+            with db.engine.connect() as conn:
+                # Insert contribution
+                insert_query = text("""
+                    INSERT INTO esg_contributions 
+                    (program_id, user_id, amount, svt_amount, contribution_date, status, notes)
+                    VALUES (:program_id, :user_id, :amount, :svt_amount, NOW(), 'completed', 'Đóng góp qua SVT')
+                """)
+                
+                result = conn.execute(insert_query, {
+                    'program_id': program_id,
+                    'user_id': user_id,
+                    'amount': amount,
+                    'svt_amount': svt_amount
+                })
+                
+                contribution_id = result.lastrowid
+                
+                # Update program current_amount
+                update_query = text("""
+                    UPDATE esg_programs 
+                    SET current_amount = current_amount + :amount 
+                    WHERE id = :program_id
+                """)
+                
+                conn.execute(update_query, {
+                    'amount': amount,
+                    'program_id': program_id
+                })
+                
+                conn.commit()
+                return contribution_id
+                
+        except Exception as e:
+            logger.error(f"Error creating ESG contribution: {e}")
+            return None
+
+    @staticmethod
+    def get_categories():
+        """Get all ESG categories"""
+        return [
+            {'value': 'environment', 'label': 'Môi trường'},
+            {'value': 'social', 'label': 'Xã hội'},
+            {'value': 'governance', 'label': 'Quản trị'}
+        ]
+
+    @staticmethod
+    def get_user_impact_report(user_id):
+        """Get user's ESG impact report"""
+        try:
+            with db.engine.connect() as conn:
+                query = text("""
+                    SELECT 
+                        p.category,
+                        COUNT(c.id) as contribution_count,
+                        SUM(c.amount) as total_contributed,
+                        SUM(c.svt_amount) as total_svt_used
+                    FROM esg_contributions c
+                    JOIN esg_programs p ON c.program_id = p.id
+                    WHERE c.user_id = :user_id AND c.status = 'completed'
+                    GROUP BY p.category
+                """)
+                
+                result = conn.execute(query, {'user_id': user_id})
+                impact_data = []
+                
+                for row in result:
+                    row_dict = dict(row._mapping)
+                    row_dict['total_contributed'] = float(row_dict['total_contributed'] or 0)
+                    row_dict['total_svt_used'] = float(row_dict['total_svt_used'] or 0)
+                    impact_data.append(row_dict)
+                
+                return {
+                    'impact_by_category': impact_data,
+                    'total_impact': {
+                        'contributions': sum(item['contribution_count'] for item in impact_data),
+                        'amount': sum(item['total_contributed'] for item in impact_data),
+                        'svt_used': sum(item['total_svt_used'] for item in impact_data)
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting user impact report: {e}")
+            return {
+                'impact_by_category': [],
+                'total_impact': {'contributions': 0, 'amount': 0, 'svt_used': 0}
             }

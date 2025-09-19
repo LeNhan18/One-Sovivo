@@ -80,5 +80,6 @@ def register_blueprints(app):
     if ESG_AVAILABLE:
         app.register_blueprint(esg_bp)
         print("✅ ESG routes registered")
-    
+        print("✅ ESG routes registered successfully")
+
     return True
