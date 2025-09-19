@@ -105,12 +105,19 @@ const ESGPrograms: React.FC = () => {
         setPrograms(programsData.programs)
       }
 
-      // Fetch user contributions
-      const contributionsResponse = await fetch('/api/esg/my-contributions')
-      const contributionsData = await contributionsResponse.json()
-      
-      if (contributionsData.success) {
-        setMyContributions(contributionsData.contributions)
+      // Fetch user contributions (requires auth)
+      const token = localStorage.getItem('auth_token')
+      if (token) {
+        const contributionsResponse = await fetch('/api/esg/my-contributions', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        const contributionsData = await contributionsResponse.json()
+        
+        if (contributionsData.success) {
+          setMyContributions(contributionsData.contributions)
+        }
       }
 
       // Fetch stats
@@ -134,10 +141,17 @@ const ESGPrograms: React.FC = () => {
     try {
       setContributionLoading(true)
       
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        alert('Vui lòng đăng nhập để đóng góp')
+        return
+      }
+
       const response = await fetch('/api/esg/contribute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           program_id: selectedProgram.id,

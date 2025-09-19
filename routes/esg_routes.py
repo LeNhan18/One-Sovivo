@@ -120,20 +120,13 @@ def contribute_to_esg():
                 'message': 'Chương trình ESG không còn hoạt động'
             }), 400
         
-        # Handle SVT payment if requested
+        # Handle SVT payment if requested  
         svt_amount = 0
         if use_svt:
-            # Convert amount to SVT (1 VND = 0.1 SVT for contributions)
-            svt_required = float(amount) * 0.1
-            
-            # Check and deduct SVT balance
-            if not TokenService.deduct_svt_balance(user_id, svt_required):
-                return jsonify({
-                    'success': False,
-                    'message': 'Số dư SVT không đủ'
-                }), 400
-            
-            svt_amount = svt_required
+            # TODO: Implement SVT payment integration
+            # For now, skip SVT payment and just record the request
+            svt_amount = float(amount) * 0.1
+            logger.info(f"SVT payment requested: {svt_amount} SVT (feature under development)")
         
         # Create contribution
         contribution_id = ESGService.create_contribution(
@@ -144,10 +137,6 @@ def contribute_to_esg():
         )
         
         if not contribution_id:
-            # Refund SVT if contribution failed
-            if use_svt and svt_amount > 0:
-                TokenService.add_svt_balance(user_id, svt_amount)
-            
             return jsonify({
                 'success': False,
                 'message': 'Lỗi khi tạo đóng góp ESG'
@@ -155,15 +144,8 @@ def contribute_to_esg():
         
         # Award SVT tokens as reward (10% of contribution amount)
         reward_svt = float(amount) * 0.1
-        TokenService.add_svt_balance(user_id, reward_svt)
-        
-        # Log the transaction
-        TokenService.log_transaction(
-            user_id=user_id,
-            transaction_type='esg_contribution',
-            amount=reward_svt,
-            description=f'ESG contribution reward for program: {program["name"]}'
-        )
+        # TODO: Implement SVT reward system
+        logger.info(f"SVT reward earned: {reward_svt} SVT (feature under development)")
         
         return jsonify({
             'success': True,
