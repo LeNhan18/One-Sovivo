@@ -25,6 +25,7 @@ interface ESGContribution {
   status: string
   program_name: string
   program_category: string
+  transaction_hash: string
 }
 
 interface ESGStats {
@@ -532,6 +533,21 @@ const ESGPrograms: React.FC = () => {
                                 {config.label}
                               </span>
                             </div>
+                            {contribution.transaction_hash && (
+                              <div className="mt-2 flex items-center gap-2 text-sm text-gray-500">
+                                <span>🔗</span>
+                                <span className="font-mono bg-gray-100 px-2 py-1 rounded text-xs">
+                                  {contribution.transaction_hash.substring(0, 16)}...
+                                </span>
+                                <button 
+                                  onClick={() => navigator.clipboard.writeText(contribution.transaction_hash)}
+                                  className="text-blue-500 hover:text-blue-700 text-xs"
+                                  title="Copy transaction hash"
+                                >
+                                  📋
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                         

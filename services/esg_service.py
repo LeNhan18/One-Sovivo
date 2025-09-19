@@ -174,19 +174,28 @@ class ESGService:
     def create_contribution(program_id, user_id, amount, svt_amount=0):
         """Create a new ESG contribution"""
         try:
+            import uuid
+            import hashlib
+            from services.token_service import TokenService
+            
             with db.engine.connect() as conn:
+                # Generate transaction hash (blockchain simulation)
+                transaction_data = f"{program_id}_{user_id}_{amount}_{svt_amount}_{datetime.now().isoformat()}"
+                transaction_hash = hashlib.sha256(transaction_data.encode()).hexdigest()
+                
                 # Insert contribution
                 insert_query = text("""
                     INSERT INTO esg_contributions 
-                    (program_id, user_id, amount, svt_amount, contribution_date, status, notes)
-                    VALUES (:program_id, :user_id, :amount, :svt_amount, NOW(), 'completed', 'Đóng góp qua SVT')
+                    (program_id, user_id, amount, svt_amount, transaction_hash, contribution_date, status, notes)
+                    VALUES (:program_id, :user_id, :amount, :svt_amount, :transaction_hash, NOW(), 'completed', 'Đóng góp qua platform')
                 """)
                 
                 result = conn.execute(insert_query, {
                     'program_id': program_id,
                     'user_id': user_id,
                     'amount': amount,
-                    'svt_amount': svt_amount
+                    'svt_amount': svt_amount,
+                    'transaction_hash': transaction_hash
                 })
                 
                 contribution_id = result.lastrowid
@@ -203,7 +212,49 @@ class ESGService:
                     'program_id': program_id
                 })
                 
+                # Record SVT token transaction to blockchain if svt_amount > 0
+                if svt_amount > 0:
+                    try:
+                        # Get user's customer info for token transaction
+                        user_query = text("""
+                            SELECT u.customer_id as user_customer_id, c.customer_id as customer_number 
+                            FROM users u 
+                            JOIN customers c ON u.customer_id = c.id 
+                            WHERE u.id = :user_id
+                        """)
+                        user_result = conn.execute(user_query, {'user_id': user_id})
+                        user_row = user_result.fetchone()
+                        
+                        if user_row and user_row._mapping['customer_number']:
+                            customer_number = user_row._mapping['customer_number']
+                            
+                            # Record token transaction to blockchain (using customers.customer_id)
+                            insert_token_tx = text("""
+                                INSERT INTO token_transactions 
+                                (tx_hash, customer_id, transaction_type, amount, description, created_at)
+                                VALUES (:tx_hash, :customer_id, :transaction_type, :amount, :description, NOW())
+                            """)
+                            
+                            conn.execute(insert_token_tx, {
+                                'tx_hash': f"esg_{transaction_hash[:16]}",
+                                'customer_id': customer_number,  # Use customers.customer_id 
+                                'transaction_type': 'esg_contribution_reward',
+                                'amount': svt_amount,
+                                'description': f'ESG contribution reward - Program {program_id} - {amount} VND'
+                            })
+                            
+                            logger.info(f"Recorded {svt_amount} SVT blockchain transaction for customer {customer_number} - ESG contribution {contribution_id}")
+                        else:
+                            logger.warning(f"User {user_id} has no valid customer relationship for token transaction")
+                        
+                    except Exception as token_error:
+                        logger.error(f"Error recording SVT token transaction: {token_error}")
+                        # Continue even if token transaction fails
+                
+                # Commit all changes together
                 conn.commit()
+                
+                logger.info(f"Created ESG contribution {contribution_id} with transaction hash: {transaction_hash}")
                 return contribution_id
                 
         except Exception as e:
