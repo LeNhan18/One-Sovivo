@@ -55,7 +55,7 @@ const CubeIcon = () => (
 )
 
 export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
-  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history' | 'esg'>('home')
+  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history' | 'esg' | 'service'>('home')
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,8 +66,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [showWelcome, setShowWelcome] = useState(true)
   const welcomeRef = useRef<HTMLDivElement>(null)
 
-  // Modal states - Tự thao tác (Buffet style)
-  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
+  // Service page states
   const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
 
   // AI Agent states - Được phục vụ (Waiter style)
@@ -351,15 +350,15 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     }
   ]
 
-  // Service modal handlers
-  const openServiceModal = (serviceType: 'vietjet' | 'hdbank' | 'resort') => {
+  // Service page handlers
+  const openServicePage = (serviceType: 'vietjet' | 'hdbank' | 'resort') => {
     setCurrentService(serviceType)
-    setIsServiceModalOpen(true)
+    setActiveSection('service')
   }
 
-  const closeServiceModal = () => {
-    setIsServiceModalOpen(false)
+  const closeServicePage = () => {
     setCurrentService(null)
+    setActiveSection('home')
   }
 
   if (loading) {
@@ -451,6 +450,16 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           <AIFinancialAssistant />
         </div>
       </div>
+    )
+  }
+
+  if (activeSection === 'service' && currentService) {
+    return (
+      <ServiceModal
+        serviceType={currentService}
+        userData={userData}
+        onBack={closeServicePage}
+      />
     )
   }
 
@@ -915,7 +924,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               unit="chuyến bay"
               color="from-red-500 to-orange-500"
               bgImage="./Image/Vietjet.jpg"
-              onClick={() => openServiceModal('vietjet')}
+              onClick={() => openServicePage('vietjet')}
               subtitle=" Tự thao tác"
             />
             <ModernServiceCard
@@ -926,7 +935,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               isCurrency
               color="from-blue-500 to-cyan-500"
               bgImage="./Image/hdbank.jpg"
-              onClick={() => openServiceModal('hdbank')}
+              onClick={() => openServicePage('hdbank')}
               subtitle=" Tự thao tác"
             />
             <ModernServiceCard
@@ -936,7 +945,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               unit="đêm nghỉ"
               color="from-green-500 to-emerald-500"
               bgImage="./Image/resort.jpg"
-              onClick={() => openServiceModal('resort')}
+              onClick={() => openServicePage('resort')}
               subtitle=" Tự thao tác"
             />
           </div>
@@ -1001,13 +1010,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         </div>
       </main>
 
-      {/* Service Modal - Tự thao tác (Buffet style) */}
-      <ServiceModal
-        isOpen={isServiceModalOpen}
-        onClose={closeServiceModal}
-        serviceType={currentService!}
-        userData={userData}
-      />
 
       {/* AI Agent Modal - Được phục vụ (Waiter style) */}
       {showAIAgent && (
