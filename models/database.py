@@ -15,9 +15,8 @@ bcrypt = Bcrypt()
 
 def get_db_connection():
     """Get a direct database connection for raw SQL queries"""
-    from flask import current_app
     # Use SQLAlchemy's engine to get raw connection
-    return current_app.extensions['sqlalchemy'].db.engine.raw_connection()
+    return db.engine.raw_connection()
 
 def _auto_migrate_hdbank_transactions():
     """Ensure hdbank_transactions table has required columns / enum values."""
