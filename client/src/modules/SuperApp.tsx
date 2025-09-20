@@ -5,6 +5,7 @@ import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
+import ESGPrograms from '../components/ESGPrograms'
 import { ServiceModal } from '../components/ServiceModal'
 import { AIAgent } from '../components/AIAgent'
 import ImageIcon from '../components/ImageIcon'
@@ -54,7 +55,7 @@ const CubeIcon = () => (
 )
 
 export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
-  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history'>('home')
+  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history' | 'esg' | 'service'>('home')
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,8 +66,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [showWelcome, setShowWelcome] = useState(true)
   const welcomeRef = useRef<HTMLDivElement>(null)
 
-  // Modal states - Tự thao tác (Buffet style)
-  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false)
+  // Service page states
   const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
 
   // AI Agent states - Được phục vụ (Waiter style)
@@ -313,42 +313,52 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   }
 
   const quickActions = [
-    { 
-      id: 'wallet', 
-      label: 'Wallet SVT', 
+    {
+      id: 'wallet',
+      label: 'Wallet SVT',
       description: 'Quản lí ví SVT',
       bgImage: './Image/vÍ.jpg',
+      icon: '💰'
     },
-    { 
-      id: 'marketplace', 
-      label: 'Marketplace', 
+    {
+      id: 'marketplace',
+      label: 'Marketplace',
       description: 'Trao đổi',
       bgImage: './Image/CUAHANG.jpg',
+      icon: '🛒'
     },
-    { 
-      id: 'ai-assistant', 
-      label: 'AI Advisor', 
+    {
+      id: 'esg',
+      label: 'ESG Impact',
+      description: 'Đầu tư bền vững',
+      bgImage: './Image/ESG3.jpg',
+      icon: '🌱'
+    },
+    {
+      id: 'ai-assistant',
+      label: 'AI Advisor',
       description: 'Hệ thống AI ',
       bgImage: './Image/AI.jpg',
+      icon: '🤖'
     },
-    { 
-      id: 'history', 
-      label: 'Blockchain', 
+    {
+      id: 'history',
+      label: 'Blockchain',
       description: 'Lịch sử giao dịch',
       bgImage: './Image/blockchain.webp',
       icon: '⛓️'
     }
   ]
 
-  // Service modal handlers
-  const openServiceModal = (serviceType: 'vietjet' | 'hdbank' | 'resort') => {
+  // Service page handlers
+  const openServicePage = (serviceType: 'vietjet' | 'hdbank' | 'resort') => {
     setCurrentService(serviceType)
-    setIsServiceModalOpen(true)
+    setActiveSection('service')
   }
 
-  const closeServiceModal = () => {
-    setIsServiceModalOpen(false)
+  const closeServicePage = () => {
     setCurrentService(null)
+    setActiveSection('home')
   }
 
   if (loading) {
@@ -403,6 +413,26 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     )
   }
 
+  if (activeSection === 'esg') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-gradient-to-r from-emerald-900 to-green-900 backdrop-blur-sm border-b border-green-700">
+          <button
+            onClick={() => setActiveSection('home')}
+            className="text-emerald-400 hover:text-emerald-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">ESG Impact</h1>
+          <div></div>
+        </div>
+        <div className="p-6">
+          <ESGPrograms />
+        </div>
+      </div>
+    )
+  }
+
   if (activeSection === 'ai-assistant') {
     return (
       <div className="text-gray-200 font-sans min-h-screen">
@@ -420,6 +450,16 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           <AIFinancialAssistant />
         </div>
       </div>
+    )
+  }
+
+  if (activeSection === 'service' && currentService) {
+    return (
+      <ServiceModal
+        serviceType={currentService}
+        userData={userData}
+        onBack={closeServicePage}
+      />
     )
   }
 
@@ -728,13 +768,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         <div className="relative group">
           {/* Professional Glow Effect */}
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-slate-600 to-blue-800 rounded-xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity"></div>
-          
+
           <div className="relative bg-gradient-to-br from-slate-800/95 via-blue-900/90 to-slate-700/95 rounded-xl p-8 text-white shadow-2xl transform hover:scale-[1.01] transition-all duration-300 overflow-hidden border border-blue-500/30">
             {/* Sovico Corporate Background */}
             <div className="absolute inset-0 opacity-25">
-              <img 
-                src="./Image/dragon-hill-sovico-holdings-min.jpg" 
-                alt="Sovico Holdings" 
+              <img
+                src="./Image/dragon-hill-sovico-holdings-min.jpg"
+                alt="Sovico Holdings"
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -742,23 +782,23 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               />
               <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-blue-900/80 to-slate-800/85"></div>
             </div>
-            
+
             {/* Corporate Pattern Overlay */}
             <div className="absolute inset-0 opacity-10">
               <div className="absolute top-6 right-6 w-24 h-24 border-2 border-blue-400/40 rounded-lg"></div>
               <div className="absolute bottom-6 left-6 w-20 h-20 border border-slate-400/30 rounded-full"></div>
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/10 rounded-full blur-xl"></div>
             </div>
-            
+
             <div className="relative">
               {/* Sovico Branding Header */}
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <div className="flex items-center space-x-4 mb-4">
                     <div className="w-12 h-12 rounded-lg overflow-hidden border-2 border-blue-400/50 bg-slate-800">
-                      <img 
-                        src="./Image/sovico.jpg" 
-                        alt="Sovico Group" 
+                      <img
+                        src="./Image/sovico.jpg"
+                        alt="Sovico Group"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
@@ -781,7 +821,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 </div>
                 <div className="text-6xl opacity-70">🏢</div>
               </div>
-              
+
               {/* Investment Portfolio Stats */}
               <div className="grid grid-cols-3 gap-4 mb-6 pt-6 border-t border-blue-400/20">
                 <div className="text-center bg-slate-800/60 backdrop-blur-sm rounded-lg p-4 border border-blue-500/30">
@@ -819,8 +859,8 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               >
                 {/* Background Image with Overlay */}
                 <div className="absolute inset-0 opacity-30 group-hover:opacity-40 transition-opacity">
-                  <img 
-                    src={action.bgImage} 
+                  <img
+                    src={action.bgImage}
                     alt={action.label}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -829,26 +869,26 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/60 to-slate-900/30"></div>
                 </div>
-                
+
                 {/* Corporate Glow Effect */}
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600/10 to-slate-600/10 opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
-                
+
                 <div className="relative text-center p-6 h-full flex flex-col justify-center">
                   <div className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300 filter drop-shadow-lg">
                     {action.icon}
                   </div>
                   <h3 className="font-bold text-white text-lg mb-2 drop-shadow-md">{action.label}</h3>
                   <p className="text-slate-300 text-sm leading-relaxed drop-shadow-sm">{action.description}</p>
-                  
+
                   {/* Hover Effect Indicator */}
                   <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="w-8 h-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 mx-auto rounded-full"></div>
                   </div>h
                 </div>
-                
+
                 {/* Professional Shine Effect */}
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-blue-300/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                
+
                 {/* Corner Accent */}
                 <div className="absolute top-3 right-3 w-3 h-3 bg-gradient-to-br from-blue-400/50 to-cyan-400/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
               </div>
@@ -875,47 +915,47 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               {/*</button>*/}
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <ModernServiceCard 
-              icon={<PlaneIcon />} 
-              title="Vietjet Air" 
-              value={userData?.services?.vietjet?.flights} 
+            <ModernServiceCard
+              icon={<PlaneIcon />}
+              title="Vietjet Air"
+              value={userData?.services?.vietjet?.flights}
               unit="chuyến bay"
               color="from-red-500 to-orange-500"
               bgImage="./Image/Vietjet.jpg"
-              onClick={() => openServiceModal('vietjet')}
+              onClick={() => openServicePage('vietjet')}
               subtitle=" Tự thao tác"
             />
-            <ModernServiceCard 
-              icon={<BankIcon />} 
-              title="HDBank" 
-              value={userData?.services?.hdbank?.avg_balance} 
-              unit="đ" 
-              isCurrency 
+            <ModernServiceCard
+              icon={<BankIcon />}
+              title="HDBank"
+              value={userData?.services?.hdbank?.avg_balance}
+              unit="đ"
+              isCurrency
               color="from-blue-500 to-cyan-500"
               bgImage="./Image/hdbank.jpg"
-              onClick={() => openServiceModal('hdbank')}
+              onClick={() => openServicePage('hdbank')}
               subtitle=" Tự thao tác"
             />
-            <ModernServiceCard 
-              icon={<BuildingIcon />} 
-              title="Resort & Spa" 
-              value={userData?.services?.resorts?.nights_stayed} 
+            <ModernServiceCard
+              icon={<BuildingIcon />}
+              title="Resort & Spa"
+              value={userData?.services?.resorts?.nights_stayed}
               unit="đêm nghỉ"
               color="from-green-500 to-emerald-500"
               bgImage="./Image/resort.jpg"
-              onClick={() => openServiceModal('resort')}
+              onClick={() => openServicePage('resort')}
               subtitle=" Tự thao tác"
             />
           </div>
-          
+
           {/* AI Agent CTA Banner with Investment Background */}
           <div className="mt-8 relative overflow-hidden">
             <div className="absolute inset-0">
-              <img 
-                src="./Image/inves1.jpg" 
-                alt="Investment" 
+              <img
+                src="./Image/inves1.jpg"
+                alt="Investment"
                 className="w-full h-full object-cover opacity-40"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -926,7 +966,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
           </div>
         </div>
-        
+
         {/* Enhanced AI Recommendations */}
         {/* Xử lý hệ thong goi y AI */}
         <div>
@@ -935,7 +975,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
               Hệ thống đề xuất model Deep Learning
             </span>
-            <button 
+            <button
               onClick={() => setActiveSection('ai-assistant')}
               className="ml-auto text-sm bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-4 py-2 rounded-xl font-medium transition-all duration-300 transform hover:scale-105"
             >
@@ -953,7 +993,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         <div>
           <h2 className="text-xl font-bold mb-4 text-white flex items-center space-x-2">
             <span>Hoạt động SVT gần đây</span>
-            <button 
+            <button
               onClick={() => setActiveSection('history')}
               className="ml-auto text-sm bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded-lg"
             >
@@ -970,13 +1010,6 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
         </div>
       </main>
 
-      {/* Service Modal - Tự thao tác (Buffet style) */}
-      <ServiceModal
-        isOpen={isServiceModalOpen}
-        onClose={closeServiceModal}
-        serviceType={currentService!}
-        userData={userData}
-      />
 
       {/* AI Agent Modal - Được phục vụ (Waiter style) */}
       {showAIAgent && (
@@ -995,10 +1028,10 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 ×
               </button>
             </div>
-            
+
             {/* AI Agent Content */}
             <div className="flex-1 overflow-hidden">
-              <AIAgent 
+              <AIAgent
                 userData={userData}
                 onServiceAction={async (service, action, params) => {
                   // Handle service actions through API
@@ -1027,7 +1060,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
                   const result = await response.json()
                   if (!result.success) throw new Error(result.message)
-                  
+
                   return result
                 }}
               />
@@ -1052,7 +1085,7 @@ type ServiceCardProps = {
 }
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ icon, title, value, unit, isCurrency = false, color = "text-gray-400", onClick, subtitle }) => (
-  <div 
+  <div
     className="bg-[#161B22] border border-gray-700 rounded-lg p-4 flex items-center cursor-pointer hover:border-blue-500 hover:bg-blue-900/20 transition-all relative"
     onClick={onClick}
   >
@@ -1087,18 +1120,18 @@ type ModernServiceCardProps = {
   subtitle?: string
 }
 
-const ModernServiceCard: React.FC<ModernServiceCardProps> = ({ 
-  icon, title, value, unit, isCurrency = false, color, bgImage, onClick, subtitle 
+const ModernServiceCard: React.FC<ModernServiceCardProps> = ({
+  icon, title, value, unit, isCurrency = false, color, bgImage, onClick, subtitle
 }) => (
-  <div 
+  <div
     className="group relative bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl overflow-hidden cursor-pointer hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl"
     onClick={onClick}
   >
     {/* Background Image with Overlay */}
     {bgImage && (
       <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
-        <img 
-          src={bgImage} 
+        <img
+          src={bgImage}
           alt={title}
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -1108,10 +1141,10 @@ const ModernServiceCard: React.FC<ModernServiceCardProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
       </div>
     )}
-    
+
     {/* Glow Effect */}
     <div className={`absolute inset-0 rounded-2xl bg-gradient-to-r ${color} opacity-0 group-hover:opacity-20 transition-opacity blur-xl`}></div>
-    
+
     <div className="relative p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -1124,7 +1157,7 @@ const ModernServiceCard: React.FC<ModernServiceCardProps> = ({
           </span>
         )}
       </div>
-      
+
       {/* Content */}
       <div className="space-y-2">
         <h3 className="text-white font-bold text-lg">{title}</h3>
@@ -1137,7 +1170,7 @@ const ModernServiceCard: React.FC<ModernServiceCardProps> = ({
           </span>
         </div>
       </div>
-      
+
       {/* Action Indicator */}
       <div className="mt-4 flex items-center text-blue-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
         <span>Xem chi tiết</span>
@@ -1159,9 +1192,9 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ title, descript
   <div className="group relative bg-gradient-to-r from-gray-800/60 to-blue-900/40 backdrop-blur-sm border border-blue-500/30 rounded-2xl overflow-hidden transition-all duration-300 hover:border-blue-400/50 hover:shadow-xl transform hover:scale-[1.02]">
     {/* Vietnam Background */}
     <div className="absolute inset-0 opacity-20">
-      <img 
-        src="./Image/VietNam.jpg" 
-        alt="Vietnam" 
+      <img
+        src="./Image/VietNam.jpg"
+        alt="Vietnam"
         className="w-full h-full object-cover"
         onError={(e) => {
           e.currentTarget.style.display = 'none';
@@ -1169,10 +1202,10 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({ title, descript
       />
       <div className="absolute inset-0 bg-gradient-to-r from-blue-900/60 to-purple-900/60"></div>
     </div>
-    
+
     {/* Glow Effect */}
     <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-600/20 opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
-    
+
     <div className="relative p-6 flex justify-between items-center">
       <div className="flex-1">
         <div className="flex items-center space-x-3 mb-3">

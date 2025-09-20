@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 interface HDBankCardProps {
   customerId: number;
   onSuccess?: () => void;
+  onBack?: () => void;
 }
 
 interface CardInfo {
@@ -53,7 +54,7 @@ const BankIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   </svg>
 );
 
-const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
+const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess, onBack }) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -234,7 +235,49 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
   }
 
   return (
-    <div className="bg-gradient-to-br from-[#0B1426] via-[#1A2332] to-[#161B22] rounded-2xl border border-blue-500/20 shadow-2xl overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background Image */}
+      <div className="absolute inset-0 z-0">
+        <img 
+          src="/static/images/esg/hdbank.jpg" 
+          alt="HDBank Background" 
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-slate-800/75 to-slate-900/85"></div>
+      </div>
+      
+      {/* Page Header */}
+      <div className="relative z-10 bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  🏦
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">HDBank</h1>
+                  <p className="text-slate-400">Digital Banking</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-gradient-to-br from-[#0B1426]/90 via-[#1A2332]/90 to-[#161B22]/90 backdrop-blur-sm rounded-2xl border border-blue-500/20 shadow-2xl overflow-hidden">
       {/* Modern Header with HDBank Branding */}
       <div className="relative bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 p-6">
         {/* Background Pattern */}
@@ -468,6 +511,8 @@ const HDBankCard: React.FC<HDBankCardProps> = ({ customerId, onSuccess }) => {
           )}
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -3,17 +3,15 @@ import HDBankCard from './HDBankCard'
 import VietjetBooking from './VietjetBooking'
 
 interface ServiceModalProps {
-  isOpen: boolean
-  onClose: () => void
   serviceType: 'vietjet' | 'hdbank' | 'resort'
   userData?: any
+  onBack?: () => void
 }
 
 export const ServiceModal: React.FC<ServiceModalProps> = ({ 
-  isOpen, 
-  onClose, 
   serviceType, 
-  userData 
+  userData,
+  onBack
 }) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [formData, setFormData] = useState({
@@ -24,7 +22,6 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     spaType: 'massage'
   })
 
-  if (!isOpen) return null
 
   const handleServiceAction = async (actionType: string) => {
     setIsProcessing(true)
@@ -89,6 +86,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             onSuccess={() => {
               console.log('Vietjet booking completed successfully');
             }}
+            onBack={onBack}
           />
         )
 
@@ -100,95 +98,157 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             customerId={userData?.customerId || 1001}
             onSuccess={() => {
               console.log('HDBank service completed successfully');
-              // Đóng modal sau khi mở thẻ thành công
-              setTimeout(() => {
-                onClose();
-              }, 2000); // Đợi 2 giây để user thấy thông báo thành công
             }}
+            onBack={onBack}
           />
         )
 
       case 'resort':
         return (
-          <div className="space-y-4">
-            <div className="text-center">
-              <div className="text-6xl mb-4">🏨</div>
-              <h3 className="text-2xl font-bold text-white mb-2">Resort & Spa</h3>
-              <p className="text-gray-300">Đặt phòng và dịch vụ spa</p>
+          <div className="min-h-screen relative overflow-hidden">
+            {/* Background Image */}
+            <div className="absolute inset-0 z-0">
+              <img 
+                src="/static/images/esg/resort.jpg" 
+                alt="Resort Background" 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/70 to-slate-900/80"></div>
             </div>
             
-            <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">{userData?.services?.resorts?.nights_stayed || 0}</div>
-                <div className="text-green-200 text-sm">Đêm nghỉ năm nay</div>
+            {/* Page Header */}
+            <div className="relative z-10 bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-16">
+                  <div className="flex items-center gap-4">
+                    {onBack && (
+                      <button
+                        onClick={onBack}
+                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                        🏨
+                      </div>
+                      <div>
+                        <h1 className="text-2xl font-bold text-white">Resort & Spa</h1>
+                        <p className="text-slate-400">Đặt phòng và dịch vụ spa</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Resort Forms */}
-            <div className="space-y-4">
-              {/* Room Booking Form */}
-              <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
-                <h4 className="text-white font-medium mb-3">🏨 Đặt phòng Resort</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Loại phòng</label>
-                    <select 
-                      value={formData.roomType}
-                      onChange={(e) => setFormData({...formData, roomType: e.target.value})}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-blue-500"
-                    >
-                      <option value="standard">Standard Room</option>
-                      <option value="deluxe">Deluxe Room</option>
-                      <option value="suite">Suite Room</option>
-                    </select>
+            {/* Main Content */}
+            <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="space-y-6">
+                {/* Stats Card */}
+                <div className="bg-green-900/40 backdrop-blur-sm border border-green-700 rounded-lg p-6 shadow-xl">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-white mb-2">{userData?.services?.resorts?.nights_stayed || 0}</div>
+                    <div className="text-green-200 text-lg">Đêm nghỉ năm nay</div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Số đêm</label>
-                    <select 
-                      value={formData.nights}
-                      onChange={(e) => setFormData({...formData, nights: e.target.value})}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-blue-500"
-                    >
-                      <option value="1">1 đêm</option>
-                      <option value="2">2 đêm</option>
-                      <option value="3">3 đêm</option>
-                      <option value="7">1 tuần</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => handleServiceAction('book_room')}
-                    disabled={isProcessing}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    {isProcessing ? '⏳ Đang đặt...' : '🏨 Đặt phòng ngay'}
-                  </button>
                 </div>
-              </div>
 
-              {/* Spa Booking Form */}
-              <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
-                <h4 className="text-white font-medium mb-3">💆 Đặt dịch vụ Spa</h4>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Loại dịch vụ</label>
-                    <select 
-                      value={formData.spaType}
-                      onChange={(e) => setFormData({...formData, spaType: e.target.value})}
-                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-blue-500"
-                    >
-                      <option value="massage">Massage thư giãn</option>
-                      <option value="facial">Chăm sóc da mặt</option>
-                      <option value="body">Tắm bùn thải độc</option>
-                      <option value="combo">Combo VIP</option>
-                    </select>
+                {/* Resort Forms */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Room Booking Form */}
+                  <div className="bg-slate-800/60 backdrop-blur-sm rounded-lg p-6 border border-slate-700 shadow-xl hover:shadow-2xl transition-all duration-300">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                      <span className="mr-2">🏨</span>
+                      Đặt phòng Resort
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-3">Loại phòng</label>
+                        <select 
+                          value={formData.roomType}
+                          onChange={(e) => setFormData({...formData, roomType: e.target.value})}
+                          className="w-full p-4 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 text-lg"
+                        >
+                          <option value="standard">Standard Room</option>
+                          <option value="deluxe">Deluxe Room</option>
+                          <option value="suite">Suite Room</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-3">Số đêm</label>
+                        <select 
+                          value={formData.nights}
+                          onChange={(e) => setFormData({...formData, nights: e.target.value})}
+                          className="w-full p-4 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-green-500 text-lg"
+                        >
+                          <option value="1">1 đêm</option>
+                          <option value="2">2 đêm</option>
+                          <option value="3">3 đêm</option>
+                          <option value="7">1 tuần</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => handleServiceAction('book_room')}
+                        disabled={isProcessing}
+                        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-3 text-lg shadow-lg hover:shadow-green-500/25 transform hover:scale-105 disabled:transform-none"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Đang đặt...
+                          </>
+                        ) : (
+                          <>
+                            <span>🏨</span>
+                            <span>Đặt phòng ngay</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleServiceAction('book_spa')}
-                    disabled={isProcessing}
-                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    {isProcessing ? '⏳ Đang đặt...' : '💆 Đặt lịch Spa'}
-                  </button>
+
+                  {/* Spa Booking Form */}
+                  <div className="bg-slate-800/60 backdrop-blur-sm rounded-lg p-6 border border-slate-700 shadow-xl hover:shadow-2xl transition-all duration-300">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                      <span className="mr-2">💆</span>
+                      Đặt dịch vụ Spa
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-3">Loại dịch vụ</label>
+                        <select 
+                          value={formData.spaType}
+                          onChange={(e) => setFormData({...formData, spaType: e.target.value})}
+                          className="w-full p-4 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 text-lg"
+                        >
+                          <option value="massage">Massage thư giãn</option>
+                          <option value="facial">Chăm sóc da mặt</option>
+                          <option value="body">Tắm bùn thải độc</option>
+                          <option value="combo">Combo VIP</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => handleServiceAction('book_spa')}
+                        disabled={isProcessing}
+                        className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-3 text-lg shadow-lg hover:shadow-purple-500/25 transform hover:scale-105 disabled:transform-none"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Đang đặt...
+                          </>
+                        ) : (
+                          <>
+                            <span>💆</span>
+                            <span>Đặt lịch Spa</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -200,25 +260,5 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0D1117] rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-700">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white">
-            {serviceType === 'vietjet' && '✈️ Vietjet'}
-            {serviceType === 'hdbank' && '🏦 HDBank'}
-            {serviceType === 'resort' && '🏨 Resort & Spa'}
-          </h2>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl font-bold"
-          >
-            ×
-          </button>
-        </div>
-        
-        {renderServiceContent()}
-      </div>
-    </div>
-  )
+  return renderServiceContent()
 }

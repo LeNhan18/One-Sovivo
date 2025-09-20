@@ -193,6 +193,11 @@ def initialize_route_services(app):
 def register_static_routes(app):
     """Register static file routes"""
 
+    @app.route('/static/<path:filename>')
+    def serve_static_files(filename):
+        """Serve static files (images, CSS, JS, etc.)"""
+        return send_from_directory('static', filename)
+
     @app.route('/admin/achievements')
     def admin_achievements_page():
         """Serve admin achievements HTML page"""

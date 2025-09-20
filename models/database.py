@@ -66,7 +66,10 @@ def init_db(app):
             db.create_all()
             # Apply automatic migrations
             _auto_migrate_hdbank_transactions()
-            print(" Database tables created successfully")
+            # Run database migrations
+            from migrations import run_migrations
+            run_migrations()
+            print("✅ Database tables created successfully")
 
             # Create default achievements if they don't exist
             from models.achievements import create_default_achievements
