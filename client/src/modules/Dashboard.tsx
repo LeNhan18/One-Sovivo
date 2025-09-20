@@ -7,6 +7,7 @@ import { AIInsights } from '../parts/AIInsights'
 import { ActionsPanel } from '../parts/ActionsPanel'
 import { ModelMetrics } from '../parts/ModelMetrics'
 import BlockchainDashboard from '../components/BlockchainDashboard'
+import AdminChatMonitor from '../components/AdminChatMonitor'
 
 export type CustomerBasic = {
   customer_id: number
@@ -47,7 +48,7 @@ export const Dashboard: React.FC = () => {
   const [insight, setInsight] = useState<Insight | null>(null)
   const [loading, setLoading] = useState(false)
   const [showMetrics, setShowMetrics] = useState(false)
-  const [activeTab, setActiveTab] = useState<'analysis' | 'blockchain'>('analysis')
+  const [activeTab, setActiveTab] = useState<'analysis' | 'blockchain' | 'chat_monitor'>('analysis')
 
   useEffect(() => {
     if (!selectedId) return
@@ -135,6 +136,16 @@ export const Dashboard: React.FC = () => {
             >
               🔗 Blockchain Achievements
             </button>
+            <button
+              onClick={() => setActiveTab('chat_monitor')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'chat_monitor'
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+              }`}
+            >
+              💬 Chat Monitor
+            </button>
           </nav>
         </div>
       </div>
@@ -147,6 +158,8 @@ export const Dashboard: React.FC = () => {
             customerId={selectedId || undefined} 
             onBackToAnalysis={() => setActiveTab('analysis')}
           />
+        ) : activeTab === 'chat_monitor' ? (
+          <AdminChatMonitor />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Column 1: Search & Suggestions */}

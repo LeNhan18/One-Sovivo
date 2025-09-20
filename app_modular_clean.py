@@ -491,6 +491,14 @@ def init_app_data():
             raise e
 
 
+# Sửa tên blueprint để tránh xung đột
+from routes.admin_chat_routes import admin_chat_bp
+
+# Register the blueprint with the Flask app
+app.register_blueprint(admin_chat_bp, name="admin_chat_unique")
+print("✅ Admin Chat routes registered")
+
+
 if __name__ == '__main__':
     print("=" * 80)
     print(" One-Sovico Platform - Modular Architecture")

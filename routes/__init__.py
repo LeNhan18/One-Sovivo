@@ -31,6 +31,12 @@ except ImportError:
     AI_CHAT_AVAILABLE = False
 
 try:
+    from .admin_chat_routes import admin_chat_bp
+    ADMIN_CHAT_AVAILABLE = True
+except ImportError:
+    ADMIN_CHAT_AVAILABLE = False
+
+try:
     from .esg_routes import esg_bp
     ESG_AVAILABLE = True
 except ImportError:
@@ -76,6 +82,10 @@ def register_blueprints(app):
     if AI_CHAT_AVAILABLE:
         app.register_blueprint(ai_chat_bp)
         print("✅ AI Chat routes registered")
+    
+    if ADMIN_CHAT_AVAILABLE:
+        app.register_blueprint(admin_chat_bp)
+        print("✅ Admin Chat routes registered")
     
     if ESG_AVAILABLE:
         app.register_blueprint(esg_bp)
