@@ -6,7 +6,7 @@
 
 One-Sovico Platform bao gồm 2 ứng dụng chính:
 
-### 1. 🧠 AI Insight Dashboard (Dành cho Chuyên viên/BGK)
+### 1. 🧠 AI Insight Dashboard (Dành cho Chuyên viên)
 - **Mục đích**: Phòng điều khiển phân tích khách hàng với AI
 
 - **Đối tượng**: Ban Giám khảo, chuyên viên HDBank
