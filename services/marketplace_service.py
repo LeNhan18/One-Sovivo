@@ -75,7 +75,7 @@ class MarketplaceService:
                 db.session.flush()  # Flush để đảm bảo transaction được tạo trước khi commit
 
             except Exception as tx_error:
-                print(f"❌ Error creating transaction: {tx_error}")
+                print(f" Error creating transaction: {tx_error}")
                 db.session.rollback()
                 return {'success': False, 'error': 'Failed to process payment'}
             

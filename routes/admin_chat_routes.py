@@ -3,10 +3,11 @@ from models.database import get_db_connection
 import json
 import uuid
 from datetime import datetime
+import pymysql
 
 admin_chat_bp = Blueprint('admin_chat', __name__)
 
-@admin_chat_bp.route('/api/admin/chats', methods=['GET'])
+@admin_chat_bp.route('/admin/chats', methods=['GET'])
 def get_all_chats():
     """Lấy tất cả cuộc chat cho admin"""
     try:
@@ -88,7 +89,7 @@ def get_all_chats():
             'message': f'Lỗi lấy danh sách chat: {str(e)}'
         }), 500
 
-@admin_chat_bp.route('/api/admin/chat/<chat_id>', methods=['GET'])
+@admin_chat_bp.route('/admin/chat/<chat_id>', methods=['GET'])
 def get_chat_detail(chat_id):
     """Lấy chi tiết cuộc chat cho admin"""
     try:
@@ -166,7 +167,7 @@ def get_chat_detail(chat_id):
             'message': f'Lỗi lấy chi tiết chat: {str(e)}'
         }), 500
 
-@admin_chat_bp.route('/api/admin/chat/<chat_id>/intervene', methods=['POST'])
+@admin_chat_bp.route('/admin/chat/<chat_id>/intervene', methods=['POST'])
 def intervene_chat(chat_id):
     """Can thiệp vào cuộc chat"""
     try:
@@ -185,27 +186,60 @@ def intervene_chat(chat_id):
         
         # Insert admin intervention message
         message_id = str(uuid.uuid4())[:8] + "_admin"
-        cursor.execute("""
-            INSERT INTO ai_chat_messages 
-            (id, chat_id, message_type, content, timestamp, is_intervention, admin_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            message_id,
-            chat_id, 
-            'admin_intervention',
-            admin_message,
-            datetime.now(),
-            True,
-            admin_id
-        ))
+        message_type = 'admin_intervention'  # Giá trị cần kiểm tra
+        
+        # Kiểm tra độ dài của message_type
+        max_length = 50  # Thay đổi giá trị này theo độ dài tối đa của cột trong cơ sở dữ liệu
+        if len(message_type) > max_length:
+            return jsonify({
+                'success': False,
+                'message': f'Loại tin nhắn vượt quá độ dài cho phép ({max_length} ký tự)'
+            }), 400
+        
+        try:
+            cursor.execute("""
+                INSERT INTO ai_chat_messages 
+                (id, chat_id, message_type, content, timestamp, is_intervention, admin_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                message_id,
+                chat_id, 
+                message_type,
+                admin_message,
+                datetime.now(),
+                True,
+                admin_id
+            ))
+        except pymysql.err.DataError as data_error:
+            conn.rollback()
+            print(f"ERROR: Lỗi khi chèn dữ liệu: {str(data_error)}")
+            return jsonify({
+                'success': False,
+                'message': f'Lỗi khi chèn dữ liệu: {str(data_error)}'
+            }), 500
+        except Exception as insert_error:
+            conn.rollback()
+            print(f"ERROR: Lỗi không xác định khi chèn dữ liệu: {str(insert_error)}")
+            return jsonify({
+                'success': False,
+                'message': f'Lỗi không xác định khi chèn dữ liệu: {str(insert_error)}'
+            }), 500
         
         # Update chat status
-        cursor.execute("""
-            UPDATE ai_chat_history 
-            SET needs_intervention = FALSE, updated_at = CURRENT_TIMESTAMP,
-                last_message_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (chat_id,))
+        try:
+            cursor.execute("""
+                UPDATE ai_chat_history 
+                SET needs_intervention = FALSE, updated_at = CURRENT_TIMESTAMP,
+                    last_message_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (chat_id,))
+        except Exception as update_error:
+            conn.rollback()
+            print(f"ERROR: Lỗi khi cập nhật trạng thái chat: {str(update_error)}")
+            return jsonify({
+                'success': False,
+                'message': f'Lỗi khi cập nhật trạng thái chat: {str(update_error)}'
+            }), 500
         
         conn.commit()
         cursor.close()
@@ -220,12 +254,13 @@ def intervene_chat(chat_id):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        print(f"ERROR: Lỗi can thiệp: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Lỗi can thiệp: {str(e)}'
         }), 500
 
-@admin_chat_bp.route('/api/admin/chat/<chat_id>/flag', methods=['POST'])
+@admin_chat_bp.route('/admin/chat/<chat_id>/flag', methods=['POST'])
 def flag_chat_for_intervention(chat_id):
     """Đánh dấu chat cần can thiệp"""
     try:
@@ -266,7 +301,7 @@ def flag_chat_for_intervention(chat_id):
             'message': f'Lỗi đánh dấu: {str(e)}'
         }), 500
 
-@admin_chat_bp.route('/api/admin/chat/stats', methods=['GET'])
+@admin_chat_bp.route('/admin/chat/stats', methods=['GET'])
 def get_chat_stats():
     """Thống kê chat cho admin"""
     try:
@@ -279,11 +314,11 @@ def get_chat_stats():
                 COUNT(*) as total_chats,
                 COUNT(CASE WHEN needs_intervention = TRUE THEN 1 END) as needs_intervention,
                 COUNT(CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 END) as today_chats,
-                AVG(
-                    SELECT COUNT(*) 
-                    FROM ai_chat_messages m 
-                    WHERE m.chat_id = h.id
-                ) as avg_messages_per_chat
+                (SELECT AVG(message_count) FROM (
+                    SELECT COUNT(*) as message_count
+                    FROM ai_chat_messages
+                    GROUP BY chat_id
+                ) as subquery) as avg_messages_per_chat
             FROM ai_chat_history h
             WHERE is_active = TRUE
         """)

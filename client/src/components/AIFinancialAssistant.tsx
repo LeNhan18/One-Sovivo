@@ -1402,7 +1402,7 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
     } catch (error: any) {
       console.error('Error generating AI response:', error);
       
-      let errorMessage = '❌ **Xin lỗi, AI gặp sự cố**\n\n';
+      let errorMessage = ' **Xin lỗi, AI gặp sự cố**\n\n';
       
       if (error.message && error.message.includes('GoogleGenerativeAI')) {
         errorMessage += '🔧 **Vấn đề Gemini AI:**\n';

@@ -235,21 +235,19 @@ const AdminChatMonitor: React.FC = () => {
                 {loading ? (
                   <div className="p-4 text-center text-gray-500">Đang tải...</div>
                 ) : chats.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">Không có chat nào</div>
+                  <div className="p-4 text-center text-black-500">Không có chat nào</div>
                 ) : (
                   chats.map((chat) => (
                     <div
                       key={chat.id}
                       onClick={() => loadChatDetail(chat.id)}
-                      className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                      className={`p-4 border-b cursor-pointer hover:bg-black-50 ${
                         selectedChat?.id === chat.id ? 'bg-blue-50 border-blue-200' : ''
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
-                          <h3 className="font-medium text-sm truncate">
-                            {chat.customer_name || 'Khách hàng'}
-                          </h3>
+                          <div className="text-black">{chat.customer_name || 'Khách hàng'}</div>
                           {chat.needs_intervention && (
                             <span className="text-orange-500">⚠️</span>
                           )}
@@ -259,11 +257,11 @@ const AdminChatMonitor: React.FC = () => {
                         </span>
                       </div>
                       
-                      <p className="text-xs text-gray-600 truncate mb-1">
+                      <p className="text-xs text-black truncate mb-1">
                         {chat.title || 'Cuộc chat'}
                       </p>
                       
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-black">
                         {formatTime(chat.updated_at)}
                       </div>
                     </div>
@@ -332,17 +330,17 @@ const AdminChatMonitor: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-black-500">
                           {formatTime(message.timestamp)}
                         </span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <div className="text-black">{message.content}</div>
                     </div>
                   ))}
                 </div>
 
                 {/* Intervention Input */}
-                <div className="p-4 border-t bg-gray-50">
+                <div className="p-4 border-t bg-black-50">
                   <div className="flex space-x-3">
                     <div className="flex-1">
                       <textarea
@@ -362,7 +360,7 @@ const AdminChatMonitor: React.FC = () => {
                       <span>Can thiệp</span>
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-black-500 mt-2">
                     Tin nhắn can thiệp sẽ được gửi cho khách hàng và AI sẽ ngừng trả lời tự động.
                   </p>
                 </div>
@@ -373,7 +371,7 @@ const AdminChatMonitor: React.FC = () => {
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   Chọn cuộc chat để xem chi tiết
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-black-600">
                   Chọn một cuộc chat từ danh sách bên trái để theo dõi và can thiệp khi cần.
                 </p>
               </div>

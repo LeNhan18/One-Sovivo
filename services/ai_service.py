@@ -64,8 +64,8 @@ class AIService:
             def predict(self, X):
                 results = []
                 for row in X:
-                    # Logic đơn giản dựa trên features
-                    if row[1] > 200000000:  # avg_balance > 200M
+                    # Improved logic for 'doanh_nhan'
+                    if row[1] > 200000000 and row[2] >= 5 and row[3] == 1:  # avg_balance > 200M, total_flights >= 5, is_business_flyer
                         results.append([0.8, 0.1, 0.1])  # doanh_nhan
                     elif row[0] < 30:  # age < 30
                         results.append([0.1, 0.1, 0.8])  # nguoi_tre
@@ -91,17 +91,36 @@ class AIService:
             return None, 'AI model chưa được tải'
 
         try:
+            # Tăng cường dữ liệu đầu vào với kiểm tra chia cho 0
+            input_data['resort_spending_ratio'] = (
+                input_data['total_resort_spending'] / input_data['avg_balance']
+                if input_data['avg_balance'] > 0 else 0
+            )
+            input_data['business_flight_ratio'] = (
+                input_data['is_business_flyer_int'] / input_data['total_flights']
+                if input_data['total_flights'] > 0 else 0
+            )
+            input_data['monthly_income'] = input_data.get('monthly_income', 0)
+            input_data['total_transactions'] = input_data.get('total_transactions', 0)
+            input_data['premium_service_usage'] = input_data.get('premium_service_usage', 0)
+
             # Chuẩn bị input
             input_df = pd.DataFrame([input_data])[self.feature_columns]
+            print("Dữ liệu đầu vào sau khi tăng cường:", input_df)
+
             input_scaled = self.scaler.transform(input_df)
+            print("Dữ liệu sau khi chuẩn hóa:", input_scaled)
 
             # Dự đoán
             predictions = self.ai_model.predict(input_scaled)
+            print("Kết quả dự đoán:", predictions)
+
             predicted_class = np.argmax(predictions[0])
             persona_names = ['doanh_nhan', 'gia_dinh', 'nguoi_tre']
             predicted_persona = persona_names[predicted_class]
             confidence = float(predictions[0][predicted_class])
 
+            print("Persona dự đoán:", predicted_persona, "Độ tin cậy:", confidence)
             return predicted_persona, None
         except Exception as e:
             return None, f'Lỗi dự đoán: {str(e)}'
@@ -191,29 +210,53 @@ class AIService:
         """Tạo đề xuất dựa trên persona được dự đoán."""
         recommendations = []
 
+        # Gợi ý cho khách hàng mới hoàn toàn
+        if input_data.get('total_transactions', 0) == 0 and input_data.get('total_flights', 0) == 0:
+            recommendations.append({
+                'offer_code': 'NEW001',
+                'title': 'Mở thẻ HDBank Visa Classic',
+                'description': 'Ưu đãi mở thẻ tín dụng lần đầu với hoàn tiền 5% cho giao dịch đầu tiên.'
+            })
+            recommendations.append({
+                'offer_code': 'NEW002',
+                'title': 'Đặt chuyến bay đầu tiên',
+                'description': 'Giảm giá 20% cho chuyến bay đầu tiên khi đặt qua HDBank App.'
+            })
+            return recommendations
+
+        # Gợi ý theo persona
         if predicted_persona == 'doanh_nhan':
             recommendations.append({
                 'offer_code': 'DN001',
                 'title': 'Mở thẻ HDBank Visa Signature',
                 'description': 'Tận hưởng đặc quyền phòng chờ sân bay và các ưu đãi golf cao cấp.'
             })
-            if input_data.get('total_resort_spending', 0) > 20_000_000:
-                recommendations.append({
-                    'offer_code': 'DN002',
-                    'title': 'Gói Nghỉ Dưỡng VIP',
-                    'description': 'Ưu đãi đặc biệt cho khách hàng thường xuyên sử dụng dịch vụ resort.'
-                })
+            recommendations.append({
+                'offer_code': 'DN002',
+                'title': 'Gói Nghỉ Dưỡng VIP',
+                'description': 'Ưu đãi đặc biệt cho khách hàng thường xuyên sử dụng dịch vụ resort.'
+            })
         elif predicted_persona == 'gia_dinh':
             recommendations.append({
                 'offer_code': 'GD001',
                 'title': 'Combo Du lịch Hè Vietjet',
                 'description': 'Giảm giá 30% cho cả gia đình khi đặt vé máy bay và khách sạn qua HDBank App.'
             })
+            recommendations.append({
+                'offer_code': 'GD002',
+                'title': 'Ưu đãi Mua sắm Gia đình',
+                'description': 'Hoàn tiền 10% khi mua sắm tại các siêu thị và trung tâm thương mại.'
+            })
         elif predicted_persona == 'nguoi_tre':
             recommendations.append({
                 'offer_code': 'NT001',
-                'title': 'Mở thẻ tín dụng đầu tiên',
-                'description': 'Bắt đầu xây dựng lịch sử tín dụng của bạn với thẻ HDBank Vietjet Platinum.'
+                'title': 'Thẻ Tín Dụng HDBank GenZ',
+                'description': 'Ưu đãi hoàn tiền 5% khi mua sắm online và đặt vé xem phim.'
+            })
+            recommendations.append({
+                'offer_code': 'NT002',
+                'title': 'Gói Du lịch Phượt Trẻ',
+                'description': 'Giảm giá 20% cho các tour du lịch khám phá.'
             })
 
         return recommendations
