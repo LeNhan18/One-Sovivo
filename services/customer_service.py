@@ -33,9 +33,14 @@ class CustomerService:
         if hdbank_transactions:
             balances = [float(t.balance) for t in hdbank_transactions]
             amounts = [float(t.amount) for t in hdbank_transactions]
+            # Sắp xếp theo thời gian để lấy balance cuối cùng
+            sorted_transactions = sorted(hdbank_transactions, key=lambda x: x.transaction_date)
+            current_balance = float(sorted_transactions[-1].balance) if sorted_transactions else 0
+            
             hdbank_summary = {
                 'total_transactions': len(hdbank_transactions),
-                'average_balance': sum(balances) / len(balances),
+                'current_balance': current_balance,  # Số dư hiện tại
+                'average_balance': sum(balances) / len(balances),  # Số dư trung bình
                 'total_credit_last_3m': sum(
                     float(t.amount) for t in hdbank_transactions if t.transaction_type == 'credit'),
                 'total_debit_last_3m': sum(

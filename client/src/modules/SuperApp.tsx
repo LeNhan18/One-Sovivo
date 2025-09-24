@@ -60,6 +60,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history' | 'esg' | 'service'>('home')
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
+  const [insights, setInsights] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [achievementsCount, setAchievementsCount] = useState(0)
@@ -223,9 +224,14 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           }
 
           // Lấy recommendations từ AI
-          const aiResponse = await fetch(`http://127.0.0.1:5000/customer/${customerId}/insights`)
+          const aiResponse = await fetch(`http://127.0.0.1:5000/customer/${customerId}/insights`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+            }
+          })
           if (aiResponse.ok) {
             const aiData = await aiResponse.json()
+            setInsights(aiData)
             setRecommendations(aiData.recommendations || [])
           }
 
@@ -788,15 +794,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 </div>
               </div>
 
-              {/* Current HDBank Balance */}
-              <div className="bg-gradient-to-r from-emerald-900/50 to-green-900/40 backdrop-blur-sm border border-emerald-400/30 rounded-lg px-6 py-4">
-                <div className="text-center">
-                  <div className="text-xs text-emerald-300 mb-1">Số dư HDBank</div>
-                  <div className="text-white font-bold text-lg">
-                    {(userData?.services?.hdbank?.balance || 0).toLocaleString('vi-VN')} VND
-                  </div>
-                </div>
-              </div>
+        
 
               {/* Logout Button */}
               <button
@@ -1042,10 +1040,34 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
               Chat với AI
             </button>
           </h2>
+          {/* Persona badge + evidence */}
+          {insights && (insights.success !== false) && (
+            <div className="mb-4 flex items-center gap-4">
+              {insights.predicted_persona && (
+                <span className="px-3 py-1 rounded-full text-xs bg-blue-700/40 border border-blue-500/40 text-blue-200">
+                  Persona: {insights.predicted_persona}
+                </span>
+              )}
+              {typeof insights.confidence === 'number' && (
+                <span className="px-3 py-1 rounded-full text-xs bg-emerald-700/40 border border-emerald-500/40 text-emerald-200">
+                  Độ tin cậy: {(insights.confidence * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          )}
+
+          {insights && insights.error && (
+            <div className="mb-4 text-sm text-red-400">{insights.error}</div>
+          )}
+
           <div className="space-y-4">
-            {recommendations.map((rec, index) => (
-              <RecommendationCard key={rec.offer_code || index} {...rec} />
-            ))}
+            {recommendations && recommendations.length > 0 ? (
+              recommendations.map((rec, index) => (
+                <RecommendationCard key={rec.offer_code || index} {...rec} />
+              ))
+            ) : (
+              <div className="text-sm text-gray-400">Chưa có gợi ý phù hợp. Hãy thực hiện vài hành động (giao dịch, bay, đặt phòng) để AI hiểu bạn hơn.</div>
+            )}
           </div>
         </div>
 
