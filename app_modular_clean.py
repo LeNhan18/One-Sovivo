@@ -233,6 +233,15 @@ def register_utility_routes(app):
             ai_status = 'loaded' if ai_service.is_model_loaded() else 'not_loaded'
         except Exception:
             ai_status = 'not_available'
+        
+        # Check Sentiment Analysis service
+        sentiment_status = 'unknown'
+        try:
+            from services.sentiment_service import get_sentiment_analyzer
+            analyzer = get_sentiment_analyzer()
+            sentiment_status = 'loaded' if len(analyzer.models) > 0 or analyzer.lstm_model else 'not_loaded'
+        except Exception:
+            sentiment_status = 'not_available'
 
         return jsonify({
             'status': 'healthy',
@@ -240,6 +249,7 @@ def register_utility_routes(app):
             'services': {
                 'database': 'connected' if db.engine else 'disconnected',
                 'ai_model': ai_status,
+                'sentiment_analysis': sentiment_status,
                 'blockchain': 'enabled' if BLOCKCHAIN_ENABLED else 'disabled',
                 'mission_system': 'enabled' if MISSION_SYSTEM_ENABLED else 'disabled'
             },
@@ -498,6 +508,15 @@ from routes.admin_chat_routes import admin_chat_bp
 app.register_blueprint(admin_chat_bp, name="admin_chat_unique")
 print("✅ Admin Chat routes registered")
 
+# Integrate Sentiment Analysis
+try:
+    from integrate_sentiment import integrate_sentiment_routes
+    integrate_sentiment_routes(app)
+    print("✅ Sentiment Analysis integrated successfully!")
+except Exception as e:
+    print(f"⚠️ Sentiment Analysis integration failed: {e}")
+    print("📊 Sentiment analysis will not be available")
+
 
 if __name__ == '__main__':
     print("=" * 80)
@@ -517,6 +536,7 @@ if __name__ == '__main__':
     print(" AI Prediction: /ai/predict")
     print(" Customer Profile: /customer/<id>")
     print(" NFT Achievements: /api/nft/<id>/achievements")
+    print(" Sentiment Analysis: /api/sentiment/*")
     print("=" * 80)
 
     # Run the application

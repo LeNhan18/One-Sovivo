@@ -294,13 +294,13 @@ class AIService:
         
         # Nếu khách hàng mới (rất ít hoạt động)
         if total_transactions < 2 and total_flights < 1 and total_nights < 1:
-            recs.append({'offer_code': 'NEW001', 'title': 'Chào mừng đến với HDBank!', 'description': 'Hoàn tiền 5% cho giao dịch đầu tiên khi mở thẻ tín dụng.'})
+            recs.append({'offer_code': 'NEW001', 'title': 'Mở thẻ HDBank đầu tiên!', 'description': 'Hoàn tiền 5% cho giao dịch đầu tiên khi mở thẻ tín dụng.'})
             recs.append({'offer_code': 'NEW002', 'title': 'Trải nghiệm Du lịch đầu tiên', 'description': 'Giảm giá 30% cho chuyến bay đầu tiên và đặt phòng resort.'})
             recs.append({'offer_code': 'NEW003', 'title': 'Gói Khởi đầu Thông minh', 'description': 'Tài khoản tiết kiệm với lãi suất ưu đãi cho khách hàng mới.'})
             return recs
 
         if label == 'thuong_gia':
-            recs.append({'offer_code': 'TG001', 'title': 'HDBank Visa Infinite', 'description': 'Thẻ tín dụng cao cấp với đặc quyền VIP toàn cầu.'})
+            recs.append({'offer_code': 'TG001', 'title': 'HDBank Visa VIP', 'description': 'Thẻ tín dụng cao cấp với đặc quyền VIP toàn cầu.'})
             recs.append({'offer_code': 'TG002', 'title': 'Gói Đầu tư Premium', 'description': 'Danh mục đầu tư cao cấp với lợi suất 15-20%/năm.'})
             recs.append({'offer_code': 'TG003', 'title': 'Combo Du lịch Luxury', 'description': 'Ưu đãi đặc biệt cho khách sạn 5 sao và vé hạng thương gia.'})
         elif label == 'doanh_nhan':

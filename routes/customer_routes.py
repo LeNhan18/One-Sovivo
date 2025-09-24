@@ -126,13 +126,17 @@ def search_customers():
     if not customer_service:
         return jsonify({'error': 'Customer service not available'}), 500
 
-    q = (request.args.get('q') or '').strip().lower()
+    q = (request.args.get('q') or '').strip()
     if not q:
         return jsonify([])
 
-    # This would need to be implemented in customer_service
-    # For now, return empty result
-    return jsonify([])
+    try:
+        # Sử dụng customer_service để tìm kiếm
+        results = customer_service.search_customers(q)
+        return jsonify(results)
+    except Exception as e:
+        print(f"❌ Error searching customers: {e}")
+        return jsonify([])
 
 
 @customers_bp.route('/suggestions', methods=['GET'])
