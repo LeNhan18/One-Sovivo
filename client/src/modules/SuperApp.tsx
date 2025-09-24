@@ -6,6 +6,8 @@ import AIFinancialAssistant from '../components/AIFinancialAssistant'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
 import ESGPrograms from '../components/ESGPrograms'
+import HDBankTransactions from '../components/HDBankTransactions'
+import HDBankCard from '../components/HDBankCard'
 import { ServiceModal } from '../components/ServiceModal'
 import { AIAgent } from '../components/AIAgent'
 import ImageIcon from '../components/ImageIcon'
@@ -61,6 +63,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [achievementsCount, setAchievementsCount] = useState(0)
+  const [hdbankView, setHdbankView] = useState<'dashboard' | 'transactions'>('dashboard')
 
   // Welcome Screen state
   const [showWelcome, setShowWelcome] = useState(true)
@@ -133,6 +136,18 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
           const tokensInfo = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0 }
           console.log('🔍 SuperApp Debug - Tokens Info:', tokensInfo);
 
+          // Lấy dashboard HDBank để lấy số dư hiện tại
+          let hdbankBalance = 0
+          try {
+            const hdbankDashRes = await fetch(`http://127.0.0.1:5000/api/service/hdbank/dashboard/${customerId}`)
+            if (hdbankDashRes.ok) {
+              const dash = await hdbankDashRes.json()
+              hdbankBalance = dash?.account_summary?.current_balance || 0
+            }
+          } catch (e) {
+            console.warn('HDBank dashboard fetch failed', e)
+          }
+
           // Tính tier dựa trên SVT balance thực tế
           const calculateTier = (svtBalance: number) => {
             if (svtBalance >= 200000) return 'Diamond';
@@ -153,7 +168,8 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 miles: (customerData.customer?.vietjet_summary?.total_flights_last_year || 0) * 1500
               },
               hdbank: {
-                avg_balance: customerData.customer?.hdbank_summary?.average_balance || 0
+                avg_balance: customerData.customer?.hdbank_summary?.average_balance || 0,
+                balance: hdbankBalance
               },
               resorts: {
                 nights_stayed: customerData.customer?.resort_summary?.total_nights_stayed || 0
@@ -223,7 +239,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             sovicoTokens: 0, // User mới không có token
             services: {
               vietjet: { flights: 0, miles: 0 },
-              hdbank: { avg_balance: 0 },
+              hdbank: { avg_balance: 0, balance: 0 },
               resorts: { nights_stayed: 0 }
             },
             transactions: [],
@@ -354,6 +370,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const openServicePage = (serviceType: 'vietjet' | 'hdbank' | 'resort') => {
     setCurrentService(serviceType)
     setActiveSection('service')
+    if (serviceType === 'hdbank') setHdbankView('dashboard')
   }
 
   const closeServicePage = () => {
@@ -454,6 +471,39 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   }
 
   if (activeSection === 'service' && currentService) {
+    if (currentService === 'hdbank') {
+      return (
+        <div className="text-gray-200 font-sans min-h-screen">
+          <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+            <button onClick={closeServicePage} className="text-blue-400 hover:text-blue-300 flex items-center">← Về dịch vụ</button>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-white">HDBank</h1>
+              <div className="ml-4 bg-[#0D1117] border border-gray-700 rounded-lg p-1 text-sm">
+                <button
+                  className={`px-3 py-1 rounded ${hdbankView === 'dashboard' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
+                  onClick={() => setHdbankView('dashboard')}
+                >Dashboard</button>
+                <button
+                  className={`px-3 py-1 rounded ${hdbankView === 'transactions' ? 'bg-blue-600 text-white' : 'text-gray-300'}`}
+                  onClick={() => setHdbankView('transactions')}
+                >Lịch sử giao dịch</button>
+              </div>
+            </div>
+            <div />
+          </div>
+          <div className="p-6">
+            {hdbankView === 'dashboard' ? (
+              <HDBankCard
+                customerId={userData?.customerId || user.customer_id}
+                onBack={closeServicePage}
+              />
+            ) : (
+              <HDBankTransactions customerId={userData?.customerId || user.customer_id} />
+            )}
+          </div>
+        </div>
+      )
+    }
     return (
       <ServiceModal
         serviceType={currentService}
@@ -738,6 +788,16 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
                 </div>
               </div>
 
+              {/* Current HDBank Balance */}
+              <div className="bg-gradient-to-r from-emerald-900/50 to-green-900/40 backdrop-blur-sm border border-emerald-400/30 rounded-lg px-6 py-4">
+                <div className="text-center">
+                  <div className="text-xs text-emerald-300 mb-1">Số dư HDBank</div>
+                  <div className="text-white font-bold text-lg">
+                    {(userData?.services?.hdbank?.balance || 0).toLocaleString('vi-VN')} VND
+                  </div>
+                </div>
+              </div>
+
               {/* Logout Button */}
               <button
                 onClick={onLogout}
@@ -930,7 +990,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
             <ModernServiceCard
               icon={<BankIcon />}
               title="HDBank"
-              value={userData?.services?.hdbank?.avg_balance}
+              value={userData?.services?.hdbank?.balance}
               unit="đ"
               isCurrency
               color="from-blue-500 to-cyan-500"

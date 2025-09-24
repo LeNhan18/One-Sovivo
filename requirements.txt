@@ -14,3 +14,6 @@ faker
 web3==6.15.1
 eth-account==0.10.0
 py-solc-x==2.0.2
+transformers>=4.0.0
+# CPU-only torch; if you have CUDA-enabled machine install the appropriate torch build instead
+torch>=1.13.0

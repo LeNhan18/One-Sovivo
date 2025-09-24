@@ -87,6 +87,21 @@ def hdbank_service_status(customer_id):
         }), 500
 
 
+@hdbank_bp.route('/transactions/<int:customer_id>', methods=['GET'])
+def hdbank_transactions(customer_id):
+    """Lấy lịch sử giao dịch HDBank của khách hàng"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        result = get_hdbank_service().get_transactions(customer_id, limit)
+        status = 200 if result.get('success') else 500
+        return jsonify(result), status
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Lỗi lấy lịch sử giao dịch: {str(e)}'
+        }), 500
+
+
 @hdbank_bp.route('/transfer', methods=['POST'])
 def hdbank_transfer():
     """Thực hiện chuyển khoản HDBank"""

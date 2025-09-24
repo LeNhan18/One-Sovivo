@@ -19,6 +19,8 @@ interface Message {
   timestamp: string;
   is_intervention: boolean;
   admin_id?: string;
+  sentiment_score?: number;
+  sentiment_label?: string;
 }
 
 interface ChatDetail {
@@ -30,6 +32,11 @@ interface ChatDetail {
   persona_type: string;
   title: string;
   messages: Message[];
+  sentiment_summary?: {
+    avg_score: number;
+    label: string;
+    user_message_count: number;
+  };
 }
 
 const AdminChatMonitor: React.FC = () => {
@@ -315,6 +322,9 @@ const AdminChatMonitor: React.FC = () => {
                         message.is_intervention
                       )}`}
                     >
+                        {message.sentiment_label && (
+                          <div className="text-xs text-gray-500 mb-1">Cảm xúc: {message.sentiment_label} {typeof message.sentiment_score === 'number' ? `(${message.sentiment_score.toFixed(2)})` : ''}</div>
+                        )}
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <span className="text-xs font-medium">
@@ -338,7 +348,12 @@ const AdminChatMonitor: React.FC = () => {
                     </div>
                   ))}
                 </div>
-
+                {/* Chat-level sentiment */}
+                {selectedChat.sentiment_summary && (
+                  <div className="p-3 border-t text-sm text-gray-700">
+                    <strong>Tổng quan cảm xúc:</strong> {selectedChat.sentiment_summary.label} (trung bình {selectedChat.sentiment_summary.avg_score}) — từ {selectedChat.sentiment_summary.user_message_count} tin khách hàng
+                  </div>
+                )}
                 {/* Intervention Input */}
                 <div className="p-4 border-t bg-black-50">
                   <div className="flex space-x-3">

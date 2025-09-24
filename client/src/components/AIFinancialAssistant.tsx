@@ -39,6 +39,14 @@ interface UserProfile {
   investmentGoals?: string[];
 }
 
+// Lightweight customer preferences to personalize intent filling
+interface CustomerPreferences {
+  preferredOrigin?: string;      // e.g., 'SGN'
+  preferredDestination?: string; // e.g., 'PQC'
+  typicalPassengers?: number;    // e.g., 2
+  typicalRoomNights?: number;    // e.g., 2
+}
+
 // Initialize Gemini AI with multiple model fallbacks
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDxF5rCqGT8v-7hP8j2mN9kL3nQ1rS6wE4';
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -76,6 +84,7 @@ const AIFinancialAssistant: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prefsRef = useRef<CustomerPreferences>({});
 
   // Fetch user profile data
   useEffect(() => {
@@ -113,6 +122,12 @@ const AIFinancialAssistant: React.FC = () => {
             investmentGoals: ['Tiết kiệm', 'Đầu tư an toàn']
           });
 
+          // Load preferences from localStorage
+          try {
+            const raw = localStorage.getItem(`prefs_${userData.customer_id}`);
+            prefsRef.current = raw ? JSON.parse(raw) : {};
+          } catch {}
+
           // Load chat history for this user
           await loadChatHistory(userData.customer_id);
         }
@@ -139,12 +154,20 @@ const AIFinancialAssistant: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
+          // Map server types -> UI types
+          const toUiType = (serverType: string): 'user' | 'ai' | 'system' => {
+            if (serverType === 'user') return 'user';
+            if (serverType === 'assistant') return 'ai';
+            if (serverType === 'admin_intervention') return 'ai';
+            return 'ai';
+          };
+
           const serverHistory: ChatHistory[] = data.chats.map((chat: any) => ({
             id: chat.id,
             customer_id: chat.customer_id,
             messages: chat.messages.map((msg: any) => ({
               id: msg.id,
-              type: msg.message_type,
+              type: toUiType(msg.message_type),
               content: msg.content,
               timestamp: new Date(msg.timestamp),
               actions: msg.actions
@@ -209,11 +232,22 @@ const AIFinancialAssistant: React.FC = () => {
 
     const chatId = currentChatId || `chat_${Date.now()}`;
     const chatTitle = generateChatTitle(messages);
+
+    // Map UI types -> server types (backend expects 'user' | 'assistant' | 'admin_intervention')
+    const toServerType = (t: Message['type']): 'user' | 'assistant' | 'admin_intervention' => {
+      if (t === 'user') return 'user';
+      if (t === 'ai') return 'assistant';
+      return 'assistant'; // map 'system' to 'assistant' by default
+    };
     
     const chatData: ChatHistory = {
       id: chatId,
       customer_id: userProfile.customer_id,
-      messages: messages,
+      messages: messages.map(m => ({
+        ...m,
+        // Convert type for server persistence layer
+        type: toServerType(m.type) as any
+      })),
       created_at: currentChatId ? chatHistory.find(c => c.id === currentChatId)?.created_at || new Date() : new Date(),
       updated_at: new Date(),
       title: chatTitle
@@ -411,13 +445,19 @@ const AIFinancialAssistant: React.FC = () => {
       const hasDestination = extractLocation(text, 'destination')  
       const hasDate = extractDate(text)
       const hasPassengerCount = extractPassengerCount(text)
+
+      // Personalize with preferences when missing
+      const prefs = prefsRef.current
+      const origin = hasOrigin || prefs.preferredOrigin || undefined
+      const destination = hasDestination || prefs.preferredDestination || undefined
+      const passengerCount = hasPassengerCount || prefs.typicalPassengers || 1
       
       console.log(' Origin:', hasOrigin, 'Destination:', hasDestination, 'Date:', hasDate, 'Passengers:', hasPassengerCount) // Debug
       
       // Nếu thiếu thông tin, không tạo action mà sẽ yêu cầu thông tin
-      if (!hasOrigin || !hasDestination || !hasDate) {
+      if (!origin || !destination || !hasDate) {
         console.log(' Missing flight information - not creating action') // Debug
-        console.log('Missing info:', !hasOrigin ? 'origin' : '', !hasDestination ? 'destination' : '', !hasDate ? 'date' : '')
+        console.log('Missing info:', !origin ? 'origin' : '', !destination ? 'destination' : '', !hasDate ? 'date' : '')
         return [] // Không tạo action, để AI hỏi thông tin
       }
       actions.push({
@@ -425,10 +465,10 @@ const AIFinancialAssistant: React.FC = () => {
         service: 'vietjet',
         action: 'book_flight',
         params: {
-          origin: hasOrigin,
-          destination: hasDestination,
+          origin,
+          destination,
           departure_date: hasDate,
-          passenger_count: hasPassengerCount || 1,
+          passenger_count: passengerCount,
           flight_type: normalizedText.includes('quoc te') || normalizedText.includes('nuoc ngoai') ? 'international' : 'domestic',
           ticket_class: normalizedText.includes('thuong gia') || normalizedText.includes('business') ? 'business' : 'economy'
         },
@@ -498,7 +538,8 @@ const AIFinancialAssistant: React.FC = () => {
     // Hotel/Resort intents
     if (normalizedText.includes('khach san') || normalizedText.includes('dat phong') || 
         normalizedText.includes('resort') || normalizedText.includes('nghi duong')) {
-      const nights = extractNights(normalizedText)
+      const prefs = prefsRef.current
+      const nights = extractNights(normalizedText) || prefs.typicalRoomNights || 2
       actions.push({
         id: `hotel_${Date.now()}`,
         service: 'resort',
@@ -996,84 +1037,37 @@ const AIFinancialAssistant: React.FC = () => {
         const currentModel = genAI.getGenerativeModel({ model: modelName });
         
         // Professional System Prompt
-        const systemPrompt = `Bạn là một Agent AI tài chính thông minh của Tập đoàn Sovico.
-Vai trò: KHÔNG CHỈ TƯ VẤN mà còn THỰC THI các dịch vụ tự động khi có đủ thông tin.
+        const systemPrompt = `Bạn là Agent AI tài chính của Sovico.
+Nhiệm vụ: Tư vấn ngắn gọn và THỰC THI khi đủ thông tin.
 
-**🤖 CHẾ ĐỘ AGENT - THỰC THI TỰ ĐỘNG:**
- **AGENT MODE**: Khi khách hàng yêu cầu cụ thể → Thực hiện ngay lập tức
- **Auto-execute**: Đặt vé máy bay, chuyển khoản, đặt phòng khi có đủ thông tin
- **Proactive**: Không hỏi xác nhận, trực tiếp thực hiện yêu cầu
- **Action-oriented**: "Đang thực hiện...", "Agent đang xử lý...", "Hoàn tất!"
+RULES:
+- Đủ slot (origin, destination, date) → Hành động ngay, nói "Agent đang xử lý...".
+- Thiếu slot → Hỏi đúng 1-2 câu, cụ thể theo thói quen của khách.
+- Mỗi lượt tập trung 1 tác vụ chính; gợi ý thêm tối đa 1.
+- Cá nhân hóa dựa trên hồ sơ & sở thích.
 
-**QUAN TRỌNG VỀ ĐẶT VÉ MÁY BAY:**
- **CÓ ĐỦ THÔNG TIN** (điểm đi + điểm đến + ngày bay) → Thực hiện đặt vé NGAY LẬP TỨC
- **THIẾU THÔNG TIN** → Hỏi cụ thể và khẳng định sẽ đặt vé khi có đủ
-Thông tin cần thiết:
-1.  **Điểm đi** (ví dụ: Hà Nội, TP.HCM, Đà Nẵng...)
-2.  **Điểm đến** (ví dụ: Phú Quốc, Nha Trang, Singapore...)
-3.  **Ngày bay** (cụ thể DD/MM/YYYY hoặc "ngày mai", "tuần sau"...)
-4.  **Số hành khách** (mặc định 1 người nếu không nói)
-5.  **Hạng vé** (mặc định Economy nếu không nói)
-
-**QUY TRÌNH AGENT:**
--  **CÓ ĐỦ INFO** → Thực hiện tức thì, thông báo "Agent đang xử lý..."
--  **THIẾU INFO** → Hỏi ngắn gọn, khẳng định "Agent sẽ đặt ngay khi có đủ thông tin"
--  **Luôn thể hiện tính chủ động**: "Tôi sẽ thực hiện...", "Đang đặt vé...", "Hoàn tất!"
-
-**KIẾN THỨC NỀN TẢNG VỀ HỆ SINH THÁI SOVICO:**
- **Sovico tập trung phát triển với sứ mệnh cung cấp những sản phẩm - dịch vụ tài chính ,ngân hàng hàng không**
-
- **Tập đoàn Sovico** - Hệ sinh thái tài chính toàn diện:
-- **HDBank**: Ngân hàng số 1 về dịch vụ khách hàng, cung cấp thẻ tín dụng, tiết kiệm, đầu tư
-- **Vietjet Air**: Hãng hàng không giá rẻ hàng đầu Đông Nam Á
-- **Sovico Resort**: Chuỗi resort cao cấp 5 sao tại các điểm đến hấp dẫn
-- **Sovico Real Estate**: Phát triển bất động sản cao cấp
-
-💎 **Sovico Token (SVT)** - Token tiện ích blockchain:
-- Kiếm SVT qua: Giao dịch HDBank (0.1% giá trị), bay Vietjet (100 SVT/chuyến), booking resort (500 SVT/đêm), hoàn thành nhiệm vụ (50-1000 SVT)
-- Sử dụng SVT: Đổi voucher ăn uống (ROI 120%), upgrade hạng bay (ROI 150%), giảm giá resort (10-30%), mua NFT achievements, P2P trading
-- Hệ thống cấp bậc: Bronze (<10K SVT), Silver (10K-50K), Gold (50K-200K), Diamond (>200K)
-
- **Hộ chiếu NFT** - Tài sản số độc nhất:
-- Ghi lại cấp bậc, thành tựu, lịch sử giao dịch
-- Tự động "tiến hóa" khi đạt cột mốc mới
-- Có thể trade trên marketplace nội bộ
-- Mang lại quyền lợi đặc biệt (ưu đãi, ưu tiên dịch vụ)
-
- **Sản phẩm HDBank chính:**
-- Thẻ Visa Signature: Phòng chờ sân bay, bảo hiểm du lịch
-- Thẻ Vietjet Platinum: Tích miles x2, miễn phí hành lý
-- Gói tiết kiệm HD EARN: 7-8%/năm + bảo hiểm
-- HD Invest: Ủy thác đầu tư từ 10 triệu VND
-
-**QUY TẮC TRẢ LỜI:**
-1. Luôn phân tích HỒ SƠ KHÁCH HÀNG trước khi tư vấn
-2. Cá nhân hóa 100% dựa trên tuổi, thu nhập, khẩu vị rủi ro
-3. Đề xuất cụ thể các sản phẩm Sovico phù hợp
-4. Luôn bao gồm chiến lược tích lũy SVT
-5. Sử dụng format Markdown với emoji để dễ đọc
-6. Đưa ra timeline và action steps cụ thể
-7. Tính toán ROI và lợi ích số liệu cụ thể
-8. **ĐẶC BIỆT: Luôn hỏi đủ thông tin trước khi đặt vé máy bay**`;
+OUTPUT:
+- Ưu tiên danh sách gạch đầu dòng, rõ ràng.
+- Nếu sẽ thực thi: nêu 3-5 bước ngắn.
+- Nếu hỏi thêm: chỉ hỏi đúng slot còn thiếu.`;
 
         // Build complete prompt with user profile
+        // Build concise Customer Insights
+        const prefs = prefsRef.current;
+        const insights = [
+          userProfile?.name ? `Tên: ${userProfile.name}` : undefined,
+          userProfile?.riskTolerance ? `Rủi ro: ${userProfile.riskTolerance}` : undefined,
+          typeof userProfile?.sovicoTokens === 'number' ? `SVT: ${userProfile.sovicoTokens}` : undefined,
+          prefs?.preferredOrigin ? `Origin thường: ${prefs.preferredOrigin}` : undefined,
+          prefs?.preferredDestination ? `Destination thường: ${prefs.preferredDestination}` : undefined,
+          prefs?.typicalPassengers ? `Số khách hay đi: ${prefs.typicalPassengers}` : undefined,
+        ].filter(Boolean).join(' • ');
+
         const fullPrompt = `${systemPrompt}
 
-**HỒ SƠ KHÁCH HÀNG HIỆN TẠI:**
--  Tên: ${userProfile?.name || 'Khách hàng'}
--  Tuổi: ${userProfile?.age || 'Chưa xác định'}
--  Khẩu vị rủi ro: ${userProfile?.riskTolerance || 'moderate'}
--  Số dư SVT: ${userProfile?.sovicoTokens?.toLocaleString('vi-VN') || '0'} SVT
--  Tổng giao dịch: ${userProfile?.totalTransactions || 0} lần
--  Thu nhập ước tính: ${userProfile?.monthlyIncome?.toLocaleString('vi-VN') || 'Chưa xác định'} VND/tháng
--  Cấp bậc hiện tại: ${userProfile?.sovicoTokens && userProfile.sovicoTokens >= 200000 ? 'Diamond 💎' : 
-                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 50000 ? 'Gold 🥇' :
-                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 10000 ? 'Silver 🥈' : 'Bronze 🥉'}
+CUSTOMER INSIGHTS: ${insights || 'N/A'}
 
-**CÂU HỎI CỦA KHÁCH HÀNG:**
-"${userMessage}"
-
-Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chính cá nhân hóa, bao gồm chiến lược sử dụng hệ sinh thái Sovico một cách tối ưu.`;
+USER ASK: "${userMessage}"`;
 
         const result = await currentModel.generateContent(fullPrompt);
         const response = await result.response;
