@@ -33,9 +33,14 @@ class CustomerService:
         if hdbank_transactions:
             balances = [float(t.balance) for t in hdbank_transactions]
             amounts = [float(t.amount) for t in hdbank_transactions]
+            # Sắp xếp theo thời gian để lấy balance cuối cùng
+            sorted_transactions = sorted(hdbank_transactions, key=lambda x: x.transaction_date)
+            current_balance = float(sorted_transactions[-1].balance) if sorted_transactions else 0
+            
             hdbank_summary = {
                 'total_transactions': len(hdbank_transactions),
-                'average_balance': sum(balances) / len(balances),
+                'current_balance': current_balance,  # Số dư hiện tại
+                'average_balance': sum(balances) / len(balances),  # Số dư trung bình
                 'total_credit_last_3m': sum(
                     float(t.amount) for t in hdbank_transactions if t.transaction_type == 'credit'),
                 'total_debit_last_3m': sum(
@@ -80,27 +85,39 @@ class CustomerService:
 
     def search_customers(self, query):
         """Tìm kiếm khách hàng theo từ khóa."""
-        q = query.strip().lower()
+        q = query.strip()
         if not q:
             return []
 
         try:
-            q_id = int(q)
-            customers = self.Customer.query.filter(
-                (self.Customer.customer_id == q_id) |
-                (self.Customer.name.ilike(f'%{q}%'))
-            ).limit(20).all()
-        except ValueError:
-            customers = self.Customer.query.filter(self.Customer.name.ilike(f'%{q}%')).limit(20).all()
+            Customer = self.models.get('Customer')
+            if not Customer:
+                return []
 
-        return [
-            {
-                'customer_id': customer.customer_id,
-                'name': customer.name,
-                'age': customer.age,
-                'city': customer.city
-            } for customer in customers
-        ]
+            # Kiểm tra xem query có phải là số (customer_id) không
+            customers = []
+            if q.isdigit():
+                # Tìm theo customer_id
+                customer = Customer.query.filter_by(customer_id=int(q)).first()
+                if customer:
+                    customers = [customer]
+            else:
+                # Tìm theo tên (case-insensitive)
+                customers = Customer.query.filter(
+                    Customer.name.ilike(f'%{q}%')
+                ).limit(20).all()
+
+            return [
+                {
+                    'customer_id': customer.customer_id,
+                    'name': customer.name,
+                    'age': customer.age,
+                    'city': customer.city
+                } for customer in customers
+            ]
+        except Exception as e:
+            print(f"❌ Error in search_customers: {e}")
+            return []
 
     def get_customer_suggestions(self):
         """API gợi ý khách hàng đáng chú ý."""

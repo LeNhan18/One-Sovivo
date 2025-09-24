@@ -86,7 +86,7 @@ const SVTMarketplace: React.FC = () => {
           price: item.price_svt,
           category: 'voucher' as const, // Default category
           provider: (item.partner_brand?.toLowerCase() || 'sovico') as any,
-          image: getItemIcon(item.partner_brand, item.name),
+          image: getItemIcon(item.partner_brand, item.name, item.image_url), // Sử dụng ảnh từ cơ sở dữ liệu
           availability: item.quantity,
           rating: 4.8, // Default rating
           isExclusive: item.quantity < 50,
@@ -109,7 +109,7 @@ const SVTMarketplace: React.FC = () => {
           sellerRating: 4.5, // Default rating
           condition: 'good' as const,
           category: 'Khác',
-          image: '📦',
+          image: listing.image_url || '📦', // Sử dụng ảnh từ cơ sở dữ liệu nếu có
           postedDate: new Date(listing.created_at).toLocaleDateString('vi-VN')
         }));
         setExchangeItems(formattedP2P);
@@ -117,33 +117,33 @@ const SVTMarketplace: React.FC = () => {
 
     } catch (error) {
       console.error('Error fetching marketplace data:', error);
-        // Fallback to some basic items
-        setMarketplaceItems([
-          {
-            id: 'fallback1',
-            name: 'Kết nối lại với server',
-            description: 'Vui lòng kiểm tra kết nối mạng',
-            price: 0,
-            category: 'service',
-            provider: 'sovico',
-            image: '🔗',
-            availability: 0,
-            rating: 0,
-            isExclusive: false,
-            validUntil: '2025-12-31'
-          }
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setMarketplaceItems([
+        {
+          id: 'fallback1',
+          name: 'Kết nối lại với server',
+          description: 'Vui lòng kiểm tra kết nối mạng',
+          price: 0,
+          category: 'service',
+          provider: 'sovico',
+          image: '🔗',
+          availability: 0,
+          rating: 0,
+          isExclusive: false,
+          validUntil: '2025-12-31'
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // useEffect to fetch data on component mount
   useEffect(() => {
     fetchMarketplaceData();
   }, []);
 
-  const getItemIcon = (partner: string, itemName: string): string => {
+  const getItemIcon = (partner: string, itemName: string, imageUrl?: string): string => {
+    if (imageUrl) return imageUrl; // Ưu tiên sử dụng ảnh từ cơ sở dữ liệu
     if (itemName.toLowerCase().includes('voucher') && itemName.toLowerCase().includes('ăn')) return '🍽️';
     if (itemName.toLowerCase().includes('vé') || itemName.toLowerCase().includes('bay')) return '✈️';
     if (itemName.toLowerCase().includes('lãi suất') || partner?.toLowerCase() === 'hdbank') return '💰';
@@ -322,60 +322,38 @@ const SVTMarketplace: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map(item => (
               <div key={item.id} className="bg-[#161B22] border border-gray-700 rounded-lg overflow-hidden hover:border-blue-500 transition-colors">
+                <img src={item.image} alt={item.name} className="w-full h-48 object-cover" />
                 <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="text-4xl">{item.image}</div>
-                    <div className="text-right">
-                      {item.isExclusive && (
-                        <span className="bg-yellow-600 text-yellow-100 px-2 py-1 rounded-full text-xs font-bold mb-2 block">
-                          EXCLUSIVE
-                        </span>
-                      )}
-                      <div className="text-2xl font-bold text-blue-400">{item.price} SVT</div>
-                      {item.originalPrice && (
-                        <div className="text-sm text-gray-500 line-through">{item.originalPrice} SVT</div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <h3 className="text-lg font-bold text-white mb-2">{item.name}</h3>
-                  <p className="text-gray-400 text-sm mb-4">{item.description}</p>
-                  
+                  <h3 className="text-lg font-bold mb-2">{item.name}</h3>
+                  <p className="text-gray-400 mb-4">{item.description}</p>
                   <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center">
-                      <span className="text-yellow-400">★</span>
-                      <span className="text-sm text-gray-400 ml-1">{item.rating}</span>
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      Còn {item.availability} sản phẩm
-                    </div>
+                    <span className="text-yellow-400 font-medium">⭐ {item.rating.toFixed(1)}</span>
+                    <span className="text-gray-400">Còn {item.availability} sản phẩm</span>
                   </div>
-                  
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-xs bg-gray-700 px-2 py-1 rounded uppercase text-gray-300">
-                      {item.provider}
+                    <span className="text-gray-500 text-sm">Nhà cung cấp: <span className="text-blue-400 font-medium">{item.provider.toUpperCase()}</span></span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-blue-500 font-bold flex items-center">
+                      {item.price.toLocaleString('vi-VN')} <span className="ml-1">SVT</span>
                     </span>
-                    <span className="text-xs text-gray-500">Hết hạn: {item.validUntil}</span>
-                  </div>
-                  
-                  <button
-                    onClick={() => handlePurchase(item)}
-                    disabled={item.availability === 0 || userSVT < item.price}
-                    className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-                      item.availability === 0
-                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    <button
+                      disabled={item.availability === 0 || userSVT < item.price}
+                      className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                        item.availability === 0
+                          ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                          : userSVT < item.price
+                          ? 'bg-red-900 text-red-400 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {item.availability === 0
+                        ? '❌ Hết hàng'
                         : userSVT < item.price
-                        ? 'bg-red-900 text-red-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                  >
-                    {item.availability === 0
-                      ? '🚫 Hết hàng'
-                      : userSVT < item.price
-                      ? '💰 Không đủ SVT'
-                      : '🛒 Mua ngay'
-                    }
-                  </button>
+                        ? '💰 Không đủ SVT'
+                        : '🛒 Mua ngay'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

@@ -429,7 +429,7 @@ cd One-Sovico
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python setup_ai_chat_db.py
-python app_modular_clean.py
+python app.py
 
 # Frontend (terminal mới)
 cd client

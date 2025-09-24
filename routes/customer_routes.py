@@ -82,29 +82,42 @@ def get_insights(customer_id):
     if profile is None:
         return jsonify({'error': f'Không tìm thấy khách hàng với ID {customer_id}'}), 404
 
+    # Lazy-load model if needed
+    try:
+        if not ai_service.is_model_loaded():
+            ai_service.load_model()
+    except Exception as e:
+        print(f"⚠️ AI load error: {e}")
+        # continue with mock inside service
+
     # Chuẩn bị input và dự đoán persona
-    input_data = {
-        'age': profile['basic_info'].get('age', 0) or 0,
-        'avg_balance': profile['hdbank_summary'].get('average_balance', 0) or 0,
-        'total_flights': profile['vietjet_summary'].get('total_flights_last_year', 0) or 0,
-        'is_business_flyer_int': int(profile['vietjet_summary'].get('is_business_flyer', False)),
-        'total_nights_stayed': profile['resort_summary'].get('total_nights_stayed', 0) or 0,
-        'total_resort_spending': profile['resort_summary'].get('total_spending', 0) or 0
-    }
+    try:
+        # Build input strictly with columns used at training (see training_meta.json)
+        input_data = {
+            'age': profile.get('basic_info', {}).get('age', 0) or 0,
+            'hdbank_tx_count': profile.get('hdbank_summary', {}).get('total_transactions', 0) or 0,
+            'hdbank_total_amount': profile.get('hdbank_summary', {}).get('total_spent', 0) or 0,
+            'vietjet_flight_count': profile.get('vietjet_summary', {}).get('total_flights_last_year', 0) or 0,
+            'resort_nights': profile.get('resort_summary', {}).get('total_nights_stayed', 0) or 0,
+            # extras for evidence/recommendations
+            'avg_balance': profile.get('hdbank_summary', {}).get('current_balance', 0) or 0,
+            'resort_spent': profile.get('resort_summary', {}).get('total_spending', 0) or 0,
+            'total_flights': profile.get('vietjet_summary', {}).get('total_flights_last_year', 0) or 0,
+            'total_nights_stayed': profile.get('resort_summary', {}).get('total_nights_stayed', 0) or 0,
+            'total_resort_spending': profile.get('resort_summary', {}).get('total_spending', 0) or 0,
+            'is_business_flyer_int': int(profile.get('vietjet_summary', {}).get('is_business_flyer', False)),
+        }
 
-    predicted_persona, error = ai_service.predict_persona(input_data)
-    if error:
-        return jsonify({'error': error}), 503
+        result = ai_service.predict_with_achievements(input_data)
+        if 'error' in result:
+            # Return graceful 200 with fallback info
+            return jsonify({'success': False, 'error': result['error']}), 200
 
-    # Build evidence và recommendations
-    evidence = ai_service.build_evidence(profile)
-    recommendations = ai_service.get_recommendations(predicted_persona, input_data)
-
-    return jsonify({
-        'predicted_persona': predicted_persona,
-        'evidence': evidence,
-        'recommendations': recommendations
-    })
+        return jsonify({'success': True, **result})
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 200
 
 
 @customers_bp.route('/search', methods=['GET'])
@@ -113,13 +126,17 @@ def search_customers():
     if not customer_service:
         return jsonify({'error': 'Customer service not available'}), 500
 
-    q = (request.args.get('q') or '').strip().lower()
+    q = (request.args.get('q') or '').strip()
     if not q:
         return jsonify([])
 
-    # This would need to be implemented in customer_service
-    # For now, return empty result
-    return jsonify([])
+    try:
+        # Sử dụng customer_service để tìm kiếm
+        results = customer_service.search_customers(q)
+        return jsonify(results)
+    except Exception as e:
+        print(f"❌ Error searching customers: {e}")
+        return jsonify([])
 
 
 @customers_bp.route('/suggestions', methods=['GET'])

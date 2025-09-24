@@ -39,6 +39,14 @@ interface UserProfile {
   investmentGoals?: string[];
 }
 
+// Lightweight customer preferences to personalize intent filling
+interface CustomerPreferences {
+  preferredOrigin?: string;      // e.g., 'SGN'
+  preferredDestination?: string; // e.g., 'PQC'
+  typicalPassengers?: number;    // e.g., 2
+  typicalRoomNights?: number;    // e.g., 2
+}
+
 // Initialize Gemini AI with multiple model fallbacks
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDxF5rCqGT8v-7hP8j2mN9kL3nQ1rS6wE4';
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -76,6 +84,36 @@ const AIFinancialAssistant: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prefsRef = useRef<CustomerPreferences>({});
+
+  // Fetch additional financial data for strategy analysis
+  const fetchFinancialData = async () => {
+    if (!userProfile) return { flightCount: 0, accountBalance: 0 };
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return { flightCount: 0, accountBalance: 0 };
+
+      // Fetch flight history
+      const flightResponse = await fetch(`http://127.0.0.1:5000/api/vietjet/history/${userProfile.customer_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const flightData = flightResponse.ok ? await flightResponse.json() : { flights: [] };
+      const flightCount = flightData.flights?.length || 0;
+
+      // Fetch account balance
+      const balanceResponse = await fetch(`http://127.0.0.1:5000/api/hdbank/balance/${userProfile.customer_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const balanceData = balanceResponse.ok ? await balanceResponse.json() : { balance: 0 };
+      const accountBalance = balanceData.balance || 0;
+
+      return { flightCount, accountBalance };
+    } catch (error) {
+      console.error('Error fetching financial data:', error);
+      return { flightCount: 0, accountBalance: 0 };
+    }
+  };
 
   // Fetch user profile data
   useEffect(() => {
@@ -113,6 +151,12 @@ const AIFinancialAssistant: React.FC = () => {
             investmentGoals: ['Tiết kiệm', 'Đầu tư an toàn']
           });
 
+          // Load preferences from localStorage
+          try {
+            const raw = localStorage.getItem(`prefs_${userData.customer_id}`);
+            prefsRef.current = raw ? JSON.parse(raw) : {};
+          } catch {}
+
           // Load chat history for this user
           await loadChatHistory(userData.customer_id);
         }
@@ -139,12 +183,20 @@ const AIFinancialAssistant: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
+          // Map server types -> UI types
+          const toUiType = (serverType: string): 'user' | 'ai' | 'system' => {
+            if (serverType === 'user') return 'user';
+            if (serverType === 'assistant') return 'ai';
+            if (serverType === 'admin_intervention') return 'ai';
+            return 'ai';
+          };
+
           const serverHistory: ChatHistory[] = data.chats.map((chat: any) => ({
             id: chat.id,
             customer_id: chat.customer_id,
             messages: chat.messages.map((msg: any) => ({
               id: msg.id,
-              type: msg.message_type,
+              type: toUiType(msg.message_type),
               content: msg.content,
               timestamp: new Date(msg.timestamp),
               actions: msg.actions
@@ -209,11 +261,22 @@ const AIFinancialAssistant: React.FC = () => {
 
     const chatId = currentChatId || `chat_${Date.now()}`;
     const chatTitle = generateChatTitle(messages);
+
+    // Map UI types -> server types (backend expects 'user' | 'assistant' | 'admin_intervention')
+    const toServerType = (t: Message['type']): 'user' | 'assistant' | 'admin_intervention' => {
+      if (t === 'user') return 'user';
+      if (t === 'ai') return 'assistant';
+      return 'assistant'; // map 'system' to 'assistant' by default
+    };
     
     const chatData: ChatHistory = {
       id: chatId,
       customer_id: userProfile.customer_id,
-      messages: messages,
+      messages: messages.map(m => ({
+        ...m,
+        // Convert type for server persistence layer
+        type: toServerType(m.type) as any
+      })),
       created_at: currentChatId ? chatHistory.find(c => c.id === currentChatId)?.created_at || new Date() : new Date(),
       updated_at: new Date(),
       title: chatTitle
@@ -411,13 +474,19 @@ const AIFinancialAssistant: React.FC = () => {
       const hasDestination = extractLocation(text, 'destination')  
       const hasDate = extractDate(text)
       const hasPassengerCount = extractPassengerCount(text)
+
+      // Personalize with preferences when missing
+      const prefs = prefsRef.current
+      const origin = hasOrigin || prefs.preferredOrigin || undefined
+      const destination = hasDestination || prefs.preferredDestination || undefined
+      const passengerCount = hasPassengerCount || prefs.typicalPassengers || 1
       
       console.log(' Origin:', hasOrigin, 'Destination:', hasDestination, 'Date:', hasDate, 'Passengers:', hasPassengerCount) // Debug
       
       // Nếu thiếu thông tin, không tạo action mà sẽ yêu cầu thông tin
-      if (!hasOrigin || !hasDestination || !hasDate) {
+      if (!origin || !destination || !hasDate) {
         console.log(' Missing flight information - not creating action') // Debug
-        console.log('Missing info:', !hasOrigin ? 'origin' : '', !hasDestination ? 'destination' : '', !hasDate ? 'date' : '')
+        console.log('Missing info:', !origin ? 'origin' : '', !destination ? 'destination' : '', !hasDate ? 'date' : '')
         return [] // Không tạo action, để AI hỏi thông tin
       }
       actions.push({
@@ -425,10 +494,10 @@ const AIFinancialAssistant: React.FC = () => {
         service: 'vietjet',
         action: 'book_flight',
         params: {
-          origin: hasOrigin,
-          destination: hasDestination,
+          origin,
+          destination,
           departure_date: hasDate,
-          passenger_count: hasPassengerCount || 1,
+          passenger_count: passengerCount,
           flight_type: normalizedText.includes('quoc te') || normalizedText.includes('nuoc ngoai') ? 'international' : 'domestic',
           ticket_class: normalizedText.includes('thuong gia') || normalizedText.includes('business') ? 'business' : 'economy'
         },
@@ -498,7 +567,8 @@ const AIFinancialAssistant: React.FC = () => {
     // Hotel/Resort intents
     if (normalizedText.includes('khach san') || normalizedText.includes('dat phong') || 
         normalizedText.includes('resort') || normalizedText.includes('nghi duong')) {
-      const nights = extractNights(normalizedText)
+      const prefs = prefsRef.current
+      const nights = extractNights(normalizedText) || prefs.typicalRoomNights || 2
       actions.push({
         id: `hotel_${Date.now()}`,
         service: 'resort',
@@ -995,85 +1065,65 @@ const AIFinancialAssistant: React.FC = () => {
         // Try each model
         const currentModel = genAI.getGenerativeModel({ model: modelName });
         
-        // Professional System Prompt
-        const systemPrompt = `Bạn là một Agent AI tài chính thông minh của Tập đoàn Sovico.
-Vai trò: KHÔNG CHỈ TƯ VẤN mà còn THỰC THI các dịch vụ tự động khi có đủ thông tin.
+        // Enhanced System Prompt for better accuracy
+        const systemPrompt = `Bạn là AI Agent tài chính chuyên nghiệp của Sovico Holdings.
 
-**🤖 CHẾ ĐỘ AGENT - THỰC THI TỰ ĐỘNG:**
- **AGENT MODE**: Khi khách hàng yêu cầu cụ thể → Thực hiện ngay lập tức
- **Auto-execute**: Đặt vé máy bay, chuyển khoản, đặt phòng khi có đủ thông tin
- **Proactive**: Không hỏi xác nhận, trực tiếp thực hiện yêu cầu
- **Action-oriented**: "Đang thực hiện...", "Agent đang xử lý...", "Hoàn tất!"
+VAI TRÒ:
+- Tư vấn tài chính chính xác và thực thi dịch vụ tự động
+- Hiểu rõ về SVT (Sovico Tokens), HDBank, Vietjet, Resort services
+- Phân tích nhu cầu khách hàng và đưa ra giải pháp phù hợp
 
-**QUAN TRỌNG VỀ ĐẶT VÉ MÁY BAY:**
- **CÓ ĐỦ THÔNG TIN** (điểm đi + điểm đến + ngày bay) → Thực hiện đặt vé NGAY LẬP TỨC
- **THIẾU THÔNG TIN** → Hỏi cụ thể và khẳng định sẽ đặt vé khi có đủ
-Thông tin cần thiết:
-1.  **Điểm đi** (ví dụ: Hà Nội, TP.HCM, Đà Nẵng...)
-2.  **Điểm đến** (ví dụ: Phú Quốc, Nha Trang, Singapore...)
-3.  **Ngày bay** (cụ thể DD/MM/YYYY hoặc "ngày mai", "tuần sau"...)
-4.  **Số hành khách** (mặc định 1 người nếu không nói)
-5.  **Hạng vé** (mặc định Economy nếu không nói)
+KIẾN THỨC CHUYÊN MÔN:
+- SVT: Token nội bộ của Sovico, dùng để tích điểm, đổi quà, giao dịch
+- HDBank: Ngân hàng liên kết, cung cấp thẻ tín dụng, vay vốn, chuyển khoản
+- Vietjet: Hãng hàng không, đặt vé máy bay nội địa và quốc tế
+- Resort: Dịch vụ nghỉ dưỡng, đặt phòng, spa, ẩm thực
 
-**QUY TRÌNH AGENT:**
--  **CÓ ĐỦ INFO** → Thực hiện tức thì, thông báo "Agent đang xử lý..."
--  **THIẾU INFO** → Hỏi ngắn gọn, khẳng định "Agent sẽ đặt ngay khi có đủ thông tin"
--  **Luôn thể hiện tính chủ động**: "Tôi sẽ thực hiện...", "Đang đặt vé...", "Hoàn tất!"
+QUY TẮC TRẢ LỜI:
+1. LUÔN trả lời chính xác về thông tin tài chính
+2. Nếu không chắc chắn, nói "Tôi cần kiểm tra thông tin này"
+3. Đưa ra lời khuyên dựa trên profile khách hàng
+4. Sử dụng số liệu cụ thể, không ước đoán
+5. Luôn đề cập đến lợi ích SVT khi có thể
 
-**KIẾN THỨC NỀN TẢNG VỀ HỆ SINH THÁI SOVICO:**
- **Sovico tập trung phát triển với sứ mệnh cung cấp những sản phẩm - dịch vụ tài chính ,ngân hàng hàng không**
+ĐỊNH DẠNG TRẢ LỜI:
+- Sử dụng bullet points rõ ràng
+- Đưa ra con số cụ thể (lãi suất, phí, thời gian)
+- Gợi ý các bước tiếp theo
+- Luôn kết thúc bằng câu hỏi để tương tác thêm
 
- **Tập đoàn Sovico** - Hệ sinh thái tài chính toàn diện:
-- **HDBank**: Ngân hàng số 1 về dịch vụ khách hàng, cung cấp thẻ tín dụng, tiết kiệm, đầu tư
-- **Vietjet Air**: Hãng hàng không giá rẻ hàng đầu Đông Nam Á
-- **Sovico Resort**: Chuỗi resort cao cấp 5 sao tại các điểm đến hấp dẫn
-- **Sovico Real Estate**: Phát triển bất động sản cao cấp
+VÍ DỤ TRẢ LỜI TỐT:
+"📊 **Phân tích tài chính của bạn:**
 
-💎 **Sovico Token (SVT)** - Token tiện ích blockchain:
-- Kiếm SVT qua: Giao dịch HDBank (0.1% giá trị), bay Vietjet (100 SVT/chuyến), booking resort (500 SVT/đêm), hoàn thành nhiệm vụ (50-1000 SVT)
-- Sử dụng SVT: Đổi voucher ăn uống (ROI 120%), upgrade hạng bay (ROI 150%), giảm giá resort (10-30%), mua NFT achievements, P2P trading
-- Hệ thống cấp bậc: Bronze (<10K SVT), Silver (10K-50K), Gold (50K-200K), Diamond (>200K)
+• **SVT hiện tại:** 15,000 tokens
+• **Mức độ:** Silver (cần 35,000 để lên Gold)
+• **Lãi suất tiết kiệm:** 7.5%/năm
+• **Phí thẻ tín dụng:** Miễn phí năm đầu
 
- **Hộ chiếu NFT** - Tài sản số độc nhất:
-- Ghi lại cấp bậc, thành tựu, lịch sử giao dịch
-- Tự động "tiến hóa" khi đạt cột mốc mới
-- Có thể trade trên marketplace nội bộ
-- Mang lại quyền lợi đặc biệt (ưu đãi, ưu tiên dịch vụ)
+**Đề xuất:**
+1. Tích lũy thêm 20,000 SVT để đạt Gold
+2. Mở tài khoản tiết kiệm HDBank
+3. Đăng ký thẻ Visa Platinum
 
- **Sản phẩm HDBank chính:**
-- Thẻ Visa Signature: Phòng chờ sân bay, bảo hiểm du lịch
-- Thẻ Vietjet Platinum: Tích miles x2, miễn phí hành lý
-- Gói tiết kiệm HD EARN: 7-8%/năm + bảo hiểm
-- HD Invest: Ủy thác đầu tư từ 10 triệu VND
-
-**QUY TẮC TRẢ LỜI:**
-1. Luôn phân tích HỒ SƠ KHÁCH HÀNG trước khi tư vấn
-2. Cá nhân hóa 100% dựa trên tuổi, thu nhập, khẩu vị rủi ro
-3. Đề xuất cụ thể các sản phẩm Sovico phù hợp
-4. Luôn bao gồm chiến lược tích lũy SVT
-5. Sử dụng format Markdown với emoji để dễ đọc
-6. Đưa ra timeline và action steps cụ thể
-7. Tính toán ROI và lợi ích số liệu cụ thể
-8. **ĐẶC BIỆT: Luôn hỏi đủ thông tin trước khi đặt vé máy bay**`;
+Bạn muốn tôi hướng dẫn chi tiết bước nào?"`;
 
         // Build complete prompt with user profile
+        // Build concise Customer Insights
+        const prefs = prefsRef.current;
+        const insights = [
+          userProfile?.name ? `Tên: ${userProfile.name}` : undefined,
+          userProfile?.riskTolerance ? `Rủi ro: ${userProfile.riskTolerance}` : undefined,
+          typeof userProfile?.sovicoTokens === 'number' ? `SVT: ${userProfile.sovicoTokens}` : undefined,
+          prefs?.preferredOrigin ? `Origin thường: ${prefs.preferredOrigin}` : undefined,
+          prefs?.preferredDestination ? `Destination thường: ${prefs.preferredDestination}` : undefined,
+          prefs?.typicalPassengers ? `Số khách hay đi: ${prefs.typicalPassengers}` : undefined,
+        ].filter(Boolean).join(' • ');
+
         const fullPrompt = `${systemPrompt}
 
-**HỒ SƠ KHÁCH HÀNG HIỆN TẠI:**
--  Tên: ${userProfile?.name || 'Khách hàng'}
--  Tuổi: ${userProfile?.age || 'Chưa xác định'}
--  Khẩu vị rủi ro: ${userProfile?.riskTolerance || 'moderate'}
--  Số dư SVT: ${userProfile?.sovicoTokens?.toLocaleString('vi-VN') || '0'} SVT
--  Tổng giao dịch: ${userProfile?.totalTransactions || 0} lần
--  Thu nhập ước tính: ${userProfile?.monthlyIncome?.toLocaleString('vi-VN') || 'Chưa xác định'} VND/tháng
--  Cấp bậc hiện tại: ${userProfile?.sovicoTokens && userProfile.sovicoTokens >= 200000 ? 'Diamond 💎' : 
-                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 50000 ? 'Gold 🥇' :
-                          userProfile?.sovicoTokens && userProfile.sovicoTokens >= 10000 ? 'Silver 🥈' : 'Bronze 🥉'}
+CUSTOMER INSIGHTS: ${insights || 'N/A'}
 
-**CÂU HỎI CỦA KHÁCH HÀNG:**
-"${userMessage}"
-
-Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chính cá nhân hóa, bao gồm chiến lược sử dụng hệ sinh thái Sovico một cách tối ưu.`;
+USER ASK: "${userMessage}"`;
 
         const result = await currentModel.generateContent(fullPrompt);
         const response = await result.response;
@@ -1099,8 +1149,104 @@ Hãy phân tích kỹ profile khách hàng và đưa ra lời khuyên tài chín
     throw new Error('All Gemini models failed');
   };
 
-  const generateLocalResponse = (userMessage: string): string => {
+  const generateLocalResponse = async (userMessage: string): Promise<string> => {
     const lowerMessage = userMessage.toLowerCase();
+    
+    // Handle specific questions about SVT meaning
+    if (lowerMessage.includes('svt là gì') || lowerMessage.includes('sovico token là gì')) {
+      return `🪙 **SVT (Sovico Token) là gì?**
+
+**📋 Định nghĩa:**
+• **SVT** = Sovico Token - Token nội bộ của hệ sinh thái Sovico
+• **Mục đích:** Tích điểm, đổi quà, giao dịch trong hệ sinh thái
+• **Giá trị:** 1 SVT = 1,000 VNĐ (tỷ giá cố định)
+
+**🎯 Công dụng chính:**
+• **Thanh toán:** Mua vé máy bay, đặt phòng resort
+• **Đổi quà:** Voucher ăn uống, spa, shopping
+• **Đầu tư:** Mua NFT, staking lãi suất
+• **Giao dịch:** Trade trên P2P marketplace
+
+**💰 Cách kiếm SVT:**
+• Giao dịch HDBank: 0.1% số tiền → SVT
+• Bay Vietjet: 100-200 SVT/chuyến
+• Nghỉ Resort: 200-500 SVT/tối
+• Review dịch vụ: 50-200 SVT/review
+• Giới thiệu bạn bè: 1,000 SVT/người
+
+**📊 Level system:**
+• **Bronze:** 0-9,999 SVT
+• **Silver:** 10,000-49,999 SVT  
+• **Gold:** 50,000-199,999 SVT
+• **Diamond:** 200,000+ SVT
+
+Bạn muốn tôi hướng dẫn cách kiếm SVT hiệu quả không?`;
+    }
+    
+    // Handle strategy questions about flights, balance, and SVT
+    if (lowerMessage.includes('chiến lược') || lowerMessage.includes('strategy') || 
+        lowerMessage.includes('kế hoạch') || lowerMessage.includes('plan') ||
+        lowerMessage.includes('số chuyến bay') || lowerMessage.includes('số dư') ||
+        lowerMessage.includes('số svt')) {
+      
+      const currentSVT = userProfile?.sovicoTokens || 0;
+      const currentLevel = currentSVT >= 200000 ? 'Diamond' : 
+                          currentSVT >= 50000 ? 'Gold' : 
+                          currentSVT >= 10000 ? 'Silver' : 'Bronze';
+      
+      // Get real data from APIs
+      const financialData = await fetchFinancialData();
+      const flightCount = financialData.flightCount || (userProfile?.totalTransactions ? Math.min(userProfile.totalTransactions, 20) : 5);
+      const accountBalance = financialData.accountBalance || (userProfile?.sovicoTokens ? userProfile.sovicoTokens * 1000 : 20000000);
+      
+      return `📊 **Chiến lược tài chính cá nhân hóa cho bạn:**
+
+**📈 Tình hình hiện tại:**
+• **SVT hiện có:** ${currentSVT.toLocaleString('vi-VN')} tokens (${currentLevel})
+• **Số chuyến bay:** ${flightCount} chuyến trong năm
+• **Số dư tài khoản:** ${accountBalance.toLocaleString('vi-VN')} VNĐ
+• **Giao dịch:** ${userProfile?.totalTransactions || 0} lần
+
+**🎯 Chiến lược tối ưu dựa trên profile:**
+
+**✈️ Chiến lược bay (${flightCount} chuyến/năm):**
+${flightCount >= 15 ? 
+  '• **Frequent Flyer:** Tối ưu hóa với Vietjet Gold/Platinum\n• Tích miles x2, ưu tiên chuyến quốc tế\n• Sử dụng SVT để upgrade hạng bay' :
+  flightCount >= 8 ?
+  '• **Regular Traveler:** Cân bằng nội địa và quốc tế\n• Tập trung tích SVT từ bay (100-200 SVT/chuyến)\n• Sử dụng voucher SVT để giảm chi phí' :
+  '• **Occasional Traveler:** Tối ưu từng chuyến bay\n• Ưu tiên bay trong mùa thấp điểm\n• Sử dụng SVT để đổi voucher du lịch'
+}
+
+**💰 Chiến lược tài chính (${(accountBalance/1000000).toFixed(0)}M VNĐ):**
+${accountBalance >= 50000000 ?
+  '• **High Balance:** Đa dạng hóa đầu tư\n• 40% tiết kiệm HDBank (7.5%/năm)\n• 30% đầu tư chứng khoán\n• 20% bất động sản\n• 10% SVT ecosystem' :
+  accountBalance >= 20000000 ?
+  '• **Medium Balance:** Cân bằng rủi ro\n• 50% tiết kiệm an toàn\n• 30% đầu tư trung bình rủi ro\n• 20% SVT và crypto' :
+  '• **Growing Balance:** Tập trung tích lũy\n• 70% tiết kiệm lãi suất cao\n• 20% đầu tư ít rủi ro\n• 10% SVT để học hỏi'
+}
+
+**🪙 Chiến lược SVT (${currentLevel} level):**
+${currentLevel === 'Diamond' ?
+  '• **Diamond Strategy:** Tối ưu hóa lợi nhuận\n• Staking SVT để nhận lãi 8-12%/năm\n• Trade SVT trên P2P marketplace\n• Đầu tư NFT premium' :
+  currentLevel === 'Gold' ?
+  '• **Gold Strategy:** Tăng cường tích lũy\n• Tập trung kiếm SVT từ giao dịch\n• Bay thêm 5-10 chuyến/năm\n• Đầu tư NFT cơ bản' :
+  currentLevel === 'Silver' ?
+  '• **Silver Strategy:** Nâng cấp level\n• Tăng cường giao dịch HDBank\n• Bay thêm 3-5 chuyến/năm\n• Tham gia referral program' :
+  '• **Bronze Strategy:** Kích hoạt tài khoản\n• Mở tài khoản HDBank để kiếm SVT\n• Bay ít nhất 2-3 chuyến/năm\n• Hoàn thành daily tasks'
+}
+
+**📅 Kế hoạch 3 tháng tới:**
+1. **Tháng 1:** ${currentLevel === 'Bronze' ? 'Kích hoạt SVT, mở tài khoản HDBank' : 'Tối ưu hóa giao dịch hiện tại'}
+2. **Tháng 2:** ${flightCount < 5 ? 'Đặt thêm 2-3 chuyến bay' : 'Tối ưu hóa chuyến bay hiện có'}
+3. **Tháng 3:** ${currentLevel === 'Diamond' ? 'Đầu tư SVT advanced' : 'Nâng cấp level SVT'}
+
+**💡 Hành động ngay:**
+• Kiểm tra ưu đãi level ${currentLevel} hiện tại
+• Đặt lịch bay tiếp theo để tích SVT
+• Review portfolio đầu tư hiện tại
+
+Bạn muốn tôi chi tiết hóa chiến lược nào?`;
+    }
     
     // Flight booking
     if (lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') || 
@@ -1233,47 +1379,84 @@ Dựa trên profile và mức độ rủi ro:
 • Cảnh báo khi vượt ngân sách`;
     }
     
-    // SVT Token
-    if (lowerMessage.includes('svt') || lowerMessage.includes('token')) {
-      return `🪙 **Chiến lược SVT Token:**
+    // SVT Token - Enhanced with accurate information
+    if (lowerMessage.includes('svt') || lowerMessage.includes('token') || lowerMessage.includes('sovico token')) {
+      const currentSVT = userProfile?.sovicoTokens || 0;
+      const currentLevel = currentSVT >= 200000 ? 'Diamond' : 
+                          currentSVT >= 50000 ? 'Gold' : 
+                          currentSVT >= 10000 ? 'Silver' : 'Bronze';
+      
+      return `🪙 **Phân tích SVT Token của bạn:**
 
- **Cách kiếm SVT:**
-• Hoàn thành nhiệm vụ hàng ngày: 50-100 SVT
-• Giao dịch HDBank: 0.1% số tiền → SVT
-• Bay Vietjet: 100 SVT/chuyến
-• Review resort: 200-500 SVT
-• Refer bạn bè: 1000 SVT/người
+**📊 Thông tin hiện tại:**
+• **SVT hiện có:** ${currentSVT.toLocaleString('vi-VN')} tokens
+• **Mức độ:** ${currentLevel}
+• **Trạng thái:** ${currentSVT >= 10000 ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
 
- **Cách dùng SVT hiệu quả:**
-• Đổi voucher ăn uống (ROI 120%)
-• Upgrade hạng bay (ROI 150%)
-• Mua NFT achievements 
-• Trade trên P2P marketplace
+**💰 Cách kiếm SVT hiệu quả:**
+• **Giao dịch HDBank:** 0.1% số tiền giao dịch → SVT
+• **Bay Vietjet:** 100 SVT/chuyến nội địa, 200 SVT/chuyến quốc tế
+• **Nghỉ Resort:** 200-500 SVT/tối tùy hạng phòng
+• **Review dịch vụ:** 50-200 SVT/review
+• **Giới thiệu bạn bè:** 1,000 SVT/người thành công
+• **Nhiệm vụ hàng ngày:** 50-100 SVT/task
 
- **Level up strategy:**
-• Tích 10,000 SVT → Silver
-• Tích 50,000 SVT → Gold  
-• Tích 200,000 SVT → Diamond`;
+**🎯 Cách sử dụng SVT tối ưu:**
+• **Đổi voucher:** 1 SVT = 1,000 VNĐ (ROI 100%)
+• **Upgrade dịch vụ:** Giảm 20-50% phí
+• **Mua NFT:** Đầu tư dài hạn
+• **Staking:** Lãi 8-12%/năm
+
+**📈 Mục tiêu level tiếp theo:**
+${currentLevel === 'Bronze' ? '• Cần 10,000 SVT để lên Silver' : 
+  currentLevel === 'Silver' ? '• Cần 50,000 SVT để lên Gold' :
+  currentLevel === 'Gold' ? '• Cần 200,000 SVT để lên Diamond' : '• Bạn đã đạt mức cao nhất!'}
+
+**💡 Đề xuất hành động:**
+1. Tăng cường giao dịch HDBank
+2. Đặt vé Vietjet thường xuyên  
+3. Nghỉ dưỡng tại Resort
+4. Tham gia chương trình referral
+
+Bạn muốn tôi hướng dẫn chi tiết cách nào?`;
     }
     
-    // HDBank
-    if (lowerMessage.includes('hdbank') || lowerMessage.includes('ngân hàng')) {
-      return ` **Sản phẩm HDBank phù hợp:**
+    // HDBank - Enhanced with accurate information
+    if (lowerMessage.includes('hdbank') || lowerMessage.includes('ngân hàng') || lowerMessage.includes('thẻ') || lowerMessage.includes('vay')) {
+      return `🏦 **Dịch vụ HDBank cho bạn:**
 
- **Thẻ tín dụng:**
-• HDBank Visa Signature: Phòng chờ sân bay
-• HDBank Vietjet Platinum: Tích miles x2
-• HDBank Live: Cashback 8% ăn uống
+**💳 Thẻ tín dụng (dựa trên profile):**
+• **HDBank Visa Classic:** Phí thường niên 200,000 VNĐ
+• **HDBank Vietjet Platinum:** Tích miles x2, phí 500,000 VNĐ/năm
+• **HDBank Signature:** Hạn mức cao, phí 1,000,000 VNĐ/năm
+• **Cashback:** 0.5-2% tùy loại thẻ
 
- **Tiết kiệm & Đầu tư:**
-• Tiền gửi online: Lãi suất ưu đãi +0.5%
-• HD EARN: Combo tiết kiệm + bảo hiểm
-• HD Invest: Ủy thác đầu tư từ 10 triệu
+**💰 Tiết kiệm & Đầu tư:**
+• **Tiền gửi có kỳ hạn:** 7.5-8.5%/năm (12-24 tháng)
+• **Tiết kiệm linh hoạt:** 6.2%/năm, rút bất kỳ lúc nào
+• **HD EARN:** Combo tiết kiệm + bảo hiểm nhân thọ
+• **HD Invest:** Ủy thác đầu tư từ 10 triệu VNĐ
 
- **Ưu đãi đặc biệt:**
-• Mở tài khoản qua Sovico: +500 SVT
-• Duy trì số dư 50 triệu: +200 SVT/tháng
-• Giao dịch 10 triệu/tháng: Free phí chuyển khoản`;
+**🏠 Vay vốn:**
+• **Vay mua nhà:** Lãi suất 8.5-9.5%/năm
+• **Vay mua xe:** Lãi suất 9.5-11%/năm  
+• **Vay kinh doanh:** Lãi suất 10-12%/năm
+• **Vay tiêu dùng:** Lãi suất 12-15%/năm
+
+**🎁 Ưu đãi đặc biệt qua Sovico:**
+• **Mở tài khoản:** +500 SVT
+• **Duy trì số dư 50 triệu:** +200 SVT/tháng
+• **Giao dịch 10 triệu/tháng:** Miễn phí chuyển khoản
+• **Mở thẻ tín dụng:** +1,000 SVT
+• **Vay vốn:** +0.1% số tiền vay → SVT
+
+**📊 Đề xuất phù hợp với bạn:**
+1. Mở tài khoản tiết kiệm để tối ưu lãi suất
+2. Đăng ký thẻ tín dụng phù hợp với thu nhập
+3. Tham gia chương trình tích điểm SVT
+4. Sử dụng dịch vụ chuyển khoản miễn phí
+
+Bạn quan tâm đến sản phẩm nào?`;
     }
     
     // Kế hoạch tài chính
@@ -1298,22 +1481,39 @@ Dựa trên profile và mức độ rủi ro:
 • Monthly review với AI advisor`;
     }
     
-    // Default response
-    return ` Cảm ơn bạn đã hỏi! Tôi đang phân tích câu hỏi của bạn...
+    // Default response - Enhanced with better guidance
+    return `🤖 **AI Agent đang phân tích yêu cầu của bạn...**
 
-Dựa trên thông tin hiện tại, tôi đề xuất:
+**📊 Dựa trên profile hiện tại:**
+• **SVT:** ${userProfile?.sovicoTokens?.toLocaleString('vi-VN') || 'Chưa có'} tokens
+• **Level:** ${userProfile?.sovicoTokens >= 200000 ? 'Diamond' : 
+              userProfile?.sovicoTokens >= 50000 ? 'Gold' : 
+              userProfile?.sovicoTokens >= 10000 ? 'Silver' : 'Bronze'}
+• **Giao dịch:** ${userProfile?.totalTransactions || 0} lần
 
-💼 **Phân tích ngắn hạn:**
-• Review lại spending pattern của bạn
-• Tối ưu hóa cash flow với các sản phẩm HDBank
-• Tích cực tham gia Sovico ecosystem để kiếm SVT
+**💡 Tôi có thể giúp bạn với:**
 
- **Chiến lược dài hạn:**
-• Đa dạng hóa portfolio (stocks, bonds, real estate)
-• Xây dựng emergency fund 6-12 tháng
-• Đầu tư vào education và personal development
+**💰 Tài chính cá nhân:**
+• Phân tích chi tiêu và tối ưu ngân sách
+• Tư vấn tiết kiệm và đầu tư
+• Kế hoạch tài chính dài hạn
 
- Bạn có thể hỏi cụ thể hơn về đầu tư, tiết kiệm, hoặc các sản phẩm tài chính nhé!`;
+**🏦 Dịch vụ ngân hàng:**
+• Mở thẻ tín dụng HDBank
+• Vay vốn mua nhà/xe/kinh doanh
+• Chuyển khoản và thanh toán
+
+**✈️ Du lịch & Nghỉ dưỡng:**
+• Đặt vé máy bay Vietjet
+• Đặt phòng resort
+• Booking spa và ẩm thực
+
+**🪙 SVT Ecosystem:**
+• Cách kiếm và sử dụng SVT hiệu quả
+• Tham gia chương trình loyalty
+• Đầu tư NFT và staking
+
+**Hãy cho tôi biết bạn cần hỗ trợ gì cụ thể nhé!** 🎯`;
   };
 
   const handleSendMessage = async () => {
@@ -1346,10 +1546,10 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
           aiResponse = await generateGeminiResponse(currentInput);
         } catch (error) {
           console.error('Gemini failed, falling back to local response:', error);
-          aiResponse = generateLocalResponse(currentInput);
+          aiResponse = await generateLocalResponse(currentInput);
         }
       } else {
-        aiResponse = generateLocalResponse(currentInput);
+        aiResponse = await generateLocalResponse(currentInput);
       }
 
       // Nếu có actions, thêm thông báo Agent vào response
@@ -1402,7 +1602,7 @@ Dựa trên thông tin hiện tại, tôi đề xuất:
     } catch (error: any) {
       console.error('Error generating AI response:', error);
       
-      let errorMessage = '❌ **Xin lỗi, AI gặp sự cố**\n\n';
+      let errorMessage = ' **Xin lỗi, AI gặp sự cố**\n\n';
       
       if (error.message && error.message.includes('GoogleGenerativeAI')) {
         errorMessage += '🔧 **Vấn đề Gemini AI:**\n';

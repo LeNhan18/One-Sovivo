@@ -10,6 +10,7 @@ from .service_routes import hdbank_bp, vietjet_bp, resort_bp
 from .nft_routes import nft_bp
 from .token_routes import token_bp
 from .token_transaction_routes import token_transaction_bp
+from .integration_routes import integration_bp
 
 # Import additional blueprints if they exist
 try:
@@ -67,6 +68,7 @@ def register_blueprints(app):
     app.register_blueprint(nft_bp)
     app.register_blueprint(token_bp)
     app.register_blueprint(token_transaction_bp)
+    app.register_blueprint(integration_bp)
     # Register new admin API blueprint under /api/admin
     app.register_blueprint(admin_api_bp)
     

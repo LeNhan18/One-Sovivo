@@ -309,6 +309,33 @@ class HDBankService:
             print(f"❌ Error opening card: {e}")
             return {'success': False, 'error': str(e)}
     
+    def get_transactions(self, customer_id, limit=100):
+        """Lấy lịch sử giao dịch HDBank theo customer_id"""
+        try:
+            HTx = _HDBankTransaction()
+            if not HTx:
+                return {'success': False, 'error': 'Model not initialized'}
+            q = HTx.query.filter_by(customer_id=customer_id).order_by(HTx.transaction_date.desc())
+            if limit:
+                q = q.limit(int(limit))
+            rows = q.all()
+            transactions = []
+            for t in rows:
+                transactions.append({
+                    'id': t.id,
+                    'transaction_id': getattr(t, 'transaction_id', None),
+                    'transaction_date': t.transaction_date.isoformat() if t.transaction_date else None,
+                    'amount': float(t.amount) if t.amount is not None else 0.0,
+                    'transaction_type': t.transaction_type,
+                    'balance': float(t.balance) if t.balance is not None else None,
+                    'description': t.description,
+                    'status': getattr(t, 'status', 'completed')
+                })
+            return {'success': True, 'customer_id': customer_id, 'count': len(transactions), 'transactions': transactions}
+        except Exception as e:
+            print(f"❌ Error getting transactions: {e}")
+            return {'success': False, 'error': str(e)}
+
     def get_customer_cards(self, customer_id):
         """Lấy danh sách thẻ của customer"""
         try:
