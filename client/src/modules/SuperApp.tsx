@@ -3,6 +3,7 @@ import { AuthUser } from '../services/auth'
 import SVTWallet from '../components/SVTWallet'
 import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
+import GameDashboard from '../components/GameDashboard'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
 import ESGPrograms from '../components/ESGPrograms'
@@ -57,7 +58,7 @@ const CubeIcon = () => (
 )
 
 export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
-  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history' | 'esg' | 'service'>('home')
+  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'games' | 'history' | 'esg' | 'service'>('home')
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [insights, setInsights] = useState<any | null>(null)
@@ -364,6 +365,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
       icon: '🤖'
     },
     {
+      id: 'games',
+      label: 'SVT Games',
+      description: 'Chơi game nhận SVT',
+      bgImage: './Image/AI.jpg',
+      icon: '🎮'
+    },
+    {
       id: 'history',
       label: 'Blockchain',
       description: 'Lịch sử giao dịch',
@@ -476,6 +484,26 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     )
   }
 
+  if (activeSection === 'games') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+          <button
+            onClick={() => setActiveSection('home')}
+            className="text-blue-400 hover:text-blue-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">🎮 SVT Game Center</h1>
+          <div></div>
+        </div>
+        <div className="h-[calc(100vh-80px)]">
+          <GameDashboard />
+        </div>
+      </div>
+    )
+  }
+
   if (activeSection === 'service' && currentService) {
     if (currentService === 'hdbank') {
       return (
@@ -521,40 +549,74 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
   if (activeSection === 'history') {
     return (
-      <div className="text-gray-200 font-sans min-h-screen">
-        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
-          <button
-            onClick={() => setActiveSection('home')}
-            className="text-blue-400 hover:text-blue-300 flex items-center"
-          >
-            ← Về trang chủ
-          </button>
-          <h1 className="text-xl font-bold text-white">Blockchain Explorer</h1>
-          <div></div>
+      <div className="text-gray-200 font-sans min-h-screen bg-gradient-to-br from-[#0D1117] via-[#161B22] to-[#0D1117]">
+        {/* Enhanced Header */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-cyan-600/20"></div>
+          <div className="relative p-6 flex justify-between items-center backdrop-blur-sm border-b border-gray-700/50">
+            <button
+              onClick={() => setActiveSection('home')}
+              className="text-blue-400 hover:text-blue-300 flex items-center group transition-all duration-300 hover:scale-105"
+            >
+              <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
+              Về trang chủ
+            </button>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                Blockchain Explorer
+              </h1>
+              <p className="text-gray-400 text-sm mt-1">Khám phá Sovico Passport NFT & Thành tựu</p>
+            </div>
+            <div className="w-24"></div>
+          </div>
         </div>
-        <div className="p-6 space-y-6">
-          {/* NFT Passport Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center">
-                🎫 <span className="ml-2">Sovico Passport NFT</span>
-              </h2>
+
+        <div className="p-6 space-y-8">
+          {/* Enhanced NFT Passport Section */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl">🎫</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Sovico Passport NFT</h2>
+                  <p className="text-gray-400 text-sm">Digital Identity & Achievements</p>
+                </div>
+              </div>
               <button
                 onClick={handleVIPSimulation}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2"
               >
-                👑 Mô phỏng VIP
+                <span className="text-lg">👑</span>
+                <span>Mô phỏng VIP</span>
               </button>
             </div>
-            <NFTPassport tokenId={userData?.customerId || 1} refreshTrigger={refreshTrigger} />
+            
+            {/* Enhanced NFT Card Container */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-2xl blur-xl"></div>
+              <div className="relative bg-[#0D1117]/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl overflow-hidden">
+                <NFTPassport tokenId={userData?.customerId || 1} refreshTrigger={refreshTrigger} />
+              </div>
+            </div>
           </div>
 
-          {/* Transaction History Section */}
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-              ⛓️ <span className="ml-2">Blockchain Explorer</span>
-            </h2>
-            <TransactionHistory />
+          {/* Enhanced Transaction History Section */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl"></div>
+            <div className="relative bg-[#0D1117]/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl">⛓️</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Blockchain Explorer</h2>
+                  <p className="text-gray-400 text-sm">Transaction History & Analytics</p>
+                </div>
+              </div>
+              <TransactionHistory />
+            </div>
           </div>
         </div>
       </div>

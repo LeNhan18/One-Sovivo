@@ -266,7 +266,7 @@ const SVTMarketplace: React.FC = () => {
         </div>
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-3 rounded-lg">
           <p className="text-purple-200 text-sm">Số dư của bạn</p>
-8          <p className="text-2xl font-bold">{(userSVT || 0).toLocaleString('vi-VN')} SVT</p>
+          <p className="text-2xl font-bold">{(userSVT || 0).toLocaleString('vi-VN')} SVT</p>
         </div>
       </div>
 
@@ -338,6 +338,7 @@ const SVTMarketplace: React.FC = () => {
                       {item.price.toLocaleString('vi-VN')} <span className="ml-1">SVT</span>
                     </span>
                     <button
+                      onClick={() => handlePurchase(item)}
                       disabled={item.availability === 0 || userSVT < item.price}
                       className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
                         item.availability === 0

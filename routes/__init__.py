@@ -43,6 +43,12 @@ try:
 except ImportError:
     ESG_AVAILABLE = False
 
+try:
+    from .game_routes import game_bp
+    GAME_AVAILABLE = True
+except ImportError:
+    GAME_AVAILABLE = False
+
 __all__ = [
     'auth_bp', 'customer_bp', 'admin_bp', 'ai_bp',
     'marketplace_bp', 'p2p_bp', 'mission_bp',
@@ -93,5 +99,9 @@ def register_blueprints(app):
         app.register_blueprint(esg_bp)
         print("✅ ESG routes registered")
         print("✅ ESG routes registered successfully")
+    
+    if GAME_AVAILABLE:
+        app.register_blueprint(game_bp)
+        print("✅ Game routes registered")
 
     return True

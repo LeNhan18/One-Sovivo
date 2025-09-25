@@ -88,7 +88,7 @@ class MarketplaceService:
                 'success': True,
                 'message': f'Đã mua {quantity}x {item.name} thành công',
                 'total_cost': total_cost,
-                'remaining_balance': current_balance - total_cost
+                'remaining_svt': current_balance - total_cost
             }
             
         except Exception as e:

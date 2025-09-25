@@ -506,16 +506,16 @@ from routes.admin_chat_routes import admin_chat_bp
 
 # Register the blueprint with the Flask app
 app.register_blueprint(admin_chat_bp, name="admin_chat_unique")
-print("✅ Admin Chat routes registered")
+print(" Admin Chat routes registered")
 
 # Integrate Sentiment Analysis
 try:
     from integrate_sentiment import integrate_sentiment_routes
     integrate_sentiment_routes(app)
-    print("✅ Sentiment Analysis integrated successfully!")
+    print(" Sentiment Analysis integrated successfully!")
 except Exception as e:
-    print(f"⚠️ Sentiment Analysis integration failed: {e}")
-    print("📊 Sentiment analysis will not be available")
+    print(f"️ Sentiment Analysis integration failed: {e}")
+    print(" Sentiment analysis will not be available")
 
 
 if __name__ == '__main__':

@@ -85,33 +85,274 @@ const AIFinancialAssistant: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prefsRef = useRef<CustomerPreferences>({});
+  
+  // Flight booking context to remember previous information
+  const [flightContext, setFlightContext] = useState<{
+    origin?: string;
+    destination?: string;
+    date?: string;
+    passengers?: number;
+    isBooking?: boolean;
+  }>({});
 
-  // Fetch additional financial data for strategy analysis
+  // Extract and combine flight information from context and current message
+  const extractFlightInfoWithContext = (userMessage: string) => {
+    const lowerMessage = userMessage.toLowerCase();
+    
+    // Check if this is a flight-related message
+    const isFlightRelated = lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') || 
+                           lowerMessage.includes('bay') || lowerMessage.includes('vietjet') ||
+                           lowerMessage.includes('đi') || lowerMessage.includes('đến') ||
+                           lowerMessage.includes('ngày') || lowerMessage.includes('người') ||
+                           lowerMessage.includes('hành khách') || lowerMessage.includes('chuyến');
+    
+    if (!isFlightRelated && !flightContext.isBooking) {
+      return null; // Not flight related
+    }
+    
+    // Extract information from current message
+    const currentOrigin = extractLocation(userMessage, 'origin');
+    const currentDestination = extractLocation(userMessage, 'destination');
+    const currentDate = extractDate(userMessage);
+    const currentPassengers = extractPassengerCount(userMessage);
+    
+    // Combine with context
+    const combinedInfo = {
+      origin: currentOrigin || flightContext.origin,
+      destination: currentDestination || flightContext.destination,
+      date: currentDate || flightContext.date,
+      passengers: currentPassengers || flightContext.passengers || 1,
+      isBooking: flightContext.isBooking || isFlightRelated
+    };
+    
+    // Update context if we found new information
+    if (currentOrigin || currentDestination || currentDate || currentPassengers) {
+      setFlightContext(combinedInfo);
+    }
+    
+    return combinedInfo;
+  };
+
+  // Smart questioning for missing flight information
+  const askForMissingFlightInfo = (missingInfo: string[], hasOrigin: string | null, hasDestination: string | null, hasDate: string | null, hasPassengerCount: number) => {
+    let questionText = '';
+    
+    if (missingInfo.length === 1) {
+      questionText = `Tôi cần biết ${missingInfo[0]} để đặt vé cho bạn.`;
+    } else if (missingInfo.length === 2) {
+      questionText = `Tôi cần biết ${missingInfo[0]} và ${missingInfo[1]} để đặt vé.`;
+    } else {
+      questionText = `Tôi cần biết ${missingInfo.slice(0, -1).join(', ')} và ${missingInfo[missingInfo.length - 1]} để đặt vé.`;
+    }
+    
+    return `✈️ **Đặt vé máy bay Vietjet**
+
+${questionText}
+
+**📋 Thông tin hiện tại:**
+${hasOrigin ? '✅ Điểm đi: ' + hasOrigin : '❌ Điểm đi: Chưa có'}
+${hasDestination ? '✅ Điểm đến: ' + hasDestination : '❌ Điểm đến: Chưa có'}
+${hasDate ? '✅ Ngày bay: ' + hasDate : '❌ Ngày bay: Chưa có'}
+${hasPassengerCount ? '✅ Số người: ' + hasPassengerCount : '✅ Số người: 1 (mặc định)'}
+
+**💡 Ví dụ cung cấp thông tin:**
+• "Từ Hà Nội đi Phú Quốc ngày 20/10 cho 2 người"
+• "Bay từ TP.HCM đến Singapore ngày mai"
+• "Đặt vé từ Đà Nẵng đi Nha Trang tuần sau"
+• Hoặc chỉ cần nhắn: "Phú Quốc" (nếu đã có điểm đi)
+• Hoặc chỉ cần nhắn: "ngày 20/10" (nếu đã có điểm đi và đến)
+
+**🎁 Ưu đãi khi đặt vé:**
+• Tích 100 SVT/chuyến nội địa, 200 SVT/chuyến quốc tế
+• Thanh toán HDBank: +0.1% cashback
+• Thành viên Gold: Miễn phí chọn chỗ ngồi
+
+Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
+  };
+
+  // Generate response when all flight info is available
+  const generateFlightBookingResponse = (hasOrigin: string | null, hasDestination: string | null, hasDate: string | null, hasPassengerCount: number) => {
+    return `✈️ **Agent đang xử lý đặt vé máy bay**
+
+**🚀 THÔNG BÁO: Agent mode ON** - Tôi sẽ thực hiện đặt vé ngay bây giờ!
+
+**📋 Thông tin chuyến bay:**
+• **Từ:** ${hasOrigin}
+• **Đến:** ${hasDestination} 
+• **Ngày:** ${hasDate}
+• **Hành khách:** ${hasPassengerCount} người
+• **Hạng:** Economy (có thể upgrade lên Business)
+
+**⚙️ Agent đang thực hiện:**
+1. 🔍 Kiểm tra chuyến bay khả dụng
+2. 💰 So sánh giá tốt nhất
+3. 🎫 Đặt vé và thanh toán
+4. 📧 Gửi boarding pass về email
+5. 🪙 Cập nhật SVT token reward
+
+**🎁 Ưu đãi áp dụng:**
+• Tích ${hasDestination?.includes('SIN') || hasDestination?.includes('NRT') || hasDestination?.includes('ICN') ? '200' : '100'} SVT cho chuyến bay này
+• Thanh toán HDBank: +0.1% cashback
+• ${userProfile?.sovicoTokens >= 50000 ? 'Thành viên Gold: Miễn phí chọn chỗ ngồi' : 'Thành viên thường: Chọn chỗ ngồi 50,000 VNĐ'}
+
+⚡ **Bạn không cần làm gì thêm, Agent sẽ hoàn tất tất cả!**`;
+  };
+
+  // Fetch comprehensive financial data for AI analysis
   const fetchFinancialData = async () => {
-    if (!userProfile) return { flightCount: 0, accountBalance: 0 };
+    if (!userProfile) return { 
+      flightCount: 0, 
+      accountBalance: 0, 
+      monthlyIncome: 0,
+      spendingPattern: {},
+      investmentPortfolio: {},
+      creditScore: 0,
+      loanHistory: [],
+      transactionHistory: []
+    };
     
     try {
       const token = localStorage.getItem('auth_token');
-      if (!token) return { flightCount: 0, accountBalance: 0 };
+      if (!token) return { 
+        flightCount: 0, 
+        accountBalance: 0, 
+        monthlyIncome: 0,
+        spendingPattern: {},
+        investmentPortfolio: {},
+        creditScore: 0,
+        loanHistory: [],
+        transactionHistory: []
+      };
 
-      // Fetch flight history
-      const flightResponse = await fetch(`http://127.0.0.1:5000/api/vietjet/history/${userProfile.customer_id}`, {
+      // Fetch comprehensive data from multiple sources
+      const [
+        flightResponse,
+        balanceResponse,
+        transactionResponse,
+        loanResponse,
+        investmentResponse
+      ] = await Promise.all([
+        // Flight history
+        fetch(`http://127.0.0.1:5000/api/vietjet/history/${userProfile.customer_id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
-      });
+        }),
+        // Account balance
+        fetch(`http://127.0.0.1:5000/api/hdbank/balance/${userProfile.customer_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        // Transaction history
+        fetch(`http://127.0.0.1:5000/api/hdbank/transactions/${userProfile.customer_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        // Loan history
+        fetch(`http://127.0.0.1:5000/api/hdbank/loans/${userProfile.customer_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        // Investment portfolio
+        fetch(`http://127.0.0.1:5000/api/hdbank/investments/${userProfile.customer_id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      // Process flight data
       const flightData = flightResponse.ok ? await flightResponse.json() : { flights: [] };
       const flightCount = flightData.flights?.length || 0;
+      const flightSpending = flightData.flights?.reduce((sum: number, flight: any) => sum + (flight.price || 0), 0) || 0;
 
-      // Fetch account balance
-      const balanceResponse = await fetch(`http://127.0.0.1:5000/api/hdbank/balance/${userProfile.customer_id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      // Process balance data
       const balanceData = balanceResponse.ok ? await balanceResponse.json() : { balance: 0 };
       const accountBalance = balanceData.balance || 0;
 
-      return { flightCount, accountBalance };
+      // Process transaction data
+      const transactionData = transactionResponse.ok ? await transactionResponse.json() : { transactions: [] };
+      const transactions = transactionData.transactions || [];
+      
+      // Calculate spending patterns - more realistic with fallback
+      const totalSpending = transactions.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+      const spendingPattern = {
+        monthly: totalSpending > 0 ? totalSpending / 12 : 15000000, // Default 15M VNĐ/month if no data
+        categories: {
+          food: transactions.filter((t: any) => t.category === 'food').reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
+          transport: transactions.filter((t: any) => t.category === 'transport').reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
+          entertainment: transactions.filter((t: any) => t.category === 'entertainment').reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
+          shopping: transactions.filter((t: any) => t.category === 'shopping').reduce((sum: number, t: any) => sum + (t.amount || 0), 0)
+        }
+      };
+
+      // Process loan data
+      const loanData = loanResponse.ok ? await loanResponse.json() : { loans: [] };
+      const loanHistory = loanData.loans || [];
+      const totalDebt = loanHistory.reduce((sum: number, loan: any) => sum + (loan.remaining_amount || 0), 0);
+
+      // Process investment data
+      const investmentData = investmentResponse.ok ? await investmentResponse.json() : { investments: [] };
+      const investmentPortfolio = {
+        totalValue: investmentData.investments?.reduce((sum: number, inv: any) => sum + (inv.current_value || 0), 0) || 0,
+        types: {
+          stocks: investmentData.investments?.filter((inv: any) => inv.type === 'stock').length || 0,
+          bonds: investmentData.investments?.filter((inv: any) => inv.type === 'bond').length || 0,
+          mutual_funds: investmentData.investments?.filter((inv: any) => inv.type === 'mutual_fund').length || 0
+        }
+      };
+
+      // Calculate credit score based on various factors - more realistic
+      const creditScore = Math.min(850, Math.max(300, 
+        300 + 
+        (accountBalance > 10000000 ? 100 : 0) + // High balance bonus
+        (loanHistory.length === 0 ? 50 : 0) + // No debt bonus
+        (transactions.length > 50 ? 50 : 0) + // Active account bonus
+        (flightCount > 5 ? 30 : 0) + // Travel activity bonus
+        (userProfile.sovicoTokens > 50000 ? 40 : 0) + // SVT level bonus
+        (userProfile.sovicoTokens > 10000 ? 20 : 0) + // SVT Silver bonus
+        (transactions.length > 10 ? 30 : 0) // Basic activity bonus
+      ));
+
+      // Calculate monthly income estimate - more realistic calculation
+      let monthlyIncome = 20000000; // Default 20M VNĐ
+      
+      if (accountBalance > 0) {
+        monthlyIncome = Math.max(monthlyIncome, accountBalance / 12);
+      }
+      if (spendingPattern.monthly > 0) {
+        monthlyIncome = Math.max(monthlyIncome, spendingPattern.monthly * 1.5);
+      }
+      if (flightSpending > 0) {
+        monthlyIncome = Math.max(monthlyIncome, flightSpending / 12);
+      }
+      
+      // If user has SVT tokens, estimate higher income
+      if (userProfile.sovicoTokens > 10000) {
+        monthlyIncome = Math.max(monthlyIncome, 25000000); // At least 25M for Silver+ users
+      }
+
+      return { 
+        flightCount, 
+        accountBalance, 
+        monthlyIncome,
+        spendingPattern,
+        investmentPortfolio,
+        creditScore,
+        loanHistory,
+        transactionHistory: transactions,
+        totalDebt,
+        flightSpending,
+        totalSpending
+      };
     } catch (error) {
       console.error('Error fetching financial data:', error);
-      return { flightCount: 0, accountBalance: 0 };
+      return { 
+        flightCount: 0, 
+        accountBalance: 0, 
+        monthlyIncome: 20000000,
+        spendingPattern: { monthly: 0, categories: {} },
+        investmentPortfolio: { totalValue: 0, types: {} },
+        creditScore: 650,
+        loanHistory: [],
+        transactionHistory: [],
+        totalDebt: 0,
+        flightSpending: 0,
+        totalSpending: 0
+      };
     }
   };
 
@@ -381,6 +622,8 @@ const AIFinancialAssistant: React.FC = () => {
     }]);
     setCurrentChatId(null);
     setShowHistory(false);
+    // Reset flight context when starting new chat
+    setFlightContext({});
   };
 
   // Load specific chat
@@ -611,8 +854,8 @@ const AIFinancialAssistant: React.FC = () => {
       if (text.includes('nghìn')) return amount * 1000
     }
     
-    // Default amounts
-    return type === 'loan' ? 500000000 : 5000000
+    // Default amounts - giảm số tiền mặc định để tránh lỗi
+    return type === 'loan' ? 100000000 : 1000000
   }
 
   // Extract nights from text
@@ -1018,7 +1261,7 @@ const AIFinancialAssistant: React.FC = () => {
     const completionMessage: Message = {
       id: `completion_${Date.now()}`,
       type: 'ai',
-      content: `✅ Hoàn thành! Tôi đã thực hiện ${completedActions}/${totalActions} yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
+      content: `✅ **Hoàn thành!** Tôi đã thực hiện ${completedActions}/${totalActions} yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
       timestamp: new Date()
     }
 
@@ -1107,21 +1350,63 @@ VÍ DỤ TRẢ LỜI TỐT:
 
 Bạn muốn tôi hướng dẫn chi tiết bước nào?"`;
 
-        // Build complete prompt with user profile
-        // Build concise Customer Insights
+        // Build comprehensive customer insights with financial data
         const prefs = prefsRef.current;
-        const insights = [
+        const financialData = await fetchFinancialData();
+        
+        // Build detailed customer profile
+        const customerInsights = [
+          // Basic Info
           userProfile?.name ? `Tên: ${userProfile.name}` : undefined,
           userProfile?.riskTolerance ? `Rủi ro: ${userProfile.riskTolerance}` : undefined,
-          typeof userProfile?.sovicoTokens === 'number' ? `SVT: ${userProfile.sovicoTokens}` : undefined,
+          typeof userProfile?.sovicoTokens === 'number' ? `SVT: ${userProfile.sovicoTokens.toLocaleString('vi-VN')}` : undefined,
+          
+          // Financial Status
+          `Số dư: ${financialData.accountBalance.toLocaleString('vi-VN')} VNĐ`,
+          `Thu nhập ước tính: ${financialData.monthlyIncome.toLocaleString('vi-VN')} VNĐ/tháng`,
+          `Credit Score: ${financialData.creditScore}`,
+          `Tổng nợ: ${financialData.totalDebt.toLocaleString('vi-VN')} VNĐ`,
+          
+          // Spending Patterns
+          `Chi tiêu tháng: ${financialData.spendingPattern.monthly?.toLocaleString('vi-VN') || '0'} VNĐ`,
+          `Đầu tư hiện tại: ${financialData.investmentPortfolio.totalValue.toLocaleString('vi-VN')} VNĐ`,
+          
+          // Travel Behavior
+          `Số chuyến bay: ${financialData.flightCount}`,
+          `Chi phí bay: ${financialData.flightSpending.toLocaleString('vi-VN')} VNĐ`,
           prefs?.preferredOrigin ? `Origin thường: ${prefs.preferredOrigin}` : undefined,
           prefs?.preferredDestination ? `Destination thường: ${prefs.preferredDestination}` : undefined,
           prefs?.typicalPassengers ? `Số khách hay đi: ${prefs.typicalPassengers}` : undefined,
+          
+          // Investment Portfolio
+          (financialData.investmentPortfolio.types as any)?.stocks > 0 ? `Cổ phiếu: ${(financialData.investmentPortfolio.types as any).stocks}` : undefined,
+          (financialData.investmentPortfolio.types as any)?.bonds > 0 ? `Trái phiếu: ${(financialData.investmentPortfolio.types as any).bonds}` : undefined,
+          (financialData.investmentPortfolio.types as any)?.mutual_funds > 0 ? `Quỹ đầu tư: ${(financialData.investmentPortfolio.types as any).mutual_funds}` : undefined,
+          
+          // Loan History
+          financialData.loanHistory.length > 0 ? `Khoản vay: ${financialData.loanHistory.length}` : undefined,
+          
+          // Transaction Activity
+          `Giao dịch: ${financialData.transactionHistory.length} lần`,
         ].filter(Boolean).join(' • ');
 
         const fullPrompt = `${systemPrompt}
 
-CUSTOMER INSIGHTS: ${insights || 'N/A'}
+CUSTOMER INSIGHTS: ${customerInsights || 'N/A'}
+
+FINANCIAL CONTEXT:
+- Account Balance: ${financialData.accountBalance.toLocaleString('vi-VN')} VNĐ
+- Monthly Income: ${financialData.monthlyIncome.toLocaleString('vi-VN')} VNĐ
+- Credit Score: ${financialData.creditScore}/850
+- Total Debt: ${financialData.totalDebt.toLocaleString('vi-VN')} VNĐ
+- Investment Value: ${financialData.investmentPortfolio.totalValue.toLocaleString('vi-VN')} VNĐ
+- Flight Activity: ${financialData.flightCount} chuyến bay
+- Spending Pattern: ${financialData.spendingPattern.monthly?.toLocaleString('vi-VN') || '0'} VNĐ/tháng
+
+DATA STATUS:
+${financialData.accountBalance === 0 ? '⚠️ Chưa có dữ liệu số dư tài khoản - sử dụng ước tính' : '✅ Có dữ liệu số dư tài khoản'}
+${financialData.flightCount === 0 ? '⚠️ Chưa có dữ liệu chuyến bay - khách hàng mới' : '✅ Có dữ liệu chuyến bay'}
+${financialData.transactionHistory.length === 0 ? '⚠️ Chưa có dữ liệu giao dịch - tài khoản mới' : '✅ Có dữ liệu giao dịch'}
 
 USER ASK: "${userMessage}"`;
 
@@ -1159,7 +1444,6 @@ USER ASK: "${userMessage}"`;
 **📋 Định nghĩa:**
 • **SVT** = Sovico Token - Token nội bộ của hệ sinh thái Sovico
 • **Mục đích:** Tích điểm, đổi quà, giao dịch trong hệ sinh thái
-• **Giá trị:** 1 SVT = 1,000 VNĐ (tỷ giá cố định)
 
 **🎯 Công dụng chính:**
 • **Thanh toán:** Mua vé máy bay, đặt phòng resort
@@ -1194,10 +1478,15 @@ Bạn muốn tôi hướng dẫn cách kiếm SVT hiệu quả không?`;
                           currentSVT >= 50000 ? 'Gold' : 
                           currentSVT >= 10000 ? 'Silver' : 'Bronze';
       
-      // Get real data from APIs
+      // Get comprehensive financial data
       const financialData = await fetchFinancialData();
-      const flightCount = financialData.flightCount || (userProfile?.totalTransactions ? Math.min(userProfile.totalTransactions, 20) : 5);
-      const accountBalance = financialData.accountBalance || (userProfile?.sovicoTokens ? userProfile.sovicoTokens * 1000 : 20000000);
+      const flightCount = financialData.flightCount;
+      const accountBalance = financialData.accountBalance;
+      const monthlyIncome = financialData.monthlyIncome;
+      const creditScore = financialData.creditScore;
+      const totalDebt = financialData.totalDebt;
+      const investmentValue = financialData.investmentPortfolio.totalValue;
+      const spendingPattern = financialData.spendingPattern;
       
       return `📊 **Chiến lược tài chính cá nhân hóa cho bạn:**
 
@@ -1205,6 +1494,11 @@ Bạn muốn tôi hướng dẫn cách kiếm SVT hiệu quả không?`;
 • **SVT hiện có:** ${currentSVT.toLocaleString('vi-VN')} tokens (${currentLevel})
 • **Số chuyến bay:** ${flightCount} chuyến trong năm
 • **Số dư tài khoản:** ${accountBalance.toLocaleString('vi-VN')} VNĐ
+• **Thu nhập ước tính:** ${monthlyIncome.toLocaleString('vi-VN')} VNĐ/tháng
+• **Credit Score:** ${creditScore}/850
+• **Tổng nợ:** ${totalDebt.toLocaleString('vi-VN')} VNĐ
+• **Giá trị đầu tư:** ${investmentValue.toLocaleString('vi-VN')} VNĐ
+• **Chi tiêu tháng:** ${spendingPattern.monthly?.toLocaleString('vi-VN') || '0'} VNĐ
 • **Giao dịch:** ${userProfile?.totalTransactions || 0} lần
 
 **🎯 Chiến lược tối ưu dựa trên profile:**
@@ -1219,10 +1513,20 @@ ${flightCount >= 15 ?
 
 **💰 Chiến lược tài chính (${(accountBalance/1000000).toFixed(0)}M VNĐ):**
 ${accountBalance >= 50000000 ?
-  '• **High Balance:** Đa dạng hóa đầu tư\n• 40% tiết kiệm HDBank (7.5%/năm)\n• 30% đầu tư chứng khoán\n• 20% bất động sản\n• 10% SVT ecosystem' :
+  `• **High Balance:** Đa dạng hóa đầu tư
+• 40% tiết kiệm HDBank (7.5%/năm) = ${(accountBalance * 0.4 / 1000000).toFixed(0)}M VNĐ
+• 30% đầu tư chứng khoán = ${(accountBalance * 0.3 / 1000000).toFixed(0)}M VNĐ  
+• 20% bất động sản = ${(accountBalance * 0.2 / 1000000).toFixed(0)}M VNĐ
+• 10% SVT ecosystem = ${(accountBalance * 0.1 / 1000000).toFixed(0)}M VNĐ` :
   accountBalance >= 20000000 ?
-  '• **Medium Balance:** Cân bằng rủi ro\n• 50% tiết kiệm an toàn\n• 30% đầu tư trung bình rủi ro\n• 20% SVT và crypto' :
-  '• **Growing Balance:** Tập trung tích lũy\n• 70% tiết kiệm lãi suất cao\n• 20% đầu tư ít rủi ro\n• 10% SVT để học hỏi'
+  `• **Medium Balance:** Cân bằng rủi ro
+• 50% tiết kiệm an toàn = ${(accountBalance * 0.5 / 1000000).toFixed(0)}M VNĐ
+• 30% đầu tư trung bình rủi ro = ${(accountBalance * 0.3 / 1000000).toFixed(0)}M VNĐ
+• 20% SVT và crypto = ${(accountBalance * 0.2 / 1000000).toFixed(0)}M VNĐ` :
+  `• **Growing Balance:** Tập trung tích lũy
+• 70% tiết kiệm lãi suất cao = ${(accountBalance * 0.7 / 1000000).toFixed(0)}M VNĐ
+• 20% đầu tư ít rủi ro = ${(accountBalance * 0.2 / 1000000).toFixed(0)}M VNĐ
+• 10% SVT để học hỏi = ${(accountBalance * 0.1 / 1000000).toFixed(0)}M VNĐ`
 }
 
 **🪙 Chiến lược SVT (${currentLevel} level):**
@@ -1245,10 +1549,38 @@ ${currentLevel === 'Diamond' ?
 • Đặt lịch bay tiếp theo để tích SVT
 • Review portfolio đầu tư hiện tại
 
+**🔍 Phân tích chi tiết:**
+• **Tỷ lệ nợ/thu nhập:** ${((totalDebt / monthlyIncome) * 100).toFixed(1)}% ${totalDebt / monthlyIncome > 0.4 ? '(Cao - cần giảm nợ)' : '(Tốt)'}
+• **Tỷ lệ tiết kiệm:** ${(((monthlyIncome - (spendingPattern.monthly || 0)) / monthlyIncome) * 100).toFixed(1)}% ${((monthlyIncome - (spendingPattern.monthly || 0)) / monthlyIncome) > 0.2 ? '(Tốt)' : '(Cần tăng tiết kiệm)'}
+• **Diversification:** ${investmentValue > 0 ? 'Có đầu tư' : 'Chưa đầu tư'} - ${investmentValue > 0 ? 'Tốt' : 'Cần bắt đầu đầu tư'}
+
 Bạn muốn tôi chi tiết hóa chiến lược nào?`;
     }
     
-    // Flight booking
+    // Flight booking - Enhanced with context awareness
+    const flightInfo = extractFlightInfoWithContext(userMessage);
+    
+    if (flightInfo) {
+      const { origin, destination, date, passengers } = flightInfo;
+      
+      // Count missing information
+      const missingInfo = [];
+      if (!origin) missingInfo.push('điểm đi');
+      if (!destination) missingInfo.push('điểm đến');
+      if (!date) missingInfo.push('ngày bay');
+      
+      // Smart questioning based on what's missing
+      if (missingInfo.length > 0) {
+        return askForMissingFlightInfo(missingInfo, origin, destination, date, passengers);
+      }
+      
+      // All information available - proceed with booking
+      // Reset context after successful booking
+      setFlightContext({});
+      return generateFlightBookingResponse(origin, destination, date, passengers);
+    }
+    
+    // Legacy flight booking check (fallback)
     if (lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') || 
         lowerMessage.includes('bay') || lowerMessage.includes('vietjet')) {
       
@@ -1258,29 +1590,15 @@ Bạn muốn tôi chi tiết hóa chiến lược nào?`;
       const hasDate = extractDate(lowerMessage)
       const hasPassengerCount = extractPassengerCount(lowerMessage)
       
-      if (!hasOrigin || !hasDestination || !hasDate) {
-        return `✈️ **Đặt vé máy bay Vietjet**
-
-Tôi là Agent AI của bạn và sẽ đặt vé ngay khi có đủ thông tin! 
-
- **Thông tin còn thiếu:**
-${!hasOrigin ? '• Điểm đi (ví dụ: Hà Nội, TP.HCM, Đà Nẵng...)' : '✅ Điểm đi: ' + hasOrigin}
-${!hasDestination ? '• Điểm đến (ví dụ: Phú Quốc, Nha Trang, Singapore...)' : '✅ Điểm đến: ' + hasDestination}
-${!hasDate ? '• Ngày bay (ví dụ: 15/10/2025, ngày mai, tuần sau...)' : '✅ Ngày bay: ' + hasDate}
-• Số hành khách: ${hasPassengerCount} người
-• Hạng vé: Economy (có thể upgrade lên Business)
-
- **Agent sẽ tự động đặt vé khi bạn cung cấp đủ thông tin!**
-
- **Ví dụ hoàn chỉnh:**
-"Đặt vé từ Hà Nội đi Phú Quốc ngày 20/10 cho 2 người"
-
-💡 **Ưu đãi đặc biệt:**
-• Bay với Vietjet: +100 SVT/chuyến
-• Thanh toán qua HDBank: +0.1% cashback
-• Thành viên Gold: Miễn phí chọn chỗ ngồi
-
-Hãy cung cấp thông tin còn thiếu để Agent đặt vé cho bạn! 🎫`;
+      // Count missing information
+      const missingInfo = [];
+      if (!hasOrigin) missingInfo.push('điểm đi');
+      if (!hasDestination) missingInfo.push('điểm đến');
+      if (!hasDate) missingInfo.push('ngày bay');
+      
+      // Smart questioning based on what's missing
+      if (missingInfo.length > 0) {
+        return askForMissingFlightInfo(missingInfo, hasOrigin, hasDestination, hasDate, hasPassengerCount);
       }
       
       return ` **Agent đang xử lý đặt vé máy bay**
@@ -1481,7 +1799,9 @@ Bạn quan tâm đến sản phẩm nào?`;
 • Monthly review với AI advisor`;
     }
     
-    // Default response - Enhanced with better guidance
+    // Default response - Enhanced with comprehensive financial data
+    const financialData = await fetchFinancialData();
+    
     return `🤖 **AI Agent đang phân tích yêu cầu của bạn...**
 
 **📊 Dựa trên profile hiện tại:**
@@ -1489,6 +1809,12 @@ Bạn quan tâm đến sản phẩm nào?`;
 • **Level:** ${userProfile?.sovicoTokens >= 200000 ? 'Diamond' : 
               userProfile?.sovicoTokens >= 50000 ? 'Gold' : 
               userProfile?.sovicoTokens >= 10000 ? 'Silver' : 'Bronze'}
+• **Số dư:** ${financialData.accountBalance.toLocaleString('vi-VN')} VNĐ
+• **Thu nhập ước tính:** ${financialData.monthlyIncome.toLocaleString('vi-VN')} VNĐ/tháng
+• **Credit Score:** ${financialData.creditScore}/850
+• **Tổng nợ:** ${financialData.totalDebt.toLocaleString('vi-VN')} VNĐ
+• **Đầu tư:** ${financialData.investmentPortfolio.totalValue.toLocaleString('vi-VN')} VNĐ
+• **Chi tiêu tháng:** ${financialData.spendingPattern.monthly?.toLocaleString('vi-VN') || '0'} VNĐ
 • **Giao dịch:** ${userProfile?.totalTransactions || 0} lần
 
 **💡 Tôi có thể giúp bạn với:**
