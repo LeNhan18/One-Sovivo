@@ -19,6 +19,7 @@ class Customer(db.Model):
     city = db.Column(db.String(100))
     persona_type = db.Column(db.Enum('doanh_nhan', 'gia_dinh', 'nguoi_tre'))
     nft_token_id = db.Column(db.Integer, nullable=True)  # ID của NFT Passport trên blockchain
+    avatar_url = db.Column(db.String(255), nullable=True)  # URL của ảnh đại diện
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
@@ -34,6 +35,7 @@ class Customer(db.Model):
             'city': self.city,
             'persona_type': self.persona_type,
             'nft_token_id': self.nft_token_id,
+            'avatar_url': self.avatar_url,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

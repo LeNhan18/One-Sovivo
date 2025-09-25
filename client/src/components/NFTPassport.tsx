@@ -198,24 +198,46 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
         </div>
       )}
 
-      {/* NFT Card Header */}
-      <div className="relative bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold mb-2">{metadata?.name}</h3>
-            <p className="text-purple-200 text-sm mb-4 max-w-md">{metadata?.description}</p>
-            
-            {/* Rank Badge */}
-            <div className={`inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r ${getRankColor(getCurrentRank())} text-white font-bold text-sm`}>
-              <span className="mr-2">{getCurrentRankBadge()}</span>
-              {getCurrentRank()} Member
+      {/* Enhanced NFT Card Header */}
+      <div className="relative overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-cyan-600/20"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/10 to-transparent rounded-full blur-2xl"></div>
+        
+        <div className="relative p-8">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-lg">🎫</span>
+                </div>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
+                  {metadata?.name}
+                </h3>
+              </div>
+              <p className="text-purple-200 text-sm mb-6 max-w-md leading-relaxed">
+                {metadata?.description}
+              </p>
+              
+              {/* Enhanced Rank Badge */}
+              <div className={`inline-flex items-center px-6 py-3 rounded-full bg-gradient-to-r ${getRankColor(getCurrentRank())} text-white font-bold text-sm shadow-lg hover:scale-105 transition-transform duration-300`}>
+                <span className="mr-2 text-lg">{getCurrentRankBadge()}</span>
+                <span>{getCurrentRank()} Member</span>
+                <div className="ml-2 w-2 h-2 bg-white/30 rounded-full animate-pulse"></div>
+              </div>
             </div>
-          </div>
-          
-          {/* NFT Image */}
-          <div className="ml-4">
-            <div className="w-32 h-40 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center text-4xl border-2 border-white/20">
-              🎫
+            
+            {/* Enhanced NFT Image */}
+            <div className="ml-6 relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl blur-lg opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
+              <div className="relative w-36 h-44 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center text-5xl border-2 border-white/20 group-hover:border-white/40 transition-all duration-300 group-hover:scale-105">
+                🎫
+              </div>
+              <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full flex items-center justify-center text-xs">
+                ✨
+              </div>
             </div>
           </div>
         </div>
@@ -225,14 +247,21 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
       <div className="p-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {metadata?.attributes?.map((attr, index) => (
-            <div key={index} className="bg-[#0D1117] border border-gray-600 rounded-lg p-3 text-center">
-              <div className="text-gray-400 text-xs uppercase tracking-wide mb-1">
-                {attr.trait_type}
-              </div>
-              <div className="text-white font-bold">
-                {attr.trait_type === 'SVT Points' ? svtBalance.toLocaleString('vi-VN') : 
-                 attr.trait_type === 'Level' ? getCurrentRank() : attr.value}
-
+            <div 
+              key={index} 
+              className="group relative bg-gradient-to-br from-[#0D1117] to-gray-800/50 border border-gray-600/50 rounded-xl p-4 text-center hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/10"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative">
+                <div className="text-gray-400 text-xs uppercase tracking-wide mb-2 font-medium">
+                  {attr.trait_type}
+                </div>
+                <div className="text-white font-bold text-lg group-hover:text-purple-200 transition-colors">
+                  {attr.trait_type === 'SVT Points' ? svtBalance.toLocaleString('vi-VN') : 
+                   attr.trait_type === 'Level' ? getCurrentRank() : attr.value}
+                </div>
+                <div className="mt-2 w-8 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 mx-auto rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
             </div>
           ))}
@@ -256,89 +285,124 @@ const NFTPassport: React.FC<NFTPassportProps> = ({ tokenId, refreshTrigger = 0 }
           </div>
 
           {achievements.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {achievements.map((achievement) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {achievements.map((achievement, index) => (
                 <div
                   key={achievement.id}
-                  className="bg-gradient-to-r from-[#0D1117] to-green-900/30 border border-green-700 rounded-lg p-4 flex items-center"
+                  className="group relative bg-gradient-to-br from-[#0D1117] via-green-900/20 to-emerald-900/30 border border-green-700/50 rounded-xl p-5 hover:border-green-500/70 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <div className="text-2xl mr-3">
-                    {getAchievementIcon(achievement.name)}
+                  {/* Achievement Badge */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-3xl group-hover:scale-110 transition-transform duration-300">
+                      {getAchievementIcon(achievement.name)}
+                    </div>
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                   </div>
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-green-300 text-sm">
+                  
+                  {/* Achievement Info */}
+                  <div className="space-y-2">
+                    <h5 className="font-bold text-green-300 text-sm group-hover:text-green-200 transition-colors">
                       {achievement.name}
                     </h5>
-                    <p className="text-gray-400 text-xs mt-1">
+                    <p className="text-gray-400 text-xs leading-relaxed">
                       {achievement.description}
                     </p>
-                    <p className="text-green-500 text-xs mt-1">
-                      Mở khóa: {new Date(achievement.unlocked_at).toLocaleDateString('vi-VN')}
-                    </p>
+                    <div className="flex items-center justify-between pt-2 border-t border-green-700/30">
+                      <span className="text-green-500 text-xs font-medium">
+                        Mở khóa: {new Date(achievement.unlocked_at).toLocaleDateString('vi-VN')}
+                      </span>
+                      <div className="w-1 h-1 bg-green-400 rounded-full"></div>
+                    </div>
                   </div>
+                  
+                  {/* Hover Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">🎯</div>
-              <p className="text-gray-400 text-sm">
-                Chưa có thành tựu nào. <br />
-                Hãy sử dụng các dịch vụ Sovico để mở khóa!
+            <div className="text-center py-12">
+              <div className="relative mb-6">
+                <div className="text-6xl mb-4 animate-bounce">🎯</div>
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-full blur-xl"></div>
+              </div>
+              <h3 className="text-xl font-bold text-gray-300 mb-2">Chưa có thành tựu</h3>
+              <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
+                Hãy sử dụng các dịch vụ Sovico để mở khóa thành tựu đầu tiên!
               </p>
+              <div className="mt-4 flex justify-center space-x-2">
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Quick Actions */}
-        <div className="mt-6 pt-6 border-t border-gray-700">
-          <div className="flex flex-wrap gap-2">
-            <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-              📤 Share NFT
+        {/* Enhanced Quick Actions */}
+        <div className="mt-6 pt-6 border-t border-gray-700/50">
+          <div className="flex flex-wrap gap-3">
+            <button className="group bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25 flex items-center space-x-2">
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">📤</span>
+              <span>Share NFT</span>
             </button>
-            <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-              🎨 Customize
+            <button className="group bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2">
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">🎨</span>
+              <span>Customize</span>
             </button>
             <button 
               onClick={() => setShowBlockchainExplorer(true)}
-              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="group bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-green-500/25 flex items-center space-x-2"
             >
-              🔗 View on Blockchain
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">🔗</span>
+              <span>View on Blockchain</span>
             </button>
           </div>
         </div>
 
-        {/* QR Code Section */}
-        <div className="mt-6 pt-6 border-t border-gray-700">
+        {/* Enhanced QR Code Section */}
+        <div className="mt-6 pt-6 border-t border-gray-700/50">
           <div className="flex justify-center">
             <button
               onClick={() => setShowQRCode(!showQRCode)}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center gap-2"
+              className="group px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center gap-3"
             >
-              <span className="text-lg">📱</span>
-              {showQRCode ? 'Ẩn QR Code' : 'Hiển thị QR Code'}
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">📱</span>
+              <span>{showQRCode ? 'Ẩn QR Code' : 'Hiển thị QR Code'}</span>
             </button>
           </div>
 
           {showQRCode && (
-            <div className="mt-4 flex flex-col items-center bg-white p-4 rounded-lg">
-              <img
-                src={generateQRCode(tokenId, metadata)}
-                alt="NFT Passport QR Code"
-                className="w-32 h-32 border-2 border-gray-300 rounded-lg"
-              />
-              <p className="text-sm text-gray-600 mt-2 text-center">
-                Mã QR cho NFT Passport #{tokenId}
-              </p>
+            <div className="mt-6 flex flex-col items-center">
+              <div className="relative bg-white p-6 rounded-2xl shadow-2xl border-2 border-purple-200">
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-xs text-white">
+                  ✨
+                </div>
+                <img
+                  src={generateQRCode(tokenId, metadata)}
+                  alt="NFT Passport QR Code"
+                  className="w-40 h-40 border-2 border-gray-200 rounded-xl"
+                />
+                <p className="text-sm text-gray-600 mt-3 text-center font-medium">
+                  Mã QR cho NFT Passport #{tokenId}
+                </p>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Metadata Footer */}
-        <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
+        {/* Enhanced Metadata Footer */}
+        <div className="mt-6 pt-6 border-t border-gray-700/50">
           <div className="flex justify-between items-center">
-            <span>Token ID: #{tokenId}</span>
-            <span>Network: Sovico Chain</span>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+              <span className="text-xs text-gray-400 font-medium">Token ID: #{tokenId}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-gray-400 font-medium">Network: Sovico Chain</span>
+            </div>
           </div>
         </div>
       </div>

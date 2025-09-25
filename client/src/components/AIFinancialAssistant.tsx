@@ -24,8 +24,10 @@ interface ServiceAction {
   service: 'vietjet' | 'hdbank' | 'resort'
   action: string
   params: any
-  status: 'pending' | 'executing' | 'completed' | 'failed'
+  status: 'pending' | 'executing' | 'completed' | 'failed' | 'waiting_otp'
   result?: any
+  requiresOTP?: boolean
+  otpVerified?: boolean
 }
 
 interface UserProfile {
@@ -83,6 +85,8 @@ const AIFinancialAssistant: React.FC = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [pendingOTPAction, setPendingOTPAction] = useState<ServiceAction | null>(null);
+  const [otpAttempts, setOtpAttempts] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prefsRef = useRef<CustomerPreferences>({});
   
@@ -213,101 +217,108 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     
     try {
       const token = localStorage.getItem('auth_token');
-      if (!token) return { 
-        flightCount: 0, 
-        accountBalance: 0, 
-        monthlyIncome: 0,
-        spendingPattern: {},
-        investmentPortfolio: {},
-        creditScore: 0,
-        loanHistory: [],
-        transactionHistory: []
-      };
+      if (!token) {
+        console.log('⚠️ No auth token found, using fallback data');
+        return { 
+          flightCount: 0, 
+          accountBalance: 0, 
+          monthlyIncome: 20000000,
+          spendingPattern: { monthly: 15000000, categories: {} },
+          investmentPortfolio: { totalValue: 0, types: {} },
+          creditScore: 650,
+          loanHistory: [],
+          transactionHistory: [],
+          totalDebt: 0,
+          flightSpending: 0,
+          totalSpending: 0
+        };
+      }
 
-      // Fetch comprehensive data from multiple sources
-      const [
-        flightResponse,
-        balanceResponse,
-        transactionResponse,
-        loanResponse,
-        investmentResponse
-      ] = await Promise.all([
-        // Flight history
-        fetch(`http://127.0.0.1:5000/api/vietjet/history/${userProfile.customer_id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        // Account balance
-        fetch(`http://127.0.0.1:5000/api/hdbank/balance/${userProfile.customer_id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        // Transaction history
-        fetch(`http://127.0.0.1:5000/api/hdbank/transactions/${userProfile.customer_id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        // Loan history
-        fetch(`http://127.0.0.1:5000/api/hdbank/loans/${userProfile.customer_id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        // Investment portfolio
-        fetch(`http://127.0.0.1:5000/api/hdbank/investments/${userProfile.customer_id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
-
-      // Process flight data
-      const flightData = flightResponse.ok ? await flightResponse.json() : { flights: [] };
-      const flightCount = flightData.flights?.length || 0;
-      const flightSpending = flightData.flights?.reduce((sum: number, flight: any) => sum + (flight.price || 0), 0) || 0;
-
-      // Process balance data
-      const balanceData = balanceResponse.ok ? await balanceResponse.json() : { balance: 0 };
-      const accountBalance = balanceData.balance || 0;
-
-      // Process transaction data
-      const transactionData = transactionResponse.ok ? await transactionResponse.json() : { transactions: [] };
-      const transactions = transactionData.transactions || [];
+      // Fetch comprehensive data from the main customer endpoint (which has all data)
+      console.log('🔍 Fetching financial data for customer:', userProfile.customer_id);
       
-      // Calculate spending patterns - more realistic with fallback
-      const totalSpending = transactions.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+      // Use the main customer endpoint that contains all data
+      const customerResponse = await fetch(`http://127.0.0.1:5000/customer/${userProfile.customer_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(err => {
+        console.log('❌ Customer API error:', err);
+        return { ok: false, json: () => Promise.resolve({ customer: null }) };
+      });
+
+      // Also fetch tokens data
+      const tokensResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${userProfile.customer_id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(err => {
+        console.log('❌ Tokens API error:', err);
+        return { ok: false, json: () => Promise.resolve({ total_svt: 0, transactions: [] }) };
+      });
+
+      // Process customer data
+      const customerData = customerResponse.ok ? await customerResponse.json() : { customer: null };
+      const tokensData = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0, transactions: [] };
+      
+      console.log('📊 Customer data received:', customerData);
+      console.log('🪙 Tokens data received:', tokensData);
+
+      // Extract data from customer response
+      const customer = customerData.customer || {};
+      const hdbankSummary = customer.hdbank_summary || {};
+      const vietjetSummary = customer.vietjet_summary || {};
+      const resortSummary = customer.resort_summary || {};
+      
+      // Get real data from HDBank
+      const accountBalance = hdbankSummary.current_balance || 0;
+      const totalTransactions = hdbankSummary.total_transactions || 0;
+      const totalCredit = hdbankSummary.total_credit_last_3m || 0;
+      const totalDebit = hdbankSummary.total_debit_last_3m || 0;
+      
+      // Get real data from Vietjet
+      const flightCount = vietjetSummary.total_flights_last_year || 0;
+      const flightSpending = vietjetSummary.total_spending || 0;
+      const isBusinessFlyer = vietjetSummary.is_business_flyer || false;
+      
+      // Get real data from Resort
+      const resortNights = resortSummary.total_nights_stayed || 0;
+      const resortSpending = resortSummary.total_spending || 0;
+      
+      // Calculate spending patterns from real data
+      const totalSpending = totalDebit || 0; // Use real debit data from HDBank
       const spendingPattern = {
         monthly: totalSpending > 0 ? totalSpending / 12 : 15000000, // Default 15M VNĐ/month if no data
         categories: {
-          food: transactions.filter((t: any) => t.category === 'food').reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
-          transport: transactions.filter((t: any) => t.category === 'transport').reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
-          entertainment: transactions.filter((t: any) => t.category === 'entertainment').reduce((sum: number, t: any) => sum + (t.amount || 0), 0),
-          shopping: transactions.filter((t: any) => t.category === 'shopping').reduce((sum: number, t: any) => sum + (t.amount || 0), 0)
+          food: Math.floor(totalSpending * 0.3), // Estimate 30% for food
+          transport: Math.floor(totalSpending * 0.2), // Estimate 20% for transport
+          entertainment: Math.floor(totalSpending * 0.2), // Estimate 20% for entertainment
+          shopping: Math.floor(totalSpending * 0.3) // Estimate 30% for shopping
         }
       };
 
-      // Process loan data
-      const loanData = loanResponse.ok ? await loanResponse.json() : { loans: [] };
-      const loanHistory = loanData.loans || [];
-      const totalDebt = loanHistory.reduce((sum: number, loan: any) => sum + (loan.remaining_amount || 0), 0);
-
-      // Process investment data
-      const investmentData = investmentResponse.ok ? await investmentResponse.json() : { investments: [] };
+      // Use simplified data for loans and investments (can be enhanced later)
+      const loanHistory: any[] = [];
+      const totalDebt = 0; // No debt data available yet
+      
       const investmentPortfolio = {
-        totalValue: investmentData.investments?.reduce((sum: number, inv: any) => sum + (inv.current_value || 0), 0) || 0,
+        totalValue: 0, // No investment data available yet
         types: {
-          stocks: investmentData.investments?.filter((inv: any) => inv.type === 'stock').length || 0,
-          bonds: investmentData.investments?.filter((inv: any) => inv.type === 'bond').length || 0,
-          mutual_funds: investmentData.investments?.filter((inv: any) => inv.type === 'mutual_fund').length || 0
+          stocks: 0,
+          bonds: 0,
+          mutual_funds: 0
         }
       };
 
-      // Calculate credit score based on various factors - more realistic
+      // Calculate credit score based on real data
       const creditScore = Math.min(850, Math.max(300, 
         300 + 
         (accountBalance > 10000000 ? 100 : 0) + // High balance bonus
-        (loanHistory.length === 0 ? 50 : 0) + // No debt bonus
-        (transactions.length > 50 ? 50 : 0) + // Active account bonus
+        (totalDebt === 0 ? 50 : 0) + // No debt bonus
+        (totalTransactions > 50 ? 50 : 0) + // Active account bonus
         (flightCount > 5 ? 30 : 0) + // Travel activity bonus
         (userProfile.sovicoTokens > 50000 ? 40 : 0) + // SVT level bonus
         (userProfile.sovicoTokens > 10000 ? 20 : 0) + // SVT Silver bonus
-        (transactions.length > 10 ? 30 : 0) // Basic activity bonus
+        (totalTransactions > 10 ? 30 : 0) // Basic activity bonus
       ));
 
-      // Calculate monthly income estimate - more realistic calculation
+      // Calculate monthly income estimate from real data
       let monthlyIncome = 20000000; // Default 20M VNĐ
       
       if (accountBalance > 0) {
@@ -325,6 +336,47 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         monthlyIncome = Math.max(monthlyIncome, 25000000); // At least 25M for Silver+ users
       }
 
+      // Check if we got real data
+      const hasRealData = accountBalance > 0 || flightCount > 0 || totalTransactions > 0;
+      if (!hasRealData) {
+        console.log('⚠️ No real data found, using enhanced fallback data');
+        // Generate some realistic demo data
+        const demoBalance = Math.floor(Math.random() * 50000000) + 10000000; // 10M - 60M
+        const demoSpending = Math.floor(demoBalance * 0.3); // 30% of balance
+        const demoFlights = Math.floor(Math.random() * 5); // 0-5 flights
+        
+        return {
+          flightCount: demoFlights,
+          accountBalance: demoBalance,
+          monthlyIncome: Math.floor(demoBalance / 12),
+          spendingPattern: { 
+            monthly: demoSpending, 
+            categories: {
+              food: Math.floor(demoSpending * 0.3),
+              transport: Math.floor(demoSpending * 0.2),
+              entertainment: Math.floor(demoSpending * 0.2),
+              shopping: Math.floor(demoSpending * 0.3)
+            }
+          },
+          investmentPortfolio: { 
+            totalValue: Math.floor(demoBalance * 0.2), 
+            types: { stocks: 2, bonds: 1, mutual_funds: 1 }
+          },
+          creditScore: Math.floor(Math.random() * 200) + 650, // 650-850
+          loanHistory: [],
+          transactionHistory: [],
+          totalDebt: 0,
+          flightSpending: demoFlights * 2000000, // 2M per flight
+          totalSpending: demoSpending
+        };
+      }
+
+      console.log('✅ Real data found! Using actual data from APIs');
+      console.log('💰 Account Balance:', accountBalance);
+      console.log('✈️ Flight Count:', flightCount);
+      console.log('💳 Total Transactions:', totalTransactions);
+      console.log('🏦 Credit Score:', creditScore);
+      
       return { 
         flightCount, 
         accountBalance, 
@@ -333,25 +385,54 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         investmentPortfolio,
         creditScore,
         loanHistory,
-        transactionHistory: transactions,
+        transactionHistory: tokensData.transactions || [],
         totalDebt,
         flightSpending,
-        totalSpending
+        totalSpending,
+        // Additional real data
+        totalTransactions,
+        totalCredit,
+        totalDebit,
+        isBusinessFlyer,
+        resortNights,
+        resortSpending
       };
     } catch (error) {
-      console.error('Error fetching financial data:', error);
+      console.error('❌ Error fetching financial data:', error);
+      console.log('🔧 Possible causes:');
+      console.log('• Backend server not running (http://127.0.0.1:5000)');
+      console.log('• API endpoints not implemented');
+      console.log('• Database connection issues');
+      console.log('• Authentication token invalid');
+      
+      // Return enhanced fallback data
+      const fallbackBalance = Math.floor(Math.random() * 40000000) + 15000000; // 15M - 55M
+      const fallbackSpending = Math.floor(fallbackBalance * 0.4);
+      const fallbackFlights = Math.floor(Math.random() * 3) + 1; // 1-3 flights
+      
       return { 
-        flightCount: 0, 
-        accountBalance: 0, 
-        monthlyIncome: 20000000,
-        spendingPattern: { monthly: 0, categories: {} },
-        investmentPortfolio: { totalValue: 0, types: {} },
-        creditScore: 650,
+        flightCount: fallbackFlights, 
+        accountBalance: fallbackBalance, 
+        monthlyIncome: Math.floor(fallbackBalance / 12),
+        spendingPattern: { 
+          monthly: fallbackSpending, 
+          categories: {
+            food: Math.floor(fallbackSpending * 0.3),
+            transport: Math.floor(fallbackSpending * 0.2),
+            entertainment: Math.floor(fallbackSpending * 0.2),
+            shopping: Math.floor(fallbackSpending * 0.3)
+          }
+        },
+        investmentPortfolio: { 
+          totalValue: Math.floor(fallbackBalance * 0.15), 
+          types: { stocks: 1, bonds: 1, mutual_funds: 0 }
+        },
+        creditScore: Math.floor(Math.random() * 150) + 700, // 700-850
         loanHistory: [],
         transactionHistory: [],
         totalDebt: 0,
-        flightSpending: 0,
-        totalSpending: 0
+        flightSpending: fallbackFlights * 1500000, // 1.5M per flight
+        totalSpending: fallbackSpending
       };
     }
   };
@@ -762,7 +843,9 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
                     normalizedText.includes('xe') ? 'car' : 
                     normalizedText.includes('kinh doanh') ? 'business' : 'personal'
         },
-        status: 'pending'
+        status: 'waiting_otp',
+        requiresOTP: true,
+        otpVerified: false
       })
     }
 
@@ -803,7 +886,9 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
           amount: amount,
           transfer_type: normalizedText.includes('nuoc ngoai') || normalizedText.includes('quoc te') ? 'international' : 'internal'
         },
-        status: 'pending'
+        status: 'waiting_otp',
+        requiresOTP: true,
+        otpVerified: false
       })
     }
 
@@ -1290,6 +1375,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
   const getActionStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return '⏳'
+      case 'waiting_otp': return '🔐'
       case 'executing': return '🔄'
       case 'completed': return '✅'
       case 'failed': return '❌'
@@ -1845,6 +1931,95 @@ Bạn quan tâm đến sản phẩm nào?`;
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading || isProcessing) return;
 
+    // Check if user is entering OTP for pending action
+    if (pendingOTPAction) {
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        type: 'user',
+        content: `OTP: ${inputMessage}`,
+        timestamp: new Date()
+      };
+
+      const newMessages = [...messages, userMessage];
+      setMessages(newMessages);
+
+      if (inputMessage.trim() === '000000') {
+        // OTP correct - proceed with action
+        setMessages(prev => prev.map(msg => 
+          msg.actions?.some(a => a.id === pendingOTPAction.id)
+            ? { ...msg, actions: msg.actions?.map(a => 
+                a.id === pendingOTPAction.id 
+                  ? { ...a, status: 'executing', otpVerified: true }
+                  : a
+              )}
+            : msg
+        ));
+
+        // Execute the pending action
+        setTimeout(() => {
+          executeActions([{ ...pendingOTPAction, status: 'executing', otpVerified: true }], userMessage.id);
+          setPendingOTPAction(null);
+          setOtpAttempts(0);
+        }, 1000);
+
+        setInputMessage('');
+        return;
+      } else {
+        // OTP incorrect - increment attempts
+        setOtpAttempts(prev => prev + 1);
+        
+        // OTP incorrect - cancel action
+        const cancelMessage: Message = {
+          id: `cancel_${Date.now()}`,
+          type: 'ai',
+          content: `❌ **OTP KHÔNG CHÍNH XÁC - GIAO DỊCH BỊ HỦY**
+
+🔐 **Bảo mật:** Mã OTP không đúng, giao dịch đã được hủy bỏ để bảo vệ tài khoản của bạn.
+
+**📋 Chi tiết giao dịch bị hủy:**
+${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer' ? 
+  `• 💳 Chuyển khoản: ${(pendingOTPAction.params.amount / 1000000).toFixed(0)} triệu VNĐ` :
+  pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'loan' ?
+  `• 💰 Vay vốn: ${(pendingOTPAction.params.loan_amount / 1000000).toFixed(0)} triệu VNĐ` :
+  `• 🏦 Dịch vụ ngân hàng HDBank`}
+
+**🛡️ Lý do hủy:**
+• Mã OTP không khớp với hệ thống (Lần thử: ${otpAttempts + 1})
+• Bảo vệ tài khoản khỏi giao dịch trái phép
+• Yêu cầu xác thực lại để tiếp tục
+
+**💡 Để thực hiện giao dịch:**
+• Vui lòng yêu cầu lại giao dịch
+• Đảm bảo nhập đúng mã OTP: 000000
+• Kiểm tra kết nối mạng và thử lại
+
+**🔒 Tài khoản của bạn vẫn an toàn!**`,
+          timestamp: new Date()
+        };
+
+        // Update action status to failed
+        setMessages(prev => prev.map(msg => 
+          msg.actions?.some(a => a.id === pendingOTPAction.id)
+            ? { ...msg, actions: msg.actions?.map(a => 
+                a.id === pendingOTPAction.id 
+                  ? { ...a, status: 'failed', result: { error: 'OTP không chính xác' } }
+                  : a
+              )}
+            : msg
+        ));
+
+        // Add cancel message
+        setTimeout(() => {
+          setMessages(prev => [...prev, cancelMessage]);
+          setPendingOTPAction(null);
+          setOtpAttempts(0);
+        }, 1000);
+
+        setInputMessage('');
+        return;
+      }
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
@@ -1898,7 +2073,19 @@ Bạn quan tâm đến sản phẩm nào?`;
           }
         }).join('\n• ')
 
-        aiResponse += `\n\n🤖 **Agent sẽ thực hiện:**\n• ${actionsList}\n\n⏳ Đang xử lý yêu cầu...`;
+        // Check if any action requires OTP
+        const requiresOTP = actions.some(a => a.requiresOTP);
+        
+        if (requiresOTP) {
+          aiResponse += `\n\n🔐 **BẢO MẬT: Xác thực OTP cần thiết**\n\n`;
+          aiResponse += `**Các giao dịch cần xác thực:**\n• ${actionsList}\n\n`;
+          aiResponse += `**📱 Mã OTP đã được gửi đến số điện thoại đăng ký**\n`;
+          aiResponse += `**🔢 Vui lòng nhập mã OTP: 000000**\n\n`;
+          aiResponse += `⚠️ **Lưu ý:** Đây là môi trường demo, OTP thực sẽ được gửi qua SMS\n`;
+          aiResponse += `⏳ **Chờ xác thực OTP để tiếp tục...**`;
+        } else {
+          aiResponse += `\n\n🤖 **Agent sẽ thực hiện:**\n• ${actionsList}\n\n⏳ Đang xử lý yêu cầu...`;
+        }
       }
 
       // Tạo AI message với cả response và actions (nếu có)
@@ -1920,9 +2107,21 @@ Bạn quan tâm đến sản phẩm nào?`;
       
       // Nếu có actions, thực hiện chúng sau khi AI đã trả lời
       if (actions.length > 0) {
-        setTimeout(() => {
-          executeActions(actions, aiMessage.id);
-        }, 1500); // Delay để user đọc được response trước
+        const requiresOTP = actions.some(a => a.requiresOTP);
+        
+        if (requiresOTP) {
+          // Set pending OTP action and wait for user input
+          const otpAction = actions.find(a => a.requiresOTP);
+          if (otpAction) {
+            setPendingOTPAction(otpAction);
+            setOtpAttempts(0); // Reset attempts for new OTP request
+          }
+        } else {
+          // Execute actions immediately if no OTP required
+          setTimeout(() => {
+            executeActions(actions, aiMessage.id);
+          }, 1500); // Delay để user đọc được response trước
+        }
       }
 
     } catch (error: any) {
@@ -2096,8 +2295,13 @@ Bạn quan tâm đến sản phẩm nào?`;
                    userProfile.sovicoTokens >= 10000 ? '🥈 Silver' : '🥉 Bronze'}
                 </span>
               </div>
-              <div className="text-gray-500 text-xs">
-                {userProfile.totalTransactions} giao dịch
+              <div className="flex items-center space-x-2">
+                <div className="text-gray-500 text-xs">
+                  {userProfile.totalTransactions} giao dịch
+                </div>
+                <span className="text-xs bg-yellow-900/30 text-yellow-400 px-2 py-1 rounded">
+                  🧪 Demo Data
+                </span>
               </div>
             </div>
           </div>
@@ -2142,9 +2346,11 @@ Bạn quan tâm đến sản phẩm nào?`;
                         <span className={`px-2 py-1 rounded text-xs ${
                           action.status === 'completed' ? 'bg-green-600' :
                           action.status === 'executing' ? 'bg-yellow-600' :
+                          action.status === 'waiting_otp' ? 'bg-purple-600' :
                           action.status === 'failed' ? 'bg-red-600' : 'bg-gray-600'
                         }`}>
                           {action.status === 'pending' && 'Chờ xử lý'}
+                          {action.status === 'waiting_otp' && 'Chờ OTP'}
                           {action.status === 'executing' && 'Đang thực hiện'}
                           {action.status === 'completed' && 'Hoàn thành'}
                           {action.status === 'failed' && 'Thất bại'}
@@ -2211,6 +2417,24 @@ Bạn quan tâm đến sản phẩm nào?`;
           </div>
         )}
 
+        {/* OTP Pending Notification */}
+        {pendingOTPAction && (
+          <div className="bg-purple-900/20 border-t border-purple-600 p-3">
+            <div className="flex items-center justify-center space-x-2 text-purple-300">
+              <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium">🔐 Đang chờ xác thực OTP cho giao dịch bảo mật</span>
+            </div>
+            <div className="mt-2 text-center">
+              <span className="text-xs text-red-400">⚠️ Nhập sai OTP sẽ hủy giao dịch</span>
+              {otpAttempts > 0 && (
+                <div className="mt-1">
+                  <span className="text-xs text-yellow-400">🔄 Lần thử: {otpAttempts}/3</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Input */}
         <div className="bg-[#161B22] border-t border-gray-700 p-4">
           <div className="flex space-x-3">
@@ -2219,7 +2443,7 @@ Bạn quan tâm đến sản phẩm nào?`;
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Hỏi AI về tài chính, đầu tư, tiết kiệm..."
+              placeholder={pendingOTPAction ? "Nhập mã OTP: 000000" : "Hỏi AI về tài chính, đầu tư, tiết kiệm..."}
               className="flex-1 bg-[#0D1117] border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
               disabled={isLoading}
             />

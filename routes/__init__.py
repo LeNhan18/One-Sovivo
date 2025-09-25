@@ -11,6 +11,7 @@ from .nft_routes import nft_bp
 from .token_routes import token_bp
 from .token_transaction_routes import token_transaction_bp
 from .integration_routes import integration_bp
+from .upload_routes import upload_bp
 
 # Import additional blueprints if they exist
 try:
@@ -53,7 +54,7 @@ __all__ = [
     'auth_bp', 'customer_bp', 'admin_bp', 'ai_bp',
     'marketplace_bp', 'p2p_bp', 'mission_bp',
     'hdbank_bp', 'vietjet_bp', 'resort_bp',
-    'nft_bp', 'token_bp', 'token_transaction_bp', 'admin_api_bp',
+    'nft_bp', 'token_bp', 'token_transaction_bp', 'admin_api_bp', 'upload_bp',
     'register_blueprints'
 ]
 
@@ -75,6 +76,8 @@ def register_blueprints(app):
     app.register_blueprint(token_bp)
     app.register_blueprint(token_transaction_bp)
     app.register_blueprint(integration_bp)
+    app.register_blueprint(upload_bp)
+    print("✅ Upload routes registered")
     # Register new admin API blueprint under /api/admin
     app.register_blueprint(admin_api_bp)
     
