@@ -926,6 +926,58 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       })
     }
 
+    // Real Estate intents - Phú Long
+    if (normalizedText.includes('bat dong san') || normalizedText.includes('mua nha') || 
+        normalizedText.includes('dau tu nha') || normalizedText.includes('can ho') ||
+        normalizedText.includes('phu long') || normalizedText.includes('essensia') ||
+        normalizedText.includes('dragon') || normalizedText.includes('mailand') ||
+        normalizedText.includes('nha o') || normalizedText.includes('dau tu') ||
+        normalizedText.includes('real estate') || normalizedText.includes('property')) {
+      
+      const budget = extractAmount(normalizedText, 'loan')
+      const consultationType = normalizedText.includes('dau tu') ? 'investment' :
+                              normalizedText.includes('nha o') ? 'residential' :
+                              normalizedText.includes('thuong mai') ? 'commercial' : 'resort'
+      
+      actions.push({
+        id: `real_estate_${Date.now()}`,
+        service: 'resort',
+        action: 'real_estate_consultation',
+        params: {
+          consultation_type: consultationType,
+          budget_range: budget > 0 ? `${(budget / 1000000000).toFixed(1)} tỷ VNĐ` : 'Từ 2-10 tỷ VNĐ',
+          location_preference: extractLocation(text, 'origin') || 'TP.HCM'
+        },
+        status: 'pending'
+      })
+    }
+
+    // Property viewing intents
+    if (normalizedText.includes('xem du an') || normalizedText.includes('xem nha') ||
+        normalizedText.includes('tham quan') || normalizedText.includes('site visit') ||
+        normalizedText.includes('xem can ho') || normalizedText.includes('xem dat')) {
+      
+      const projectName = normalizedText.includes('essensia parkway') ? 'Essensia Parkway' :
+                         normalizedText.includes('essensia sky') ? 'Essensia Sky' :
+                         normalizedText.includes('dragon riverside') ? 'Dragon Riverside City' :
+                         normalizedText.includes('mailand hanoi') ? 'Mailand Hanoi City' :
+                         normalizedText.includes('ariyana') ? 'Ariyana Tourism Complex' :
+                         'Essensia Parkway'
+      const preferredDate = extractDate(text)
+      
+      actions.push({
+        id: `property_viewing_${Date.now()}`,
+        service: 'resort',
+        action: 'book_property_viewing',
+        params: {
+          project_name: projectName || 'Essensia Parkway',
+          preferred_date: preferredDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          contact_info: 'Auto-generated from user profile'
+        },
+        status: 'pending'
+      })
+    }
+
     return actions
   }
 
@@ -1251,8 +1303,43 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     if (passengerMatch) {
       const count = parseInt(passengerMatch[1])
       console.log(`✅ Found passenger count: ${count}`) // Debug
-      return count
-    }
+    return count
+  }
+
+  // Extract project name from text for real estate
+  const extractProjectName = (text: string): string => {
+    console.log('🏢 Extracting project name from:', text) // Debug
+    
+    const normalizedText = text.toLowerCase()
+    
+    // Check for specific Phú Long projects
+    if (normalizedText.includes('essensia parkway')) return 'Essensia Parkway'
+    if (normalizedText.includes('essensia sky')) return 'Essensia Sky'
+    if (normalizedText.includes('dragon riverside')) return 'Dragon Riverside City'
+    if (normalizedText.includes('mailand hanoi')) return 'Mailand Hanoi City'
+    if (normalizedText.includes('ariyana')) return 'Ariyana Tourism Complex'
+    if (normalizedText.includes('dragon hill')) return 'Dragon Hill'
+    
+    // Default to most popular project
+    return 'Essensia Parkway'
+  }
+
+  // Extract budget range for real estate
+  const extractBudgetRange = (text: string): string => {
+    console.log('💰 Extracting budget range from:', text) // Debug
+    
+    const normalizedText = text.toLowerCase()
+    
+    // Look for specific budget mentions
+    if (normalizedText.includes('5 tỷ') || normalizedText.includes('5 ty')) return '5 tỷ VNĐ'
+    if (normalizedText.includes('3 tỷ') || normalizedText.includes('3 ty')) return '3 tỷ VNĐ'
+    if (normalizedText.includes('10 tỷ') || normalizedText.includes('10 ty')) return '10 tỷ VNĐ'
+    if (normalizedText.includes('cao cap') || normalizedText.includes('premium')) return '5-10 tỷ VNĐ'
+    if (normalizedText.includes('trung binh') || normalizedText.includes('vua phai')) return '3-5 tỷ VNĐ'
+    
+    // Default range
+    return '2-10 tỷ VNĐ'
+  }
     
     // Tìm từ khóa số lượng
     if (normalizedText.includes('hai nguoi') || normalizedText.includes('2 nguoi') || normalizedText.includes('cho 2')) {
@@ -1366,6 +1453,8 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       case 'resort':
         if (action === 'book_room') return `${baseUrl}/resort/book-room`
         if (action === 'spa_booking') return `${baseUrl}/resort/book-spa`
+        if (action === 'real_estate_consultation') return `${baseUrl}/resort/real-estate-consultation`
+        if (action === 'book_property_viewing') return `${baseUrl}/resort/book-property-viewing`
         return ''
       default:
         return ''
@@ -1400,6 +1489,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 VAI TRÒ:
 - Tư vấn tài chính chính xác và thực thi dịch vụ tự động
 - Hiểu rõ về SVT (Sovico Tokens), HDBank, Vietjet, Resort services
+- Tư vấn bất động sản chuyên nghiệp với Phú Long Real Estate
 - Phân tích nhu cầu khách hàng và đưa ra giải pháp phù hợp
 
 KIẾN THỨC CHUYÊN MÔN:
@@ -1407,6 +1497,45 @@ KIẾN THỨC CHUYÊN MÔN:
 - HDBank: Ngân hàng liên kết, cung cấp thẻ tín dụng, vay vốn, chuyển khoản
 - Vietjet: Hãng hàng không, đặt vé máy bay nội địa và quốc tế
 - Resort: Dịch vụ nghỉ dưỡng, đặt phòng, spa, ẩm thực
+
+🏢 PHÚ LONG REAL ESTATE - KIẾN THỨC CHUYÊN SÂU:
+- Công ty thành viên của Tập đoàn Sovico, hơn 20 năm kinh nghiệm
+- Chuyên phát triển bất động sản nhà ở, nghỉ dưỡng, thương mại văn phòng
+- Đạt Top 50 Doanh nghiệp phát triển bền vững tiêu biểu Việt Nam 2025
+- Nhận giải thưởng quốc tế HR Asia 2025 và Asia Pacific Property Award 2025-2026
+
+DỰ ÁN NỔI BẬT CỦA PHÚ LONG:
+1. **Essensia Parkway** - Nguyễn Hữu Thọ, Nhà Bè, TP.HCM
+   - Căn hộ cao cấp, chuẩn sống Lux-Well
+   - Giá từ 3.5 tỷ VNĐ, đang mở bán
+   - Tiện ích: Sky Pool, Gym, Concierge
+
+2. **Essensia Sky** - Nguyễn Hữu Thọ, Nhà Bè, TP.HCM  
+   - Căn hộ cao cấp, "Nơi Đất Lành Cho Cuộc Sống Hoan Ca"
+   - Giá từ 4.2 tỷ VNĐ, đang mở bán
+   - Tiện ích: Sky Living, Panoramic View, Sky Bar
+
+3. **Dragon Riverside City** - Đại lộ Võ Văn Kiệt, TP.HCM
+   - Khu đô thị, "Thành phố 5 sao trong lòng Thành Phố"
+   - Giá từ 2.8 tỷ VNĐ, đang hoạt động
+   - Tiện ích: River View, Golf Course, Shopping Mall
+
+4. **Mailand Hanoi City** - Xã Sơn Đồng, Hà Nội
+   - Khu đô thị thông minh tại thủ đô
+   - Giá từ 2.5 tỷ VNĐ, đang mở bán
+   - Tiện ích: Smart City, Green Living, Cultural Center
+
+5. **Ariyana Tourism Complex** - Đà Nẵng
+   - Khu nghỉ dưỡng cao cấp với view biển
+   - Giá từ 1.8 tỷ VNĐ, đang hoạt động
+   - Tiện ích: Beach Resort, Golf Course, Conference Center
+
+DỊCH VỤ BẤT ĐỘNG SẢN PHÚ LONG:
+- Xem dự án miễn phí (100 SVT thưởng)
+- Tư vấn đầu tư bất động sản (200 SVT thưởng)
+- Tư vấn nhà ở, thương mại, nghỉ dưỡng
+- Hỗ trợ vay vốn mua nhà qua HDBank
+- Chuyển đổi SVT thành ưu đãi mua nhà
 
 QUY TẮC TRẢ LỜI:
 1. LUÔN trả lời chính xác về thông tin tài chính
@@ -1422,6 +1551,8 @@ QUY TẮC TRẢ LỜI:
 - Luôn kết thúc bằng câu hỏi để tương tác thêm
 
 VÍ DỤ TRẢ LỜI TỐT:
+
+**Tư vấn tài chính:**
 "📊 **Phân tích tài chính của bạn:**
 
 • **SVT hiện tại:** 15,000 tokens
@@ -1434,7 +1565,30 @@ VÍ DỤ TRẢ LỜI TỐT:
 2. Mở tài khoản tiết kiệm HDBank
 3. Đăng ký thẻ Visa Platinum
 
-Bạn muốn tôi hướng dẫn chi tiết bước nào?"`;
+Bạn muốn tôi hướng dẫn chi tiết bước nào?"
+
+**Tư vấn bất động sản:**
+"🏢 **Tư vấn đầu tư bất động sản Phú Long:**
+
+• **Ngân sách:** 5-8 tỷ VNĐ
+• **Mục đích:** Đầu tư dài hạn
+• **Vị trí ưu tiên:** TP.HCM
+
+**Dự án phù hợp:**
+1. **Essensia Parkway** - 3.5 tỷ VNĐ
+   - Chuẩn sống Lux-Well, tiềm năng tăng giá cao
+   - Tiện ích: Sky Pool, Gym, Concierge
+   
+2. **Dragon Riverside City** - 2.8 tỷ VNĐ
+   - Khu đô thị hoàn chỉnh, thanh khoản tốt
+   - Tiện ích: River View, Golf Course, Mall
+
+**Hỗ trợ tài chính:**
+• Vay HDBank lên đến 80% giá trị
+• Lãi suất ưu đãi cho khách hàng Sovico
+• SVT có thể đổi thành ưu đãi mua nhà
+
+Bạn muốn tôi đặt lịch xem dự án nào?"`;
 
         // Build comprehensive customer insights with financial data
         const prefs = prefsRef.current;
@@ -2067,6 +2221,8 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
             case 'resort':
               if (a.action === 'book_room') return `🏨 Đặt phòng ${a.params.nights} đêm`
               if (a.action === 'spa_booking') return `💆‍♀️ Đặt lịch Spa`
+              if (a.action === 'real_estate_consultation') return `🏢 Tư vấn bất động sản ${a.params.consultation_type}`
+              if (a.action === 'book_property_viewing') return `🏠 Đặt lịch xem dự án ${a.params.project_name}`
               return `🏖️ Dịch vụ Resort`
             default:
               return '🔧 Dịch vụ khác'

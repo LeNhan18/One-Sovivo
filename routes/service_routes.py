@@ -7,7 +7,7 @@ Service integration routes (HDBank, Vietjet, Resort)
 from flask import Blueprint, jsonify, request
 from services.hdbank_service import HDBankService
 from services.vietjet_service import VietjetService
-from services.resort_service import ResortService
+from services.resort_service import PhuLongRealEstateService
 
 # Create blueprints
 hdbank_bp = Blueprint('hdbank', __name__, url_prefix='/api/service/hdbank')
@@ -46,9 +46,9 @@ def get_resort_service():
     global _resort_service
     if _resort_service is None:
         try:
-            _resort_service = ResortService()
+            _resort_service = PhuLongRealEstateService()
         except Exception as e:
-            print(f"❌ Error creating ResortService: {e}")
+            print(f" Error creating PhuLongRealEstateService: {e}")
             return None
     return _resort_service
 
@@ -309,4 +309,86 @@ def resort_book_spa():
         return jsonify({
             "success": False,
             "message": f"Lỗi đặt spa: {str(e)}"
+        }), 500
+
+
+# =============================================================================
+# PHÚ LONG REAL ESTATE ROUTES
+# =============================================================================
+
+@resort_bp.route('/real-estate-projects', methods=['GET'])
+def get_real_estate_projects():
+    """Lấy danh sách dự án bất động sản của Phú Long"""
+    try:
+        service = get_resort_service()
+        if service is None:
+            return jsonify({
+                "success": False,
+                "message": "Phú Long service không khả dụng"
+            }), 500
+            
+        projects = service.get_real_estate_projects()
+        return jsonify({
+            "success": True,
+            "projects": projects
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi lấy danh sách dự án: {str(e)}"
+        }), 500
+
+
+@resort_bp.route('/book-property-viewing', methods=['POST'])
+def book_property_viewing():
+    """Đặt lịch xem dự án bất động sản"""
+    try:
+        data = request.get_json()
+        service = get_resort_service()
+        if service is None:
+            return jsonify({
+                "success": False,
+                "message": "Phú Long service không khả dụng"
+            }), 500
+            
+        result = service.book_property_viewing(
+            customer_id=data.get('customer_id'),
+            project_name=data.get('project_name'),
+            preferred_date=data.get('preferred_date'),
+            contact_info=data.get('contact_info')
+        )
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi đặt lịch xem dự án: {str(e)}"
+        }), 500
+
+
+@resort_bp.route('/real-estate-consultation', methods=['POST'])
+def real_estate_consultation():
+    """Tư vấn bất động sản"""
+    try:
+        data = request.get_json()
+        service = get_resort_service()
+        if service is None:
+            return jsonify({
+                "success": False,
+                "message": "Phú Long service không khả dụng"
+            }), 500
+            
+        result = service.get_real_estate_consultation(
+            customer_id=data.get('customer_id'),
+            consultation_type=data.get('consultation_type'),
+            budget_range=data.get('budget_range'),
+            location_preference=data.get('location_preference')
+        )
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Lỗi tư vấn bất động sản: {str(e)}"
         }), 500
