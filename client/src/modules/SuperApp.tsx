@@ -3,6 +3,7 @@ import { AuthUser } from '../services/auth'
 import SVTWallet from '../components/SVTWallet'
 import SVTMarketplace from '../components/SVTMarketplace'
 import AIFinancialAssistant from '../components/AIFinancialAssistant'
+import GameDashboard from '../components/GameDashboard'
 import TransactionHistory from '../components/TransactionHistory'
 import NFTPassport from '../components/NFTPassport'
 import ESGPrograms from '../components/ESGPrograms'
@@ -57,7 +58,7 @@ const CubeIcon = () => (
 )
 
 export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
-  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'history' | 'esg' | 'service'>('home')
+  const [activeSection, setActiveSection] = useState<'home' | 'wallet' | 'marketplace' | 'ai-assistant' | 'games' | 'history' | 'esg' | 'service'>('home')
   const [userData, setUserData] = useState<any>(null)
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [insights, setInsights] = useState<any | null>(null)
@@ -364,6 +365,13 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
       icon: '🤖'
     },
     {
+      id: 'games',
+      label: 'SVT Games',
+      description: 'Chơi game nhận SVT',
+      bgImage: './Image/AI.jpg',
+      icon: '🎮'
+    },
+    {
       id: 'history',
       label: 'Blockchain',
       description: 'Lịch sử giao dịch',
@@ -476,6 +484,26 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
     )
   }
 
+  if (activeSection === 'games') {
+    return (
+      <div className="text-gray-200 font-sans min-h-screen">
+        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
+          <button
+            onClick={() => setActiveSection('home')}
+            className="text-blue-400 hover:text-blue-300 flex items-center"
+          >
+            ← Về trang chủ
+          </button>
+          <h1 className="text-xl font-bold text-white">🎮 SVT Game Center</h1>
+          <div></div>
+        </div>
+        <div className="h-[calc(100vh-80px)]">
+          <GameDashboard />
+        </div>
+      </div>
+    )
+  }
+
   if (activeSection === 'service' && currentService) {
     if (currentService === 'hdbank') {
       return (
@@ -521,40 +549,299 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
 
   if (activeSection === 'history') {
     return (
-      <div className="text-gray-200 font-sans min-h-screen">
-        <div className="p-4 flex justify-between items-center bg-[#161B22]/80 backdrop-blur-sm border-b border-gray-700">
-          <button
-            onClick={() => setActiveSection('home')}
-            className="text-blue-400 hover:text-blue-300 flex items-center"
-          >
-            ← Về trang chủ
-          </button>
-          <h1 className="text-xl font-bold text-white">Blockchain Explorer</h1>
-          <div></div>
-        </div>
-        <div className="p-6 space-y-6">
-          {/* NFT Passport Section */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center">
-                🎫 <span className="ml-2">Sovico Passport NFT</span>
-              </h2>
-              <button
-                onClick={handleVIPSimulation}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200"
-              >
-                👑 Mô phỏng VIP
-              </button>
+      <div className="text-gray-200 font-sans min-h-screen bg-gradient-to-br from-[#0D1117] via-[#161B22] to-[#0D1117]">
+        {/* Enhanced Header with User Profile */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-blue-600/20 to-cyan-600/20"></div>
+          <div className="relative p-6 flex justify-between items-center backdrop-blur-sm border-b border-gray-700/50">
+            <button
+              onClick={() => setActiveSection('home')}
+              className="text-blue-400 hover:text-blue-300 flex items-center group transition-all duration-300 hover:scale-105"
+            >
+              <span className="mr-2 group-hover:-translate-x-1 transition-transform duration-300">←</span>
+              Về trang chủ
+            </button>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                Blockchain Explorer
+              </h1>
+              <p className="text-gray-400 text-sm mt-1">Khám phá Sovico Passport NFT & Thành tựu</p>
             </div>
-            <NFTPassport tokenId={userData?.customerId || 1} refreshTrigger={refreshTrigger} />
+            
+            {/* User Profile Section */}
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <p className="text-white font-medium text-sm">{user.name || 'Khách hàng'}</p>
+                <p className="text-gray-400 text-xs">ID: {user.customer_id || 'N/A'}</p>
+              </div>
+              <div className="relative group">
+                <div className="w-12 h-12 rounded-full overflow-hidden shadow-lg hover:scale-110 transition-transform duration-300">
+                  {userData?.customer?.avatar_url ? (
+                    <img 
+                      src={userData.customer.avatar_url} 
+                      alt={user.name || 'Customer'} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className={`w-full h-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-lg ${userData?.customer?.avatar_url ? 'hidden' : 'flex'}`}
+                  >
+                    {user.name ? user.name.charAt(0).toUpperCase() : '👤'}
+                  </div>
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-8">
+          {/* Customer Profile Section */}
+          <div className="mb-8">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl blur-xl"></div>
+              <div className="relative bg-[#0D1117]/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+                <div className="flex items-center space-x-6">
+                  {/* Customer Avatar */}
+                  <div className="relative group">
+                    <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                      {userData?.customer?.avatar_url ? (
+                        <img 
+                          src={userData.customer.avatar_url} 
+                          alt={user.name || 'Customer'} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to gradient avatar if image fails to load
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={`w-full h-full bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-2xl ${userData?.customer?.avatar_url ? 'hidden' : 'flex'}`}
+                      >
+                        {user.name ? user.name.charAt(0).toUpperCase() : '👤'}
+                      </div>
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full flex items-center justify-center">
+                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </div>
+                  
+                  {/* Customer Info */}
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-2xl font-bold text-white">{user.name || 'Khách hàng Sovico'}</h3>
+                      <div className="px-3 py-1 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full text-xs font-medium text-white">
+                        VIP Member
+                      </div>
+                    </div>
+                    <p className="text-gray-400 text-sm mb-3">Customer ID: {user.customer_id || 'N/A'}</p>
+                    <div className="flex items-center space-x-6">
+                      <div className="text-center">
+                        <p className="text-gray-400 text-xs">SVT Balance</p>
+                        <p className="text-white font-bold text-lg">{userData?.sovicoTokens?.toLocaleString('vi-VN') || '0'} SVT</p>
+                      </div>
+
+                      <div className="text-center">
+                        <p className="text-gray-400 text-xs">Status</p>
+                        <p className="text-green-400 font-bold text-sm">Active</p>
+                      </div>
+                    </div>
+                    
+                    {/* Upload Avatar Button */}
+                    <div className="mt-4 flex items-center space-x-3">
+                      <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 hover:from-purple-600/30 hover:to-blue-600/30 border border-purple-500/30 rounded-lg text-sm font-medium text-purple-300 hover:text-purple-200 cursor-pointer transition-all duration-300 hover:scale-105">
+                        <span className="mr-2">📷</span>
+                        {userData?.customer?.avatar_url ? 'Thay đổi ảnh' : 'Tải ảnh đại diện'}
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              // Show loading state
+                              const button = e.target.parentElement as HTMLElement;
+                              const originalText = button.textContent;
+                              
+                              try {
+                                // Validate file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  alert('Kích thước file quá lớn. Vui lòng chọn file nhỏ hơn 5MB.');
+                                  return;
+                                }
+                                
+                                // Validate file type
+                                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                                if (!allowedTypes.includes(file.type)) {
+                                  alert('Định dạng file không được hỗ trợ. Vui lòng chọn file JPG, PNG, GIF hoặc WEBP.');
+                                  return;
+                                }
+                                
+                                button.innerHTML = '<span class="mr-2">⏳</span>Đang upload...';
+                                (button as any).disabled = true;
+                                
+                                // Create FormData
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                formData.append('customer_id', user.customer_id?.toString() || '1001');
+                                
+                                // Upload to backend
+                                const response = await fetch('http://127.0.0.1:5000/api/upload/avatar', {
+                                  method: 'POST',
+                                  body: formData
+                                });
+                                
+                                const result = await response.json();
+                                
+                                if (result.success) {
+                                  // Update userData with new avatar URL
+                                  setUserData(prev => ({
+                                    ...prev,
+                                    customer: {
+                                      ...prev.customer,
+                                      avatar_url: result.avatar_url
+                                    }
+                                  }));
+                                  
+                                  // Show success message
+                                  alert('✅ Upload ảnh đại diện thành công!');
+                                  
+                                  // Refresh the page to show new avatar
+                                  window.location.reload();
+                                } else {
+                                  alert(`❌ Lỗi upload: ${result.error}`);
+                                }
+                                
+                              } catch (error) {
+                                console.error('Upload error:', error);
+                                alert('❌ Có lỗi xảy ra khi upload ảnh. Vui lòng thử lại.');
+                              } finally {
+                                // Reset button state
+                                if (button && originalText) {
+                                  button.innerHTML = originalText;
+                                  (button as any).disabled = false;
+                                }
+                                e.target.value = ''; // Reset file input
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                      
+                      {/* Delete Avatar Button */}
+                      {userData?.customer?.avatar_url && (
+                        <button
+                          onClick={async () => {
+                            if (confirm('Bạn có chắc muốn xóa ảnh đại diện?')) {
+                              try {
+                                const response = await fetch(`http://127.0.0.1:5000/api/upload/avatar/${user.customer_id || 1001}`, {
+                                  method: 'DELETE'
+                                });
+                                
+                                const result = await response.json();
+                                
+                                if (result.success) {
+                                  // Update userData to remove avatar
+                                  setUserData(prev => ({
+                                    ...prev,
+                                    customer: {
+                                      ...prev.customer,
+                                      avatar_url: null
+                                    }
+                                  }));
+                                  
+                                  alert('✅ Xóa ảnh đại diện thành công!');
+                                  window.location.reload();
+                                } else {
+                                  alert(`❌ Lỗi xóa ảnh: ${result.error}`);
+                                }
+                              } catch (error) {
+                                console.error('Delete avatar error:', error);
+                                alert('❌ Có lỗi xảy ra khi xóa ảnh. Vui lòng thử lại.');
+                              }
+                            }
+                          }}
+                          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600/20 to-red-700/20 hover:from-red-600/30 hover:to-red-700/30 border border-red-500/30 rounded-lg text-sm font-medium text-red-300 hover:text-red-200 transition-all duration-300 hover:scale-105"
+                        >
+                          <span className="mr-2">🗑️</span>
+                          Xóa ảnh
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Quick Stats */}
+                  <div className="text-right">
+                    <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-xl p-4 border border-purple-500/30">
+                      <p className="text-purple-300 text-xs font-medium mb-1">Blockchain Status</p>
+                      <p className="text-white font-bold text-sm">Connected</p>
+                      <div className="flex items-center justify-end mt-2">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-green-400 text-xs ml-2">Live</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Transaction History Section */}
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-              ⛓️ <span className="ml-2">Blockchain Explorer</span>
-            </h2>
-            <TransactionHistory />
+          {/* Enhanced NFT Passport Section */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl">🎫</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Sovico Passport NFT</h2>
+                  <p className="text-gray-400 text-sm">Digital Identity & Achievements</p>
+                </div>
+              </div>
+              <button
+                onClick={handleVIPSimulation}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-xl text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center space-x-2"
+              >
+                <span className="text-lg">👑</span>
+                <span>Mô phỏng VIP</span>
+              </button>
+            </div>
+            
+            {/* Enhanced NFT Card Container */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-2xl blur-xl"></div>
+              <div className="relative bg-[#0D1117]/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl overflow-hidden">
+                <NFTPassport tokenId={userData?.customerId || 1} refreshTrigger={refreshTrigger} />
+              </div>
+            </div>
+          </div>
+
+          {/* Enhanced Transaction History Section */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl blur-xl"></div>
+            <div className="relative bg-[#0D1117]/80 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl">⛓️</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Blockchain Explorer</h2>
+                  <p className="text-gray-400 text-sm">Transaction History & Analytics</p>
+                </div>
+              </div>
+              <TransactionHistory />
+            </div>
           </div>
         </div>
       </div>

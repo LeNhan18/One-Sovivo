@@ -184,7 +184,6 @@ def evaluate_all_achievements(profile):
                 'description': config['description'],
                 'svt_reward': config['svt_reward']
             })
-    
     return achievements
 
 def get_highest_rank_from_achievements(achievements):

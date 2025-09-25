@@ -295,7 +295,7 @@ class AIService:
         # Nếu khách hàng mới (rất ít hoạt động)
         if total_transactions < 2 and total_flights < 1 and total_nights < 1:
             recs.append({'offer_code': 'NEW001', 'title': 'Mở thẻ HDBank đầu tiên!', 'description': 'Hoàn tiền 5% cho giao dịch đầu tiên khi mở thẻ tín dụng.'})
-            recs.append({'offer_code': 'NEW002', 'title': 'Trải nghiệm Du lịch đầu tiên', 'description': 'Giảm giá 30% cho chuyến bay đầu tiên và đặt phòng resort.'})
+            recs.append({'offer_code': 'NEW002', 'title': 'Đặt vé máy bay đầu tiên', 'description': 'Giảm giá 30% cho chuyến bay đầu tiên và đặt phòng resort.'})
             recs.append({'offer_code': 'NEW003', 'title': 'Gói Khởi đầu Thông minh', 'description': 'Tài khoản tiết kiệm với lãi suất ưu đãi cho khách hàng mới.'})
             return recs
 
@@ -313,14 +313,14 @@ class AIService:
             recs.append({'offer_code': 'SV003', 'title': 'Ưu đãi Du lịch Sinh viên', 'description': 'Giảm giá 50% cho vé máy bay và khách sạn sinh viên.'})
         elif label == 'nguoi_tre':
             recs.append({'offer_code': 'NT001', 'title': 'Thẻ HDBank GenZ', 'description': 'Thẻ tín dụng dành cho GenZ với hoàn tiền cao.'})
-            recs.append({'offer_code': 'NT002', 'title': 'Gói Đầu tư Trẻ', 'description': 'Sản phẩm đầu tư phù hợp với người trẻ, rủi ro thấp.'})
-            recs.append({'offer_code': 'NT003', 'title': 'Ưu đãi Mua sắm Online', 'description': 'Hoàn tiền 10% khi mua sắm online và đặt vé xem phim.'})
+            recs.append({'offer_code': 'NT002', 'title': 'Ưu đãi 10% cho chuyến bay ', 'description': 'Sản phẩm đầu tư phù hợp với người trẻ, rủi ro thấp.'})
+            recs.append({'offer_code': 'NT003', 'title': 'Combo du lịch hạng trung bình', 'description': 'Hoàn tiền 10% khi mua sắm online và đặt vé xem phim.'})
         elif label == 'du_lich':
-            recs.append({'offer_code': 'DL001', 'title': 'Combo Vietjet + Resort', 'description': 'Gói du lịch trọn gói với giảm giá 30% cho vé máy bay và resort.'})
+            recs.append({'offer_code': 'DL001', 'title': 'Combo khuyến mãi Vietjet + Resort', 'description': 'Gói du lịch trọn gói với giảm giá 30% cho vé máy bay và resort.'})
             recs.append({'offer_code': 'DL002', 'title': 'Thẻ HDBank Travel', 'description': 'Thẻ tín dụng du lịch với tích miles và bảo hiểm du lịch.'})
             recs.append({'offer_code': 'DL003', 'title': 'Gói Du lịch Quốc tế', 'description': 'Ưu đãi đặc biệt cho các chuyến du lịch quốc tế.'})
         else:  # gia_dinh
-            recs.append({'offer_code': 'GD001', 'title': 'Thẻ HDBank Family', 'description': 'Thẻ tín dụng gia đình với ưu đãi cho cả nhà.'})
+            recs.append({'offer_code': 'GD001', 'title': 'Thẻ HDBank Gia đình', 'description': 'Thẻ tín dụng gia đình với ưu đãi cho cả nhà.'})
             recs.append({'offer_code': 'GD002', 'title': 'Gói Tiết kiệm Gia đình', 'description': 'Tài khoản tiết kiệm với lãi suất ưu đãi cho gia đình.'})
             recs.append({'offer_code': 'GD003', 'title': 'Combo Du lịch Gia đình', 'description': 'Ưu đãi đặc biệt cho các chuyến du lịch gia đình.'})
         return recs
