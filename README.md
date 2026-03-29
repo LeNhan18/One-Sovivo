@@ -6,26 +6,21 @@
 
 One-Sovico Platform bao gồm 2 ứng dụng chính:
 
-### 1. 🧠 AI Insight Dashboard (Dành cho Chuyên viên)
-- **Mục đích**: Phòng điều khiển phân tích khách hàng với AI
+### Phân hệ Khách hàng (One-Sovico Super App)
+Đây là ứng dụng "All-in-one" (Tất cả trong một) nhằm mang lại trải nghiệm liền mạch cho người dùng cuối trong hệ sinh thái Sovico:
+Tích hợp đa dịch vụ lõi: Người dùng có thể quản lý tài khoản/giao dịch ngân hàng (HDBank), đặt vé máy bay (Vietjet) và đặt phòng nghỉ dưỡng/spa (Resort) mà không cần chuyển đổi giữa nhiều app khác nhau.
+Trợ lý tài chính thông minh (AI Advisor): Tích hợp AI (Gemini 1.5 Flash) để giao tiếp bằng ngôn ngữ tự nhiên. Điểm ăn tiền là khả năng nhận diện ý định (intent) để tự động hóa các luồng dịch vụ (ví dụ: gõ "đặt vé đi Phú Quốc", AI sẽ tự động gọi API của Vietjet).
 
-- **Đối tượng**: Ban Giám khảo, chuyên viên HDBank
-- **Tính năng**:
-  - Tìm kiếm và phân tích khách hàng 360°
-  - AI dự đoán persona (doanh_nhan, gia_dinh, nguoi_tre)
-  - Đề xuất sản phẩm cá nhân hóa
-  - Trực quan hóa hiệu suất Model AI
-  - Hệ thống Achievement và NFT tự động
+Ví & Hệ thống phần thưởng Web3 (SVT Wallet & Blockchain Explorer): Gamification quá trình sử dụng app bằng Blockchain. Người dùng có ví lưu trữ Token (SVT), sở hữu định danh số duy nhất (NFT Passport/Soulbound Tokens) không thể làm giả. Token này có thể dùng trên Marketplace, chơi game hoặc đóng góp cho các quỹ ESG.
 
-### 2.  One-Sovico Super App (Dành cho Khách hàng)
-- **Mục đích**: Siêu ứng dụng quản lý dịch vụ tài chính
-- **Đối tượng**: Khách hàng cuối
-- **Tính năng**:
-  - Ví Sovico Token (SVT) Blockchain
-  - Tổng quan dịch vụ (HDBank, Vietjet, Resort)
-  - AI Financial Assistant với automation
-  - Ưu đãi AI cá nhân hóa
-  - Lịch sử giao dịch Blockchain minh bạch
+### Phân hệ Quản trị / Chuyên viên (AI Insight Dashboard)
+Đây là "bộ não" nội bộ (CRM thông minh) giúp nhân viên thấu hiểu và chăm sóc khách hàng tốt hơn:
+
+Hồ sơ khách hàng 360°: Gom tụ toàn bộ mảnh ghép dữ liệu từ ngân hàng, hàng không đến du lịch để tạo ra một góc nhìn toàn diện về một cá nhân.
+
+Dự đoán chân dung bằng Machine Learning (AI Insights): Hệ thống không bắt nhân viên tự phân tích số liệu. Mô hình Deep Learning sẽ tự động "đọc" lịch sử giao dịch để gắn nhãn chân dung khách hàng (ví dụ: Thương gia, Gia đình, Sinh viên...), từ đó gợi ý chính xác sản phẩm hoặc ưu đãi (Cross-sell/Up-sell).
+
+Giám sát & Can thiệp Chatbot (Chat Monitor): Đây là một tính năng backend rất thực tế. Admin có thể xem lịch sử chat của AI với khách, đánh giá cảm xúc (sentiment), và đặc biệt là có quyền can thiệp (intervene) trực tiếp vào luồng chat để take-over (tiếp quản) khi khách hàng cần hỗ trợ của người thật.
 
 ## 🏗️ Kiến trúc Modular Clean
 
