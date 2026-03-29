@@ -224,7 +224,7 @@ def get_chat_detail(chat_id):
                 'tốtt','ok','okay','quá tốt','ổn','helpful','hay'
             }
             negative = {
-                'tệ','buồn','tức giận','không hài lòng','ghét','trả lời chậm','ngu','dở','lâu','mệt',
+                'tệ','buồn','tức giận','không hài lòng','ghét','trả lời chậm','ngu','dở','lâu','mệt', 
                 'vấn đề','thất vọng','không hài lòng','không','không bao giờ','tức giận','thô lỗ','bạn trả lời chậm','đặt vé lâu'
             }
 
@@ -293,9 +293,7 @@ def get_chat_detail(chat_id):
         except Exception:
             # If sentiment analysis fails, continue without blocking
             chat['sentiment_summary'] = {'avg_score': 0.0, 'label': 'neutral', 'user_message_count': 0}
-        
-        chat['messages'] = messages
-        
+        chat['messages'] = messages    
         cursor.close()
         conn.close()
         
@@ -303,8 +301,8 @@ def get_chat_detail(chat_id):
             'success': True,
             'chat': chat
         })
-        
     except Exception as e:
+        
         import traceback
         traceback.print_exc()
         return jsonify({

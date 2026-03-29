@@ -1,115 +1,141 @@
 # One-Sovico Platform
 
- **Hệ thống AI phân tích khách hàng thông minh** cho hệ sinh thái tài chính Sovico
+Hệ thống AI phân tích khách hàng cho hệ sinh thái tài chính Sovico.
 
-##  Tổng quan
+## Tổng quan
 
-One-Sovico Platform bao gồm 2 ứng dụng chính:
+Nền tảng gồm hai giao diện chính: **AI Insight Dashboard** (nội bộ) và **One-Sovico Super App** (khách hàng). Cùng một backend Flask và frontend React (Vite).
 
-### 1. 🧠 AI Insight Dashboard (Dành cho Chuyên viên/BGK)
-- **Mục đích**: Phòng điều khiển phân tích khách hàng với AI
+## Chức năng trên trang web
 
-- **Đối tượng**: Ban Giám khảo, chuyên viên HDBank
-- **Tính năng**:
-  - Tìm kiếm và phân tích khách hàng 360°
-  - AI dự đoán persona (doanh_nhan, gia_dinh, nguoi_tre)
-  - Đề xuất sản phẩm cá nhân hóa
-  - Trực quan hóa hiệu suất Model AI
-  - Hệ thống Achievement và NFT tự động
+Mục dưới đây khớp với các module trong `client/src/App.tsx`, `modules/Dashboard.tsx` và `modules/SuperApp.tsx`. Một số nút (ví dụ "Báo cáo" trên Dashboard) có thể chỉ là placeholder chưa nối API đầy đủ.
 
-### 2.  One-Sovico Super App (Dành cho Khách hàng)
-- **Mục đích**: Siêu ứng dụng quản lý dịch vụ tài chính
-- **Đối tượng**: Khách hàng cuối
-- **Tính năng**:
-  - Ví Sovico Token (SVT) Blockchain
-  - Tổng quan dịch vụ (HDBank, Vietjet, Resort)
-  - AI Financial Assistant với automation
-  - Ưu đãi AI cá nhân hóa
-  - Lịch sử giao dịch Blockchain minh bạch
+### Vỏ ứng dụng (sau khi đăng nhập)
 
-## 🏗️ Kiến trúc Modular Clean
+| Thành phần | Chức năng |
+|------------|-----------|
+| Đăng nhập / đăng ký | Màn `AuthPanel` trước khi vào hệ thống |
+| Đăng xuất | Xóa token, quay lại màn đăng nhập |
+| Admin | Chuyển nhanh giữa **AI Insight Dashboard** và **One-Sovico Super App** |
+| Khách hàng | Mặc định vào Super App; có thể dùng nút chuyển sang Dashboard (nếu hiển thị trong thanh điều hướng) |
 
+### AI Insight Dashboard (vai trò admin / chuyên viên)
 
+**Tab "Customer Analysis"**
 
-### 📁 Cấu trúc dự án
+| Khu vực | Chức năng |
+|--------|-----------|
+| Tìm kiếm (`SearchPanel`) | Tìm theo tên hoặc mã khách hàng, chọn khách để phân tích |
+| Hồ sơ 360° (`Profile360`) | Tổng hợp HDBank, Vietjet, resort (theo API `/api/customer/...`) |
+| AI Insights (`AIInsights`) | Persona, evidence, gợi ý sản phẩm / ưu đãi |
+| Hành động gợi ý (`ActionsPanel`) | Gắn với insight / khách hàng đang chọn |
+| Model Metrics | Overlay xem metric model (nút bật/tắt trên header) |
+| Thống kê / trạng thái | Khối "Thống kê hôm nay" và "Trạng thái hệ thống" (phần số liệu có thể demo) |
+| Báo cáo | Nút trên header (có thể chưa nối báo cáo thật) |
+
+**Tab "Blockchain Achievements"**
+
+| Chức năng |
+|-----------|
+| `BlockchainDashboard`: NFT Passport, thành tựu, simulation (theo triển khai) |
+
+**Tab "Chat Monitor"**
+
+| Chức năng |
+|-----------|
+| `AdminChatMonitor`: xem / giám sát hội thoại AI khách hàng (khi backend và route hoạt động) |
+
+### One-Sovico Super App (khách hàng)
+
+**Trang chủ** — Thẻ SVT, hạng thành viên, ô dịch vụ Vietjet / HDBank / resort, và các **lối tắt** (cùng tên trong code):
+
+| Lối tắt (quick action) | Component / nội dung |
+|------------------------|----------------------|
+| Wallet SVT | `SVTWallet`: ví, số dư, giao dịch (API `/api/tokens/...`) |
+| Marketplace | `SVTMarketplace`: P2P / vật phẩm SVT |
+| ESG Impact | `ESGPrograms`: chương trình, tiến độ, đóng góp (VND / tùy chọn SVT theo API) |
+| AI Advisor | `AIFinancialAssistant`: chat Gemini, tự động hóa dịch vụ theo intent |
+| SVT Games | `GameDashboard`: game nhận SVT |
+| Blockchain (mục "Lịch sử" trên card) | **Blockchain Explorer**: khám phá NFT Passport / thành tựu (không chỉ "lịch sử giao dịch" thuần) |
+
+**Dịch vụ từ trang chủ (không qua lối tắt trên)**
+
+| Dịch vụ | Chức năng |
+|---------|-----------|
+| Vietjet / Resort | `ServiceModal`: đặt vé, đặt phòng / spa (theo loại) |
+| HDBank | Trang riêng: `HDBankCard` (dashboard thẻ) hoặc `HDBankTransactions` (lịch sử giao dịch), chuyển tab trong cùng màn |
+
+**Khác:** Cập nhật avatar, tải dữ liệu khách hàng — theo các API upload và customer (xem `SuperApp.tsx`).
+
+**Điểm thưởng (SVT):** Dùng trong ví, marketplace; có thể liên quan ESG hoặc đổi quà tùy backend và phiên bản giao diện.
+
+### Đăng nhập và phân quyền
+
+- **admin / chuyên viên:** mặc định Dashboard; có thể mở Super App để trải nghiệm như khách.
+- **khách hàng:** mặc định Super App.
+
+## Kiến trúc
+
+Modular: entry Flask, models SQLAlchemy, services (business logic), routes (blueprints), client React/Vite.
+
+### Cấu trúc thư mục (tóm tắt)
 
 ```
-z:\One-Sovico\
-├── app_modular_clean.py       # 🎯 Main application (Production)
-├── config.py                  # ⚙️ Configuration settings
-├── requirements.txt           # 📦 Dependencies
-├── 
-├── models/                    # 🗃️ Database Models
-│   ├── __init__.py           # Model initialization với DI
-│   ├── database.py           # Database connection utilities
-│   ├── user.py              # User authentication model
-│   ├── customer.py          # Customer profile model  
-│   ├── transactions.py      # Financial transaction models
-│   ├── achievements.py      # Achievement & NFT models
-│   ├── missions.py          # Mission progression models
-│   └── marketplace.py       # Marketplace & P2P models
+One-Sovico/
+├── app_modular_clean.py      # Entry Flask (production)
+├── config.py                 # Cấu hình MySQL, MODEL_DIR, v.v.
+├── requirements.txt
+├── blockchain_simple.py        # Blockchain mock / tích hợp
+├── blockchain_config.py
 │
-├── services/                  # 🔧 Business Logic Services
-│   ├── __init__.py           # Service initialization
-│   ├── auth_service.py       # Authentication logic
-│   ├── ai_service.py         # AI/ML prediction service
-│   ├── customer_service.py   # Customer data operations
-│   ├── admin_service.py      # Admin & achievement management
-│   └── marketplace_service.py # Marketplace logic
+├── models/                   # ORM: customers, users, transactions, flights, resorts, ...
+├── services/                 # Auth, AI, customer, admin, marketplace, token, ...
+├── routes/                   # Blueprint API: auth, customer, ai, admin, chat, game, ...
+├── migrations/               # Script migration DB (theo thứ tự số)
+├── scripts/                  # Tiện ích train sentiment, cài dependency, v.v.
+├── legacy/                   # Code cũ (ví dụ ai_utils)
+├── test/                     # Script / test thủ công ESG, sentiment, ...
 │
-├── routes/                    # 🛣️ API Route Handlers
-│   ├── __init__.py           # Route registration
-│   ├── auth_routes.py        # Authentication endpoints
-│   ├── customer_routes.py    # Customer data endpoints
-│   ├── ai_routes.py          # AI prediction endpoints
-│   ├── admin_routes.py       # Admin panel endpoints
-│   └── ai_chat_routes.py     # 🆕 AI Chat history endpoints
-│
-├── client/                    # ⚛️ React Frontend
+├── client/                   # Frontend React + TypeScript + Vite
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── AIFinancialAssistant.tsx  # 🤖 AI Chat với automation
-│   │   │   ├── ServiceModal.tsx          # 📋 Self-service forms
-│   │   │   └── AIAgent.tsx               # 🎯 AI automation component
-│   │   └── modules/
-│   │       └── SuperApp.tsx              # 📱 Main app với hybrid UX
-│   └── ...
+│   │   ├── components/       # AIFinancialAssistant, SuperApp modules, ...
+│   │   ├── modules/
+│   │   └── ...
+│   └── package.json
 │
-├── blockchain_simple.py       # 🔗 Blockchain integration (mock)
-├── blockchain_config.py       # ⚙️ Achievement configuration
-└── dl_model/                  # 🧠 AI Model directory
+├── dl_model/                 # Artifact model (persona, sentiment), train_persona_model.py
+├── static/                   # File tĩnh (avatars, items, ...)
+├
+├── contracts/                # Hardhat, Solidity (NFT), tách khỏi backend Python
+└── (file gốc khác)           # test_*.py, restart_server.py, integrate_sentiment.py — tiện ích dev
 ```
 
-##  Cài đặt và Chạy
+**Ghi chú:** Một số file tiện ích nằm trực tiếp ở thư mục gốc; không ảnh hưởng import của app chính. Có thể gom vào `scripts/` sau nếu muốn gọn hơn (cần cập nhật đường dẫn khi chạy thủ công).
 
-### Bước 1: Cài đặt MySQL
-```bash
-# Windows: Tải MySQL từ https://dev.mysql.com/downloads/installer/
-# Hoặc sử dụng XAMPP: https://www.apachefriends.org/
-```
+## Cài đặt và chạy
 
-### Bước 2: Thiết lập Database
+### Bước 1: MySQL
+
+Cài MySQL (Windows) hoặc XAMPP, tạo database theo `config.py` / biến môi trường.
+
+### Bước 2: Database
+
 ```bash
-# Chạy script setup database
 python setup_ai_chat_db.py
-
-# Hoặc sử dụng PowerShell script
+# hoặc
 .\setup_ai_chat.ps1
 ```
 
-### Bước 3: Thiết lập Backend
-```bash
-# Kích hoạt virtual environment
+### Bước 3: Backend
+
+```powershell
 .venv\Scripts\Activate.ps1
-
-# Cài đặt Python dependencies
 pip install -r requirements.txt
-
-# Chạy backend
 python app_modular_clean.py
 ```
 
-### Bước 4: Thiết lập Frontend
+### Bước 4: Frontend
+
 ```bash
 cd client
 npm install
@@ -117,311 +143,143 @@ npm run dev
 ```
 
 ### Bước 5: Truy cập
-- **Backend API**: http://127.0.0.1:5000
-- **Frontend**: http://localhost:5173
-- **API Documentation**: http://127.0.0.1:5000/health
 
-## 🛠️ Công nghệ
+- Backend API: `http://127.0.0.1:5000`
+- Frontend: `http://localhost:5173`
+- Health: `http://127.0.0.1:5000/health`
+
+## Công nghệ
 
 ### Backend
-- **Framework**: Flask + SQLAlchemy
-- **Database**: MySQL với PyMySQL
-- **AI/ML**: TensorFlow, Scikit-learn, Google Gemini AI
-- **Auth**: JWT + BCrypt
-- **Blockchain**: Web3.py (optional)
+
+- Flask, SQLAlchemy, MySQL (PyMySQL)
+- AI/ML: TensorFlow, Scikit-learn, Google Gemini (client)
+- Auth: JWT, BCrypt
+- Blockchain: Web3.py (tùy chọn)
 
 ### Frontend
-- **Framework**: React + TypeScript
-- **Styling**: Tailwind CSS
-- **Build Tool**: Vite
-- **AI Integration**: Google Gemini API
 
-##  Demo Accounts
+- React, TypeScript, Tailwind, Vite
+- Google Generative AI (Gemini) trên client
+
+## Tài khoản demo
 
 ### Chuyên viên (Dashboard)
-- **Email**: `admin@hdbank.com.vn`
-- **Password**: `123456`
+
+- Email: `admin@hdbank.com.vn`
+- Password: `123456`
 
 ### Khách hàng (Super App)
-- **Email**: `khachhang@gmail.com`
-- **Password**: `123456`
 
-##  API Endpoints
+- Email: `khachhang@gmail.com`
+- Password: `123456`
 
-### 🔐 Authentication
-- `POST /auth/login` - Đăng nhập
-- `POST /auth/register` - Đăng ký
+## API (rút gọn)
 
-### 👤 Customer Management
-- `GET /customer/{id}` - Hồ sơ 360°
-- `GET /customer/{id}/insights` - AI insights
-- `GET /customers/search?q=...` - Tìm kiếm
+### Authentication
 
-### 🤖 AI Services
-- `POST /predict` - Dự đoán persona
-- `POST /ai/chat` - AI Assistant chat
+- `POST /auth/login` — Đăng nhập
+- `POST /auth/register` — Đăng ký
 
-### 🗨️ AI Chat History (NEW)
-- `GET /api/chat/history/{customer_id}` - Lấy lịch sử chat
-- `POST /api/chat/save` - Lưu cuộc trò chuyện
-- `DELETE /api/chat/{chat_id}` - Xóa chat
-- `GET /api/chat/{chat_id}/actions` - Lấy actions của chat
-- `POST /api/chat/actions/save` - Lưu action thực hiện
-- `GET /api/chat/stats/{customer_id}` - Thống kê chat
+### Customer
 
-### 🏆 Admin & Achievements
-- `GET /admin/achievements` - Quản lý thành tựu
-- `POST /admin/assign-achievement` - Gán thành tựu
-- `POST /admin/auto-assign-achievements` - Tự động gán thành tựu
+- `GET /customer/{id}` — Hồ sơ 360°
+- `GET /customer/{id}/insights` — AI insights
+- `GET /customers/search?q=...` — Tìm kiếm
 
-### 💰 Token Management
-- `GET /api/tokens/{customer_id}` - Số dư SVT
-- `POST /api/tokens/add` - Thêm token
-- `GET /api/tokens/{customer_id}/history` - Lịch sử giao dịch
+### AI
 
-## 🧠 AI Model & Services
+- `POST /predict` hoặc route AI tương ứng trong app — Dự đoán persona (xem `routes/ai_routes.py`)
 
-### Gemini AI Integration
-- **Model**: Gemini-1.5-flash với fallbacks
-- **Features**: Natural language processing, Intent recognition
-- **Service automation**: Tự động thực hiện đặt vé, chuyển tiền, đặt phòng
+### AI Chat History
 
-### Traditional ML Model
-- **Input Features**: Tuổi, số dư HDBank, chuyến bay Vietjet, nghỉ dưỡng resort
-- **Output Personas**: 
-  - `doanh_nhan` - Doanh nhân
-  - `gia_dinh` - Gia đình  
-  - `nguoi_tre` - Người trẻ
+- `GET /api/chat/history/{customer_id}`
+- `POST /api/chat/save`
+- `DELETE /api/chat/{chat_id}`
+- (Các endpoint chi tiết trong `routes/ai_chat_routes.py`)
 
-### AI Chat Features
-- **Intent Recognition**: Hiểu được yêu cầu từ ngôn ngữ tự nhiên
-- **Service Integration**: Tự động kết nối với API của Vietjet, HDBank, Resort
-- **Context Awareness**: Nhớ lịch sử hội thoại và preferences
-- **Progress Tracking**: Theo dõi trạng thái thực hiện real-time
+### Admin & Achievements
 
-## 🏆 Blockchain Achievement System
+- `GET /admin/achievements`
+- `POST /admin/assign-achievement`
+- `POST /admin/auto-assign-achievements`
 
-### Achievement Categories
+### Token
 
-#### ✈️ Frequent Flyer
-- **Điều kiện**: > 20 chuyến bay/năm
-- **Rank**: Gold
-- **SVT Reward**: 1,000 tokens
+- `GET /api/tokens/{customer_id}`
+- `POST /api/tokens/add`
+- `GET /api/tokens/{customer_id}/history`
 
-#### 💼 Business Elite  
-- **Điều kiện**: Hạng thương gia + > 10 chuyến bay/năm
-- **Rank**: Platinum
-- **SVT Reward**: 2,000 tokens
+## AI Model & Services
 
-#### 💎 High Roller
-- **Điều kiện**: Số dư trung bình > 500 triệu VND
-- **Rank**: Diamond  
-- **SVT Reward**: 5,000 tokens
+### Gemini AI
 
-#### 🏖️ Resort Lover
-- **Điều kiện**: Chi tiêu nghỉ dưỡng > 50 triệu VND
-- **Rank**: Gold
-- **SVT Reward**: 1,500 tokens
+- Model: Gemini 1.5 Flash (fallback theo cấu hình client)
+- NLP, intent, tự động hóa dịch vụ (đặt vé, chuyển tiền, đặt phòng — theo triển khai)
 
-#### 🏨 Long Stay Guest
-- **Điều kiện**: > 30 đêm nghỉ dưỡng/năm
-- **Rank**: Platinum
-- **SVT Reward**: 2,500 tokens
+### Persona ML
 
-#### 🏆 VIP Ecosystem Member
-- **Điều kiện**: Kết hợp cả 3 dịch vụ ở mức cao
-- **Rank**: Diamond
-- **SVT Reward**: 10,000 tokens
+- Input: tuổi, số dư HDBank, giao dịch, chuyến bay, resort, v.v.
+- Output: các persona đã định nghĩa trong `training_meta.json` (xem `dl_model/`)
 
-### Smart Contract Integration
-- **SovicoPassport NFT**: Dynamic metadata với achievements
-- **Soulbound Tokens**: Không thể chuyển nhượng
-- **Auto-detection**: AI tự động phát hiện thành tựu
+### AI Chat
 
-## 💬 AI Financial Assistant Features
+- Lưu lịch sử MySQL, theo dõi action, có thể tích hợp sentiment (backend)
 
-### 🤖 Hybrid UX Model
-- **ServiceModal**: Self-service forms (buffet style)
-- **AIAgent**: AI-powered automation (waiter style)
-- **Intent Recognition**: Natural language → automatic service execution
-- **Real Database Integration**: All actions save to database
+## Blockchain Achievement (tóm tắt)
 
-### 🎯 Service Automation Examples
-```
-User: "Đặt vé từ Sài Gòn đi Phú Quốc ngày 25/10 cho 2 người"
-AI: ✅ Tự động extract: SGN→PQC, 2025-10-25, 2 passengers
-    ✅ Call Vietjet API
-    ✅ Return booking confirmation
-```
+- NFT SovicoPassport, soulbound, metadata động
+- Chi tiết triển khai: `contracts/`
 
-```
-User: "Chuyển 5 triệu cho anh Nam"
-AI: ✅ Extract amount & recipient
-    ✅ Call HDBank transfer API  
-    ✅ Show transaction status
-```
+## Database Schema (tóm tắt)
 
-### 💾 Chat History & Persistence
-- **Database Storage**: MySQL với 3 tables (chat_history, messages, actions)
-- **Cross-device Sync**: Sync giữa các thiết bị
-- **Smart Titles**: Auto-generate tiêu đề chat từ nội dung
-- **Action Tracking**: Lưu tất cả actions đã thực hiện
-- **Search & Analytics**: Có thể search và phân tích patterns
+- `users`, `customers`, `hdbank_transactions`, `vietjet_flights`, `resort_bookings`
+- `achievements`, `customer_achievements`, `token_transactions`
+- `ai_chat_history`, `ai_chat_messages`, `ai_service_actions` (theo migration)
 
-## 🗃️ Database Schema
+## Kiến trúc service
 
-### Core Tables
-- `users` - User authentication
-- `customers` - Customer profiles  
-- `hdbank_transactions` - Banking data
-- `vietjet_flights` - Flight bookings
-- `resort_bookings` - Resort stays
-- `achievements` - Achievement definitions
-- `customer_achievements` - User achievements
-- `token_transactions` - SVT token history
+- Tách models / services / routes
+- Dependency injection qua `init_services` và `set_models` (xem `app_modular_clean.py`)
 
-### AI Chat Tables (NEW)
-- `ai_chat_history` - Chat sessions
-- `ai_chat_messages` - Individual messages  
-- `ai_service_actions` - Service actions performed
+## Testing & Development
 
-## 🔧 Service Architecture
+- `GET /health` — health check
+- Các route debug nếu có trong `routes/debug_routes.py`
 
-### 🏗️ Clean Architecture Benefits
+## Production
 
-1. **Maintainability**: Code dễ đọc, dễ sửa, dễ mở rộng
-2. **Testability**: Có thể test từng layer độc lập  
-3. **Scalability**: Thêm features mới không ảnh hưởng code cũ
-4. **Team Collaboration**: Dev có thể work parallel
-5. **Performance**: Import optimization, lazy loading
-
-### 🔄 Dependency Injection Pattern
-```python
-# Initialize services với dependencies
-service_instances = init_services(db, bcrypt, app.config, ...)
-
-# Inject models vào services
-for service_name, service_instance in service_instances.items():
-    if hasattr(service_instance, 'set_models'):
-        service_instance.set_models(model_classes)
-```
-
-## 🧪 Testing & Development
-
-### 🔍 Debug Endpoints
-- `/health` - System health check
-- `/debug/customers` - Sample customers
-- `/debug/ai-chat` - Test AI chat functionality
-
-### 🧪 Test AI Chat
 ```bash
-# Test natural language processing
-POST /ai/chat
-{
-  "message": "Đặt vé từ Sài Gòn đi Phú Quốc ngày mai cho 2 người",
-  "customer_id": 1001
-}
-```
-
-### 🔧 Test Service Integration
-```bash
-# Test flight booking
-POST /api/vietjet/book_flight
-{
-  "customer_id": 1001,
-  "origin": "SGN",
-  "destination": "PQC", 
-  "departure_date": "2025-10-25",
-  "passengers": 2
-}
-```
-
-## 🚀 Production Deployment
-
-### 🌐 Environment Setup
-```bash
-# Production environment variables
 export FLASK_ENV=production
-export MYSQL_HOST=your_mysql_host
-export GEMINI_API_KEY=your_gemini_key
-export JWT_SECRET_KEY=your_secret_key
+export MYSQL_HOST=...
+export GEMINI_API_KEY=...
+export JWT_SECRET_KEY=...
 ```
 
-### 🔐 Security Considerations
-- JWT token expiration
-- Input validation & sanitization  
-- SQL injection prevention
-- Rate limiting for AI endpoints
-- CORS configuration
-- API key protection
+Bảo mật: JWT, validate input, CORS, rate limit (theo cấu hình), không commit secret.
 
-## 📈 Monitoring & Analytics
+## Monitoring
 
-### 📊 Available Metrics
-- AI chat usage patterns
-- Service automation success rate
-- Achievement distribution
-- Token transaction volume
-- Customer engagement analytics
+- Log Flask, metrics theo nhu cầu triển khai
 
-### 🔍 Logging
-```python
-# Enable debug logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
+## Cập nhật gần đây (Version 2.x)
 
-## 🆕 Latest Updates
+- Lịch sử chat DB, automation dịch vụ, tối ưu tải
 
-### ✅ Version 2.0 Features
-- **AI Chat History**: Full database persistence
-- **Service Automation**: End-to-end AI automation  
-- **Intent Recognition**: Advanced NLP với Gemini
-- **Cross-device Sync**: Chat history sync
-- **Smart Analytics**: AI usage insights
-- **Performance Optimization**: Lazy loading, caching
+### Roadmap (gợi ý)
 
-### 🔜 Roadmap
-- [ ] Voice integration cho AI Assistant
-- [ ] Mobile app với React Native
-- [ ] Advanced analytics dashboard
-- [ ] Mainnet blockchain deployment
-- [ ] Multi-language support
-- [ ] Advanced AI personas
+- Voice, mobile, analytics nâng cao, mainnet, đa ngôn ngữ
 
-## 📞 Support & Troubleshooting
+## Xử lý sự cố
 
-### 🐛 Common Issues
+1. **AI Chat 404** — Restart Flask, kiểm tra đăng ký blueprint trong log.
+2. **Model AI chưa sẵn sàng** — Kiểm tra `dl_model/` và `MODEL_DIR`; có thể fallback mock trong `ai_service`.
+3. **Database connection failed** — MySQL đang chạy, kiểm tra `config.py` / env.
+4. **Gemini API** — Biến `VITE_GEMINI_API_KEY` (client), không hardcode key.
 
-1. **"AI Chat 404 Error"**
-   - Solution: Restart Flask để load AI chat routes
-   - Check: `✅ AI Chat routes registered` trong logs
-
-2. **"Model AI chưa sẵn sàng"**
-   - Solution: Kiểm tra `dl_model/` directory
-   - Fallback: Mock model sẽ được sử dụng
-
-
-3. **"Database connection failed"**
-   - Solution: Kiểm tra MySQL service đang chạy
-   - Check: Database credentials trong `config.py`
-
-4. **"Gemini API Error"**
-   - Solution: Verify `VITE_GEMINI_API_KEY` trong `.env`
-   - Fallback: AI sẽ dùng basic pattern matching
-
-### 📧 Development Team
-- **Backend**: Flask + AI Services
-- **Frontend**: React + TypeScript
-- **AI/ML**: TensorFlow + Gemini Integration
-- **Blockchain**: Web3.py + Smart Contracts
-
----
-
-## 🎉 Quick Start
+## Quick Start
 
 ```bash
-# Clone và setup
 git clone [repository-url]
 cd One-Sovico
 
@@ -429,24 +287,20 @@ cd One-Sovico
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python setup_ai_chat_db.py
-python app.py
+python app_modular_clean.py
 
-# Frontend (terminal mới)
+# Frontend (terminal khác)
 cd client
-npm install  
+npm install
 npm run dev
-
-# Truy cập
-# Frontend: http://localhost:5173
-# Backend: http://127.0.0.1:5000
 ```
 
-**🚀 Hệ sinh thái One-Sovico hoàn chỉnh với AI, Database, Blockchain và Chat History!**
+- Frontend: `http://localhost:5173`
+- Backend: `http://127.0.0.1:5000`
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: September 13, 2025  
-**Architecture**: Modular Clean Architecture  
-**Author**: One-Sovico Development Team
-
+**Version:** 2.0.0  
+**Last Updated:** September 13, 2025  
+**Architecture:** Modular Clean  
+**Author:** One-Sovico Development Team

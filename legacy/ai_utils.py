@@ -108,9 +108,9 @@ def train_and_save_model(app, db):
     ])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    print("🔄 Training model...")
+    print(" Training model...")
     history = model.fit(X_scaled, y_encoded, epochs=15, batch_size=64, verbose=1)
-    print("✅ Training hoàn tất")
+    print(" Training hoàn tất")
 
     # Lưu model
     model_dir = app.config.get('MODEL_DIR', 'dl_model')
@@ -185,11 +185,11 @@ def load_model(app, db=None):
             ai_model = tf.keras.models.load_model(model_path)
             scaler = joblib.load(os.path.join(model_dir, SCALER_NAME))
             encoder = joblib.load(os.path.join(model_dir, ENCODER_NAME))
-            print(f"✅ Đã load model từ {model_dir}")
+            print(f" Đã load model từ {model_dir}")
         else:
-            print("⚠️ Không tìm thấy model. Tạo MockModel...")
+            print(" Không tìm thấy model. Tạo MockModel...")
             create_mock_model(app)
 
     except Exception as e:
-        print(f"❌ Lỗi khi load model: {e}")
+        print(f" Lỗi khi load model: {e}")
         create_mock_model(app)

@@ -55,7 +55,7 @@ class AIService:
             self.categorical_cols = meta.get('categorical_cols', [])
             self.classes = meta.get('classes', ['nguoi_moi'])
         except Exception as e:
-            print(f"⚠️ Could not load training_meta.json: {e}")
+            print(f"️ Could not load training_meta.json: {e}")
             # Provide safe defaults
             self.numeric_cols = ['age', 'monthly_income', 'total_transactions']
             self.categorical_cols = []
@@ -65,25 +65,28 @@ class AIService:
         try:
             self.scaler = joblib.load(os.path.join(self.model_dir, 'scaler.pkl'))
         except Exception as e:
-            print(f"⚠️ Could not load scaler.pkl: {e}")
+            print(f" Could not load scaler.pkl: {e}")
             self.scaler = None
 
         try:
             self.encoder = joblib.load(os.path.join(self.model_dir, 'encoder.pkl'))
         except Exception as e:
-            print(f"⚠️ Could not load encoder.pkl: {e}")
+            print(f" Could not load encoder.pkl: {e}")
             self.encoder = None
 
-        # Load keras model
+        # Load Keras model (.keras ưu tiên, .h5 fallback)
         try:
             if tf is None:
-                print("⚠️ TensorFlow not available. Using mock model.")
+                print("️ TensorFlow not available. Using mock model.")
                 return self.create_mock_model()
-            self.ai_model = tf.keras.models.load_model(os.path.join(self.model_dir, 'persona_model.h5'))
-            print(f"✅ Loaded AI model from {self.model_dir} | classes={self.classes}")
+            model_path = os.path.join(self.model_dir, 'persona_model.keras')
+            if not os.path.exists(model_path):
+                model_path = os.path.join(self.model_dir, 'persona_model.h5')
+            self.ai_model = tf.keras.models.load_model(model_path)
+            print(f" Loaded AI model from {self.model_dir} | classes={self.classes}")
             return True
         except Exception as e:
-            print(f"⚠️ Failed to load Keras model: {e}. Using mock model.")
+            print(f" Failed to load Keras model: {e}. Using mock model.")
             return self.create_mock_model()
 
     def create_mock_model(self):
@@ -118,7 +121,7 @@ class AIService:
         self.ai_model = MockModel()
         # attach classes for reference
         setattr(self.ai_model, 'classes', self.classes)
-        print("🔧 Using Mock AI model")
+        print(" Using Mock AI model")
         return True
 
     def _prepare_input_vector(self, input_data: dict) -> np.ndarray:
@@ -132,13 +135,14 @@ class AIService:
         else:
             required_numeric = list(self.numeric_cols or [])
 
-        # Map alternate keys → required keys
+        # Map required cols → alternate keys (input_data có thể dùng tên khác)
         alt_map = {
-            'hdbank_tx_count': ['total_transactions', 'hdbank_transaction_count'],
-            'vietjet_flight_count': ['total_flights', 'flights_last_year'],
-            'resort_nights': ['total_nights_stayed'],
-            'hdbank_total_amount': ['total_spent', 'hdbank_spent_total'],
+            'total_transactions': ['hdbank_tx_count', 'hdbank_transaction_count'],
+            'total_flights': ['vietjet_flight_count', 'flights_last_year'],
+            'total_nights_stayed': ['resort_nights'],
+            'total_spent': ['hdbank_total_amount', 'hdbank_spent_total'],
             'avg_balance': ['hdbank_average_balance', 'average_balance'],
+            'total_resort_spending': ['resort_spent', 'total_resort_spending'],
         }
 
         num_vals = {}
@@ -146,7 +150,6 @@ class AIService:
             if col in input_data:
                 num_vals[col] = input_data.get(col, 0)
                 continue
-            # try alternates
             for alt in alt_map.get(col, []):
                 if alt in input_data:
                     num_vals[col] = input_data.get(alt, 0)
@@ -158,12 +161,6 @@ class AIService:
         X_num = pd.DataFrame([num_vals]) if required_numeric else pd.DataFrame(index=[0])
         if required_numeric:
             X_num = X_num.reindex(columns=required_numeric, fill_value=0)
-        # Debug columns to diagnose mismatches
-        try:
-            print(f"[AIService] required_numeric={required_numeric}")
-            print(f"[AIService] X_num.columns={list(X_num.columns)}")
-        except Exception:
-            pass
         X_num_tx = self.scaler.transform(X_num) if required_numeric else np.zeros((1, 0))
 
         # Build categorical frame
@@ -182,83 +179,21 @@ class AIService:
         return np.concatenate([X_num_tx, X_cat_tx], axis=1)
 
     def predict_persona(self, input_data: dict):
-        """Predict persona label and confidence from raw dict of features."""
+        """Predict persona label and confidence từ model đã train."""
         if not self.is_model_loaded():
             return None, 'AI model is not loaded'
-        
-        # Kiểm tra khách hàng mới
-        total_transactions = input_data.get('total_transactions', input_data.get('hdbank_tx_count', 0)) or 0
-        total_flights = input_data.get('total_flights', input_data.get('vietjet_flight_count', 0)) or 0
-        total_nights = input_data.get('total_nights_stayed', input_data.get('resort_nights', 0)) or 0
-        
-        # Nếu khách hàng mới (rất ít hoạt động - chỉ dành cho khách hàng thực sự mới)
-        if total_transactions < 2 and total_flights < 1 and total_nights < 1:
-            return {
-                'label': 'khach_hang_moi', 
-                'confidence': 0.9, 
-                'probs': {'khach_hang_moi': 0.9, 'sinh_vien': 0.05, 'nguoi_tre': 0.05}
-            }, None
-        
-        # Logic đặc biệt dựa trên tuổi và hoạt động
-        age = input_data.get('age', 30)
-        avg_balance = input_data.get('avg_balance', input_data.get('hdbank_average_balance', 0)) or 0
-        
-        # Sinh viên: tuổi <= 25 và thu nhập thấp
-        if age <= 25 and avg_balance < 50_000_000:
-            return {
-                'label': 'sinh_vien',
-                'confidence': 0.9,
-                'probs': {'sinh_vien': 0.9, 'nguoi_tre': 0.1}
-            }, None
-        
-        # Thuong gia: số dư cao và nhiều hoạt động
-        if avg_balance >= 200_000_000 and total_flights >= 10:
-            return {
-                'label': 'thuong_gia',
-                'confidence': 0.95,
-                'probs': {'thuong_gia': 0.95, 'doanh_nhan': 0.05}
-            }, None
-        
-        # Doanh nhân: số dư tốt và hoạt động
-        if avg_balance >= 100_000_000 and (total_flights >= 5 or age >= 35):
-            return {
-                'label': 'doanh_nhan',
-                'confidence': 0.9,
-                'probs': {'doanh_nhan': 0.9, 'thuong_gia': 0.1}
-            }, None
-        
-        # Du lich: nhiều chuyến bay hoặc đêm nghỉ
-        if total_flights >= 5 or total_nights >= 3:
-            return {
-                'label': 'du_lich',
-                'confidence': 0.85,
-                'probs': {'du_lich': 0.85, 'gia_dinh': 0.15}
-            }, None
-        
-        # Nguoi tre: tuổi <= 35
-        if age <= 35:
-            return {
-                'label': 'nguoi_tre',
-                'confidence': 0.8,
-                'probs': {'nguoi_tre': 0.8, 'gia_dinh': 0.2}
-            }, None
-        
-        # Gia dinh: mặc định cho người lớn tuổi
-        return {
-            'label': 'gia_dinh',
-            'confidence': 0.8,
-            'probs': {'gia_dinh': 0.8, 'doanh_nhan': 0.2}
-        }, None
-        
+
         try:
             X = self._prepare_input_vector(input_data)
             probs = self.ai_model.predict(X)
             probs = np.asarray(probs)[0]
             idx = int(np.argmax(probs))
             label = self.classes[idx] if idx < len(self.classes) else self.classes[0]
-            # Sử dụng 6 personas mới trực tiếp
-            # Không cần mapping vì đã dùng labels mới
-            return {'label': label, 'confidence': float(probs[idx]), 'probs': {c: float(probs[i]) for i, c in enumerate(self.classes)}}, None
+            return {
+                'label': label,
+                'confidence': float(probs[idx]),
+                'probs': {c: float(probs[i]) for i, c in enumerate(self.classes)}
+            }, None
         except Exception as e:
             return None, f'Prediction error: {str(e)}'
 

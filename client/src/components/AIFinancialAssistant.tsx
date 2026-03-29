@@ -50,19 +50,19 @@ interface CustomerPreferences {
 }
 
 // Initialize Gemini AI with multiple model fallbacks
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDxF5rCqGT8v-7hP8j2mN9kL3nQ1rS6wE4';
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyB_EU8gL32OMQb7edyhhFd7i3gpc_bkHwU';
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// Try different models in order of preference
+// Try different models in order of preference (Updated 2024)
 const getModel = () => {
   const modelNames = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro", 
-    "gemini-pro",
-    "gemini-1.0-pro"
+    "gemini-1.5-flash",  // Fast and efficient
+    "gemini-1.5-pro",    // More capable
+    "gemini-pro", // Latest flash model
+    "gemini-1.0-pro"    // Latest pro model
   ];
-  
-  // For now, use the most stable one
+
+  // Use the most stable and available model
   return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 };
 
@@ -89,7 +89,7 @@ const AIFinancialAssistant: React.FC = () => {
   const [otpAttempts, setOtpAttempts] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prefsRef = useRef<CustomerPreferences>({});
-  
+
   // Flight booking context to remember previous information
   const [flightContext, setFlightContext] = useState<{
     origin?: string;
@@ -102,24 +102,24 @@ const AIFinancialAssistant: React.FC = () => {
   // Extract and combine flight information from context and current message
   const extractFlightInfoWithContext = (userMessage: string) => {
     const lowerMessage = userMessage.toLowerCase();
-    
+
     // Check if this is a flight-related message
-    const isFlightRelated = lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') || 
+    const isFlightRelated = lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') ||
                            lowerMessage.includes('bay') || lowerMessage.includes('vietjet') ||
                            lowerMessage.includes('đi') || lowerMessage.includes('đến') ||
                            lowerMessage.includes('ngày') || lowerMessage.includes('người') ||
                            lowerMessage.includes('hành khách') || lowerMessage.includes('chuyến');
-    
+
     if (!isFlightRelated && !flightContext.isBooking) {
       return null; // Not flight related
     }
-    
+
     // Extract information from current message
     const currentOrigin = extractLocation(userMessage, 'origin');
     const currentDestination = extractLocation(userMessage, 'destination');
     const currentDate = extractDate(userMessage);
     const currentPassengers = extractPassengerCount(userMessage);
-    
+
     // Combine with context
     const combinedInfo = {
       origin: currentOrigin || flightContext.origin,
@@ -128,19 +128,19 @@ const AIFinancialAssistant: React.FC = () => {
       passengers: currentPassengers || flightContext.passengers || 1,
       isBooking: flightContext.isBooking || isFlightRelated
     };
-    
+
     // Update context if we found new information
     if (currentOrigin || currentDestination || currentDate || currentPassengers) {
       setFlightContext(combinedInfo);
     }
-    
+
     return combinedInfo;
   };
 
   // Smart questioning for missing flight information
   const askForMissingFlightInfo = (missingInfo: string[], hasOrigin: string | null, hasDestination: string | null, hasDate: string | null, hasPassengerCount: number) => {
     let questionText = '';
-    
+
     if (missingInfo.length === 1) {
       questionText = `Tôi cần biết ${missingInfo[0]} để đặt vé cho bạn.`;
     } else if (missingInfo.length === 2) {
@@ -148,30 +148,30 @@ const AIFinancialAssistant: React.FC = () => {
     } else {
       questionText = `Tôi cần biết ${missingInfo.slice(0, -1).join(', ')} và ${missingInfo[missingInfo.length - 1]} để đặt vé.`;
     }
-    
+
     return `✈️ **Đặt vé máy bay Vietjet**
 
 ${questionText}
 
 **📋 Thông tin hiện tại:**
-${hasOrigin ? '✅ Điểm đi: ' + hasOrigin : '❌ Điểm đi: Chưa có'}
-${hasDestination ? '✅ Điểm đến: ' + hasDestination : '❌ Điểm đến: Chưa có'}
-${hasDate ? '✅ Ngày bay: ' + hasDate : '❌ Ngày bay: Chưa có'}
-${hasPassengerCount ? '✅ Số người: ' + hasPassengerCount : '✅ Số người: 1 (mặc định)'}
+${hasOrigin ? ' Điểm đi: ' + hasOrigin : ' Điểm đi: Chưa có'}
+${hasDestination ? 'Điểm đến: ' + hasDestination : ' Điểm đến: Chưa có'}
+${hasDate ? ' Ngày bay: ' + hasDate : ' Ngày bay: Chưa có'}
+${hasPassengerCount ? ' Số người: ' + hasPassengerCount : ' Số người: 1 (mặc định)'}
 
-**💡 Ví dụ cung cấp thông tin:**
+** Ví dụ cung cấp thông tin:**
 • "Từ Hà Nội đi Phú Quốc ngày 20/10 cho 2 người"
 • "Bay từ TP.HCM đến Singapore ngày mai"
 • "Đặt vé từ Đà Nẵng đi Nha Trang tuần sau"
 • Hoặc chỉ cần nhắn: "Phú Quốc" (nếu đã có điểm đi)
 • Hoặc chỉ cần nhắn: "ngày 20/10" (nếu đã có điểm đi và đến)
 
-**🎁 Ưu đãi khi đặt vé:**
+** Ưu đãi khi đặt vé:**
 • Tích 100 SVT/chuyến nội địa, 200 SVT/chuyến quốc tế
 • Thanh toán HDBank: +0.1% cashback
 • Thành viên Gold: Miễn phí chọn chỗ ngồi
 
-Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
+Hãy cho tôi biết thông tin còn thiếu nhé! `;
   };
 
   // Generate response when all flight info is available
@@ -187,14 +187,14 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 • **Hành khách:** ${hasPassengerCount} người
 • **Hạng:** Economy (có thể upgrade lên Business)
 
-**⚙️ Agent đang thực hiện:**
-1. 🔍 Kiểm tra chuyến bay khả dụng
-2. 💰 So sánh giá tốt nhất
-3. 🎫 Đặt vé và thanh toán
-4. 📧 Gửi boarding pass về email
-5. 🪙 Cập nhật SVT token reward
+** Agent đang thực hiện:**
+1.  Kiểm tra chuyến bay khả dụng
+2.  So sánh giá tốt nhất
+3.  Đặt vé và thanh toán
+4.  Gửi boarding pass về email
+5.  Cập nhật SVT token reward
 
-**🎁 Ưu đãi áp dụng:**
+** Ưu đãi áp dụng:**
 • Tích ${hasDestination?.includes('SIN') || hasDestination?.includes('NRT') || hasDestination?.includes('ICN') ? '200' : '100'} SVT cho chuyến bay này
 • Thanh toán HDBank: +0.1% cashback
 • ${userProfile?.sovicoTokens >= 50000 ? 'Thành viên Gold: Miễn phí chọn chỗ ngồi' : 'Thành viên thường: Chọn chỗ ngồi 50,000 VNĐ'}
@@ -204,9 +204,9 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 
   // Fetch comprehensive financial data for AI analysis
   const fetchFinancialData = async () => {
-    if (!userProfile) return { 
-      flightCount: 0, 
-      accountBalance: 0, 
+    if (!userProfile) return {
+      flightCount: 0,
+      accountBalance: 0,
       monthlyIncome: 0,
       spendingPattern: {},
       investmentPortfolio: {},
@@ -214,14 +214,14 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       loanHistory: [],
       transactionHistory: []
     };
-    
+
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
         console.log('⚠️ No auth token found, using fallback data');
-        return { 
-          flightCount: 0, 
-          accountBalance: 0, 
+        return {
+          flightCount: 0,
+          accountBalance: 0,
           monthlyIncome: 20000000,
           spendingPattern: { monthly: 15000000, categories: {} },
           investmentPortfolio: { totalValue: 0, types: {} },
@@ -236,7 +236,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 
       // Fetch comprehensive data from the main customer endpoint (which has all data)
       console.log('🔍 Fetching financial data for customer:', userProfile.customer_id);
-      
+
       // Use the main customer endpoint that contains all data
       const customerResponse = await fetch(`http://127.0.0.1:5000/customer/${userProfile.customer_id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -256,31 +256,31 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       // Process customer data
       const customerData = customerResponse.ok ? await customerResponse.json() : { customer: null };
       const tokensData = tokensResponse.ok ? await tokensResponse.json() : { total_svt: 0, transactions: [] };
-      
-      console.log('📊 Customer data received:', customerData);
-      console.log('🪙 Tokens data received:', tokensData);
+
+      console.log(' Customer data received:', customerData);
+      console.log(' Tokens data received:', tokensData);
 
       // Extract data from customer response
       const customer = customerData.customer || {};
       const hdbankSummary = customer.hdbank_summary || {};
       const vietjetSummary = customer.vietjet_summary || {};
       const resortSummary = customer.resort_summary || {};
-      
+
       // Get real data from HDBank
       const accountBalance = hdbankSummary.current_balance || 0;
       const totalTransactions = hdbankSummary.total_transactions || 0;
       const totalCredit = hdbankSummary.total_credit_last_3m || 0;
       const totalDebit = hdbankSummary.total_debit_last_3m || 0;
-      
+
       // Get real data from Vietjet
       const flightCount = vietjetSummary.total_flights_last_year || 0;
       const flightSpending = vietjetSummary.total_spending || 0;
       const isBusinessFlyer = vietjetSummary.is_business_flyer || false;
-      
+
       // Get real data from Resort
       const resortNights = resortSummary.total_nights_stayed || 0;
       const resortSpending = resortSummary.total_spending || 0;
-      
+
       // Calculate spending patterns from real data
       const totalSpending = totalDebit || 0; // Use real debit data from HDBank
       const spendingPattern = {
@@ -296,7 +296,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       // Use simplified data for loans and investments (can be enhanced later)
       const loanHistory: any[] = [];
       const totalDebt = 0; // No debt data available yet
-      
+
       const investmentPortfolio = {
         totalValue: 0, // No investment data available yet
         types: {
@@ -307,8 +307,8 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       };
 
       // Calculate credit score based on real data
-      const creditScore = Math.min(850, Math.max(300, 
-        300 + 
+      const creditScore = Math.min(850, Math.max(300,
+        300 +
         (accountBalance > 10000000 ? 100 : 0) + // High balance bonus
         (totalDebt === 0 ? 50 : 0) + // No debt bonus
         (totalTransactions > 50 ? 50 : 0) + // Active account bonus
@@ -320,7 +320,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 
       // Calculate monthly income estimate from real data
       let monthlyIncome = 20000000; // Default 20M VNĐ
-      
+
       if (accountBalance > 0) {
         monthlyIncome = Math.max(monthlyIncome, accountBalance / 12);
       }
@@ -330,7 +330,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       if (flightSpending > 0) {
         monthlyIncome = Math.max(monthlyIncome, flightSpending / 12);
       }
-      
+
       // If user has SVT tokens, estimate higher income
       if (userProfile.sovicoTokens > 10000) {
         monthlyIncome = Math.max(monthlyIncome, 25000000); // At least 25M for Silver+ users
@@ -344,13 +344,13 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         const demoBalance = Math.floor(Math.random() * 50000000) + 10000000; // 10M - 60M
         const demoSpending = Math.floor(demoBalance * 0.3); // 30% of balance
         const demoFlights = Math.floor(Math.random() * 5); // 0-5 flights
-        
+
         return {
           flightCount: demoFlights,
           accountBalance: demoBalance,
           monthlyIncome: Math.floor(demoBalance / 12),
-          spendingPattern: { 
-            monthly: demoSpending, 
+          spendingPattern: {
+            monthly: demoSpending,
             categories: {
               food: Math.floor(demoSpending * 0.3),
               transport: Math.floor(demoSpending * 0.2),
@@ -358,8 +358,8 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
               shopping: Math.floor(demoSpending * 0.3)
             }
           },
-          investmentPortfolio: { 
-            totalValue: Math.floor(demoBalance * 0.2), 
+          investmentPortfolio: {
+            totalValue: Math.floor(demoBalance * 0.2),
             types: { stocks: 2, bonds: 1, mutual_funds: 1 }
           },
           creditScore: Math.floor(Math.random() * 200) + 650, // 650-850
@@ -376,10 +376,10 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       console.log('✈️ Flight Count:', flightCount);
       console.log('💳 Total Transactions:', totalTransactions);
       console.log('🏦 Credit Score:', creditScore);
-      
-      return { 
-        flightCount, 
-        accountBalance, 
+
+      return {
+        flightCount,
+        accountBalance,
         monthlyIncome,
         spendingPattern,
         investmentPortfolio,
@@ -404,18 +404,18 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       console.log('• API endpoints not implemented');
       console.log('• Database connection issues');
       console.log('• Authentication token invalid');
-      
+
       // Return enhanced fallback data
       const fallbackBalance = Math.floor(Math.random() * 40000000) + 15000000; // 15M - 55M
       const fallbackSpending = Math.floor(fallbackBalance * 0.4);
       const fallbackFlights = Math.floor(Math.random() * 3) + 1; // 1-3 flights
-      
-      return { 
-        flightCount: fallbackFlights, 
-        accountBalance: fallbackBalance, 
+
+      return {
+        flightCount: fallbackFlights,
+        accountBalance: fallbackBalance,
         monthlyIncome: Math.floor(fallbackBalance / 12),
-        spendingPattern: { 
-          monthly: fallbackSpending, 
+        spendingPattern: {
+          monthly: fallbackSpending,
           categories: {
             food: Math.floor(fallbackSpending * 0.3),
             transport: Math.floor(fallbackSpending * 0.2),
@@ -423,8 +423,8 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
             shopping: Math.floor(fallbackSpending * 0.3)
           }
         },
-        investmentPortfolio: { 
-          totalValue: Math.floor(fallbackBalance * 0.15), 
+        investmentPortfolio: {
+          totalValue: Math.floor(fallbackBalance * 0.15),
           types: { stocks: 1, bonds: 1, mutual_funds: 0 }
         },
         creditScore: Math.floor(Math.random() * 150) + 700, // 700-850
@@ -450,12 +450,12 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 
         if (response.ok) {
           const userData = await response.json();
-          
+
           // Get SVT balance from correct endpoint
           const svtResponse = await fetch(`http://127.0.0.1:5000/api/tokens/${userData.customer_id}`);
           let svtBalance = 0;
           let transactionCount = 0;
-          
+
           if (svtResponse.ok) {
             const svtData = await svtResponse.json();
             svtBalance = svtData.total_svt || 0;
@@ -496,12 +496,12 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       // Get from API
       const token = localStorage.getItem('auth_token');
       const response = await fetch(`http://127.0.0.1:5000/api/chat/history/${customerId}`, {
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -527,45 +527,45 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
             updated_at: new Date(chat.updated_at),
             title: chat.title
           }));
-          
+
           setChatHistory(serverHistory);
-          
+
           // Also save to localStorage as backup
           localStorage.setItem(`chat_history_${customerId}`, JSON.stringify(serverHistory));
-          
+
           // Load the most recent chat if exists
           if (serverHistory.length > 0) {
             const latestChat = serverHistory[0];
             setCurrentChatId(latestChat.id);
           }
-          
+
           return;
         }
       }
-      
+
       // Fallback to localStorage if API fails
       console.log('API failed, falling back to localStorage');
       const localHistory = localStorage.getItem(`chat_history_${customerId}`);
       if (localHistory) {
         const parsedHistory: ChatHistory[] = JSON.parse(localHistory);
         setChatHistory(parsedHistory);
-        
+
         if (parsedHistory.length > 0) {
           const latestChat = parsedHistory[0];
           setCurrentChatId(latestChat.id);
         }
       }
-      
+
     } catch (error) {
       console.error('Error loading chat history:', error);
-      
+
       // Fallback to localStorage on error
       try {
         const localHistory = localStorage.getItem(`chat_history_${customerId}`);
         if (localHistory) {
           const parsedHistory: ChatHistory[] = JSON.parse(localHistory);
           setChatHistory(parsedHistory);
-          
+
           if (parsedHistory.length > 0) {
             const latestChat = parsedHistory[0];
             setCurrentChatId(latestChat.id);
@@ -590,7 +590,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       if (t === 'ai') return 'assistant';
       return 'assistant'; // map 'system' to 'assistant' by default
     };
-    
+
     const chatData: ChatHistory = {
       id: chatId,
       customer_id: userProfile.customer_id,
@@ -609,7 +609,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       const token = localStorage.getItem('auth_token');
       const response = await fetch('http://127.0.0.1:5000/api/chat/save', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -620,49 +620,49 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         const result = await response.json();
         if (result.success) {
           console.log(' Chat saved to server successfully');
-          
+
           // Update local state
           let updatedHistory = [...chatHistory];
           const existingIndex = updatedHistory.findIndex(c => c.id === chatId);
-          
+
           if (existingIndex >= 0) {
             updatedHistory[existingIndex] = chatData;
           } else {
             updatedHistory.unshift(chatData);
             setCurrentChatId(chatId);
           }
-          
+
           updatedHistory = updatedHistory.slice(0, 50);
           setChatHistory(updatedHistory);
-          
+
           // Also save to localStorage as backup
           localStorage.setItem(`chat_history_${userProfile.customer_id}`, JSON.stringify(updatedHistory));
-          
+
           return;
         }
       }
-      
+
       throw new Error('API save failed');
-      
+
     } catch (error) {
       console.error('Error saving to API, falling back to localStorage:', error);
-      
+
       // Fallback to localStorage
       try {
         let updatedHistory = [...chatHistory];
         const existingIndex = updatedHistory.findIndex(c => c.id === chatId);
-        
+
         if (existingIndex >= 0) {
           updatedHistory[existingIndex] = chatData;
         } else {
           updatedHistory.unshift(chatData);
           setCurrentChatId(chatId);
         }
-        
+
         updatedHistory = updatedHistory.slice(0, 50);
         setChatHistory(updatedHistory);
         localStorage.setItem(`chat_history_${userProfile.customer_id}`, JSON.stringify(updatedHistory));
-        
+
         console.log('💾 Chat saved to localStorage as fallback');
       } catch (localError) {
         console.error('Error saving to localStorage:', localError);
@@ -674,7 +674,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
   const generateChatTitle = (messages: Message[]): string => {
     const userMessages = messages.filter(m => m.type === 'user');
     if (userMessages.length === 0) return 'Cuộc trò chuyện mới';
-    
+
     const firstMessage = userMessages[0].content;
     // Extract key words for title
     if (firstMessage.toLowerCase().includes('vé máy bay') || firstMessage.toLowerCase().includes('đặt vé')) {
@@ -717,18 +717,18 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
   // Delete chat
   const deleteChat = async (chatId: string) => {
     if (!userProfile) return;
-    
+
     try {
       // Delete from API first
       const token = localStorage.getItem('auth_token');
       const response = await fetch(`http://127.0.0.1:5000/api/chat/${chatId}`, {
         method: 'DELETE',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -740,12 +740,12 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     } catch (error) {
       console.error('Error deleting from API:', error);
     }
-    
+
     // Always update local state regardless of API result
     const updatedHistory = chatHistory.filter(c => c.id !== chatId);
     setChatHistory(updatedHistory);
     localStorage.setItem(`chat_history_${userProfile.customer_id}`, JSON.stringify(updatedHistory));
-    
+
     // If deleting current chat, start new one
     if (currentChatId === chatId) {
       startNewChat();
@@ -768,7 +768,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     "Agent đặt vé từ TP.HCM đi Đà Nẵng ngày mai",
     "Bay từ Hà Nội đến Singapore ngày 15/12 cho 1 người",
     "Agent mở thẻ Visa Platinum HDBank với thu nhập cao",
-    "Agent phân tích profile tài chính và đề xuất chiến lược", 
+    "Agent phân tích profile tài chính và đề xuất chiến lược",
     "Agent vay 500 triệu để mua nhà ngay",
     "Agent đặt phòng resort 3 đêm tức thì"
   ];
@@ -786,16 +786,16 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 
     const actions: ServiceAction[] = []
     // Flight booking intents - Yêu cầu thông tin đầy đủ
-    if (normalizedText.includes('ve may bay') || normalizedText.includes('dat ve') || 
+    if (normalizedText.includes('ve may bay') || normalizedText.includes('dat ve') ||
         normalizedText.includes('bay') || normalizedText.includes('chuyen bay') ||
         normalizedText.includes('vietjet') || normalizedText.includes('may bay') ||
         (normalizedText.includes('di') && (normalizedText.includes('ve') || normalizedText.includes('bay'))) ||
         normalizedText.includes('book flight') || normalizedText.includes('flight') ||
         normalizedText.includes('agent')) {
-      
+
       // Extract information từ text gốc (không normalize để giữ chính xác)
       const hasOrigin = extractLocation(text, 'origin')
-      const hasDestination = extractLocation(text, 'destination')  
+      const hasDestination = extractLocation(text, 'destination')
       const hasDate = extractDate(text)
       const hasPassengerCount = extractPassengerCount(text)
 
@@ -804,9 +804,9 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       const origin = hasOrigin || prefs.preferredOrigin || undefined
       const destination = hasDestination || prefs.preferredDestination || undefined
       const passengerCount = hasPassengerCount || prefs.typicalPassengers || 1
-      
+
       console.log(' Origin:', hasOrigin, 'Destination:', hasDestination, 'Date:', hasDate, 'Passengers:', hasPassengerCount) // Debug
-      
+
       // Nếu thiếu thông tin, không tạo action mà sẽ yêu cầu thông tin
       if (!origin || !destination || !hasDate) {
         console.log(' Missing flight information - not creating action') // Debug
@@ -830,7 +830,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     }
 
     // Banking intents
-    if (normalizedText.includes('vay') || normalizedText.includes('khoan vay') || 
+    if (normalizedText.includes('vay') || normalizedText.includes('khoan vay') ||
         normalizedText.includes('vay tien')) {
       const amount = extractAmount(normalizedText, 'loan')
       actions.push({
@@ -839,8 +839,8 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         action: 'loan',
         params: {
           loan_amount: amount,
-          loan_type: normalizedText.includes('nha') ? 'home' : 
-                    normalizedText.includes('xe') ? 'car' : 
+          loan_type: normalizedText.includes('nha') ? 'home' :
+                    normalizedText.includes('xe') ? 'car' :
                     normalizedText.includes('kinh doanh') ? 'business' : 'personal'
         },
         status: 'waiting_otp',
@@ -850,18 +850,18 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     }
 
     // Card opening intents - Mở thẻ ngân hàng
-    if (normalizedText.includes('mo the') || normalizedText.includes('lam the') || 
+    if (normalizedText.includes('mo the') || normalizedText.includes('lam the') ||
         normalizedText.includes('dang ky the') || normalizedText.includes('tao the') ||
         normalizedText.includes('the tin dung') || normalizedText.includes('the visa') ||
         normalizedText.includes('open card') || normalizedText.includes('credit card')) {
-      
+
       // Determine card type from text
       let cardType = 'classic'
       if (normalizedText.includes('platinum') || normalizedText.includes('bach kim')) cardType = 'platinum'
       else if (normalizedText.includes('gold') || normalizedText.includes('vang')) cardType = 'gold'
       else if (normalizedText.includes('signature') || normalizedText.includes('cao cap')) cardType = 'signature'
       else if (normalizedText.includes('vietjet')) cardType = 'vietjet'
-      
+
       actions.push({
         id: `card_${Date.now()}`,
         service: 'hdbank',
@@ -893,7 +893,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     }
 
     // Hotel/Resort intents
-    if (normalizedText.includes('khach san') || normalizedText.includes('dat phong') || 
+    if (normalizedText.includes('khach san') || normalizedText.includes('dat phong') ||
         normalizedText.includes('resort') || normalizedText.includes('nghi duong')) {
       const prefs = prefsRef.current
       const nights = extractNights(normalizedText) || prefs.typicalRoomNights || 2
@@ -911,7 +911,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     }
 
     // Spa intents
-    if (normalizedText.includes('spa') || normalizedText.includes('massage') || 
+    if (normalizedText.includes('spa') || normalizedText.includes('massage') ||
         normalizedText.includes('thu gian')) {
       actions.push({
         id: `spa_${Date.now()}`,
@@ -921,58 +921,6 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
           spa_type: normalizedText.includes('cao cap') ? 'premium_package' :
                    normalizedText.includes('mat') ? 'facial' :
                    normalizedText.includes('body') ? 'body_treatment' : 'massage'
-        },
-        status: 'pending'
-      })
-    }
-
-    // Real Estate intents - Phú Long
-    if (normalizedText.includes('bat dong san') || normalizedText.includes('mua nha') || 
-        normalizedText.includes('dau tu nha') || normalizedText.includes('can ho') ||
-        normalizedText.includes('phu long') || normalizedText.includes('essensia') ||
-        normalizedText.includes('dragon') || normalizedText.includes('mailand') ||
-        normalizedText.includes('nha o') || normalizedText.includes('dau tu') ||
-        normalizedText.includes('real estate') || normalizedText.includes('property')) {
-      
-      const budget = extractAmount(normalizedText, 'loan')
-      const consultationType = normalizedText.includes('dau tu') ? 'investment' :
-                              normalizedText.includes('nha o') ? 'residential' :
-                              normalizedText.includes('thuong mai') ? 'commercial' : 'resort'
-      
-      actions.push({
-        id: `real_estate_${Date.now()}`,
-        service: 'resort',
-        action: 'real_estate_consultation',
-        params: {
-          consultation_type: consultationType,
-          budget_range: budget > 0 ? `${(budget / 1000000000).toFixed(1)} tỷ VNĐ` : 'Từ 2-10 tỷ VNĐ',
-          location_preference: extractLocation(text, 'origin') || 'TP.HCM'
-        },
-        status: 'pending'
-      })
-    }
-
-    // Property viewing intents
-    if (normalizedText.includes('xem du an') || normalizedText.includes('xem nha') ||
-        normalizedText.includes('tham quan') || normalizedText.includes('site visit') ||
-        normalizedText.includes('xem can ho') || normalizedText.includes('xem dat')) {
-      
-      const projectName = normalizedText.includes('essensia parkway') ? 'Essensia Parkway' :
-                         normalizedText.includes('essensia sky') ? 'Essensia Sky' :
-                         normalizedText.includes('dragon riverside') ? 'Dragon Riverside City' :
-                         normalizedText.includes('mailand hanoi') ? 'Mailand Hanoi City' :
-                         normalizedText.includes('ariyana') ? 'Ariyana Tourism Complex' :
-                         'Essensia Parkway'
-      const preferredDate = extractDate(text)
-      
-      actions.push({
-        id: `property_viewing_${Date.now()}`,
-        service: 'resort',
-        action: 'book_property_viewing',
-        params: {
-          project_name: projectName || 'Essensia Parkway',
-          preferred_date: preferredDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          contact_info: 'Auto-generated from user profile'
         },
         status: 'pending'
       })
@@ -990,7 +938,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       if (text.includes('triệu')) return amount * 1000000
       if (text.includes('nghìn')) return amount * 1000
     }
-    
+
     // Default amounts - giảm số tiền mặc định để tránh lỗi
     return type === 'loan' ? 100000000 : 1000000
   }
@@ -1016,14 +964,14 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
       .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
       .replace(/đ/g, 'd')
-    
+
     console.log(`🔍 Extracting ${type} location from:`, normalizedText) // Debug
-    
+
     const locations = {
       'ha noi': 'HAN',
       'hanoi': 'HAN',
       'thu do': 'HAN',
-      'sai gon': 'SGN', 
+      'sai gon': 'SGN',
       'saigon': 'SGN',
       'ho chi minh': 'SGN',
       'tphcm': 'SGN',
@@ -1061,17 +1009,17 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         /bay\s+tu\s+([^di]+?)\s+di/,  // "bay từ X đi"
         /tu\s+([a-z\s]+?)(?:\s+den|\s+$)/,  // "từ X đến" or end of string
       ]
-      
+
       for (const pattern of originPatterns) {
         const match = normalizedText.match(pattern)
         if (match) {
           const location = match[1].trim()
-          console.log(`🔍 Found origin pattern: "${match[0]}" -> location: "${location}"`) // Debug
-          
+          console.log(` Found origin pattern: "${match[0]}" -> location: "${location}"`) // Debug
+
           // Find matching location
           for (const [name, code] of Object.entries(locations)) {
             if (location.includes(name) || name.includes(location)) {
-              console.log(`✅ Matched origin: ${name} -> ${code}`) // Debug
+              console.log(` Matched origin: ${name} -> ${code}`) // Debug
               return code
             }
           }
@@ -1081,21 +1029,21 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       // Look for "đi X" or "đến X" patterns - destination
       const destPatterns = [
         /di\s+([^ngay\d]+?)(?:\s+ngay|\s+\d|$)/,  // "đi X ngày" or "đi X" at end
-        /den\s+([^ngay\d]+?)(?:\s+ngay|\s+\d|$)/,  // "đến X ngày" or "đến X" at end  
+        /den\s+([^ngay\d]+?)(?:\s+ngay|\s+\d|$)/,  // "đến X ngày" or "đến X" at end
         /di\s+([a-z\s]+?)(?:\s+cho|\s+ve|\s+$)/,  // "đi X cho" or "đi X vé" or end
         /den\s+([a-z\s]+?)(?:\s+cho|\s+ve|\s+$)/, // "đến X cho" or "đến X vé" or end
       ]
-      
+
       for (const pattern of destPatterns) {
         const match = normalizedText.match(pattern)
         if (match) {
           const location = match[1].trim()
-          console.log(`🔍 Found destination pattern: "${match[0]}" -> location: "${location}"`) // Debug
-          
+          console.log(` Found destination pattern: "${match[0]}" -> location: "${location}"`) // Debug
+
           // Find matching location
           for (const [name, code] of Object.entries(locations)) {
             if (location.includes(name) || name.includes(location)) {
-              console.log(`✅ Matched destination: ${name} -> ${code}`) // Debug
+              console.log(` Matched destination: ${name} -> ${code}`) // Debug
               return code
             }
           }
@@ -1106,19 +1054,19 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     // Strategy 2: Direct location match (fallback)
     for (const [name, code] of Object.entries(locations)) {
       if (normalizedText.includes(name)) {
-        console.log(`✅ Found location (direct fallback): ${name} -> ${code}`) // Debug
+        console.log(` Found location (direct fallback): ${name} -> ${code}`) // Debug
         return code
       }
     }
-    
-    console.log(`❌ No ${type} location found`) // Debug
+
+    console.log(` No ${type} location found`) // Debug
     return null
   }
 
   // Extract date from text - Enhanced version
   const extractDate = (text: string): string | null => {
     console.log('📅 Extracting date from:', text) // Debug
-    
+
     // Normalize text for better matching
     const normalizedText = text.toLowerCase()
       .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
@@ -1128,23 +1076,23 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
       .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
       .replace(/đ/g, 'd')
-    
+
     // Check for special keywords first (more reliable)
     const today = new Date()
     if (normalizedText.includes('hom nay') || normalizedText.includes('bay hom nay')) {
       const result = today.toISOString().split('T')[0]
-      console.log(`✅ Found "hôm nay" -> ${result}`) // Debug
+      console.log(` Found "hôm nay" -> ${result}`) // Debug
       return result
-    } 
-    
+    }
+
     if (normalizedText.includes('ngay mai') || normalizedText.includes('bay ngay mai')) {
       const tomorrow = new Date(today)
       tomorrow.setDate(today.getDate() + 1)
       const result = tomorrow.toISOString().split('T')[0]
-      console.log(`✅ Found "ngày mai" -> ${result}`) // Debug
+      console.log(` Found "ngày mai" -> ${result}`) // Debug
       return result
     }
-    
+
     if (normalizedText.includes('tuan sau') || normalizedText.includes('tuan toi')) {
       const nextWeek = new Date(today)
       nextWeek.setDate(today.getDate() + 7)
@@ -1173,50 +1121,50 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     for (const pattern of datePatterns) {
       const match = normalizedText.match(pattern)
       if (match) {
-        console.log(`🔍 Pattern matched: ${pattern.source} -> ${match[0]}`) // Debug
+        console.log(` Pattern matched: ${pattern.source} -> ${match[0]}`) // Debug
         let day, month, year
-        
+
         // Parse based on pattern type - prioritize "tháng" patterns
         if (pattern.source.includes('thang')) {
           // "DD tháng MM" or "ngày DD tháng MM"
           day = match[1]
           month = match[2]
           year = new Date().getFullYear()
-          console.log(`📝 Vietnamese pattern: ${day} tháng ${month}`) // Debug
+          console.log(` Vietnamese pattern: ${day} tháng ${month}`) // Debug
         } else if (pattern.source.includes('ngay')) {
-          // "ngày DD/MM" or "ngày DD/MM/YYYY"  
+          // "ngày DD/MM" or "ngày DD/MM/YYYY"
           day = match[1]
           month = match[2]
           year = match[3] || new Date().getFullYear()
-          console.log(`📝 Ngày pattern: ngày ${day}/${month}`) // Debug
+          console.log(` Ngày pattern: ngày ${day}/${month}`) // Debug
         } else {
           // Standard DD/MM patterns
           day = match[1]
           month = match[2]
           year = match[3] || new Date().getFullYear()
-          console.log(`📝 Standard pattern: ${day}/${month}`) // Debug
+          console.log(` Standard pattern: ${day}/${month}`) // Debug
         }
-        
+
         // Validate date ranges
         const dayNum = parseInt(day)
         const monthNum = parseInt(month)
         const yearNum = parseInt(year.toString())
-        
+
         console.log(`🔍 Parsed: day=${day}, month=${month}, year=${year}`) // Debug
-        
+
         if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= new Date().getFullYear()) {
           const result = `${yearNum}-${monthNum.toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`
-          console.log(`✅ Found date pattern: ${match[0]} -> ${result}`) // Debug
-          
+          console.log(` Found date pattern: ${match[0]} -> ${result}`) // Debug
+
           // Additional validation: check if date is not in the past
           const parsedDate = new Date(result)
           const today = new Date()
           today.setHours(0, 0, 0, 0) // Reset time to compare dates only
-          
+
           if (parsedDate >= today) {
             return result
           } else {
-            console.log(`⚠️ Date ${result} is in the past, skipping`) // Debug
+            console.log(` Date ${result} is in the past, skipping`) // Debug
           }
         }
       }
@@ -1229,7 +1177,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
   // Extract recipient from text for transfers
   const extractRecipient = (text: string): { name?: string, account?: string } => {
     console.log('👤 Extracting recipient from:', text) // Debug
-    
+
     // Normalize text
     const normalizedText = text.toLowerCase()
       .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
@@ -1249,12 +1197,12 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       /stk\s*(\d{8,20})/g,
       /(\d{10,20})/g  // fallback for long numbers
     ]
-    
+
     for (const pattern of accountPatterns) {
       const match = pattern.exec(normalizedText)
       if (match) {
         recipient.account = match[1]
-        console.log('✅ Found account:', recipient.account)
+        console.log(' Found account:', recipient.account)
         break
       }
     }
@@ -1266,7 +1214,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       /chuyen.*?den\s+(.+?)(?:\s+so|\s+tai|\s+\d|$)/i,
       /cho\s+(.+?)(?:\s+so|\s+tai|\s+\d|$)/i
     ]
-    
+
     for (const pattern of namePatterns) {
       const match = text.match(pattern)
       if (match) {
@@ -1288,7 +1236,7 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
   // Extract passenger count from text
   const extractPassengerCount = (text: string): number => {
     console.log('👥 Extracting passenger count from:', text) // Debug
-    
+
     // Normalize text
     const normalizedText = text.toLowerCase()
       .replace(/à|á|ả|ã|ạ|ă|ằ|ắ|ẳ|ẵ|ặ|â|ầ|ấ|ẩ|ẫ|ậ/g, 'a')
@@ -1298,82 +1246,47 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       .replace(/ù|ú|ủ|ũ|ụ|ư|ừ|ứ|ử|ữ|ự/g, 'u')
       .replace(/ỳ|ý|ỷ|ỹ|ỵ/g, 'y')
       .replace(/đ/g, 'd')
-    
+
     const passengerMatch = normalizedText.match(/(\d+)\s*(nguoi|khach|hanh khach|ve)/)
     if (passengerMatch) {
       const count = parseInt(passengerMatch[1])
-      console.log(`✅ Found passenger count: ${count}`) // Debug
-    return count
-  }
+      console.log(` Found passenger count: ${count}`) // Debug
+      return count
+    }
 
-  // Extract project name from text for real estate
-  const extractProjectName = (text: string): string => {
-    console.log('🏢 Extracting project name from:', text) // Debug
-    
-    const normalizedText = text.toLowerCase()
-    
-    // Check for specific Phú Long projects
-    if (normalizedText.includes('essensia parkway')) return 'Essensia Parkway'
-    if (normalizedText.includes('essensia sky')) return 'Essensia Sky'
-    if (normalizedText.includes('dragon riverside')) return 'Dragon Riverside City'
-    if (normalizedText.includes('mailand hanoi')) return 'Mailand Hanoi City'
-    if (normalizedText.includes('ariyana')) return 'Ariyana Tourism Complex'
-    if (normalizedText.includes('dragon hill')) return 'Dragon Hill'
-    
-    // Default to most popular project
-    return 'Essensia Parkway'
-  }
-
-  // Extract budget range for real estate
-  const extractBudgetRange = (text: string): string => {
-    console.log('💰 Extracting budget range from:', text) // Debug
-    
-    const normalizedText = text.toLowerCase()
-    
-    // Look for specific budget mentions
-    if (normalizedText.includes('5 tỷ') || normalizedText.includes('5 ty')) return '5 tỷ VNĐ'
-    if (normalizedText.includes('3 tỷ') || normalizedText.includes('3 ty')) return '3 tỷ VNĐ'
-    if (normalizedText.includes('10 tỷ') || normalizedText.includes('10 ty')) return '10 tỷ VNĐ'
-    if (normalizedText.includes('cao cap') || normalizedText.includes('premium')) return '5-10 tỷ VNĐ'
-    if (normalizedText.includes('trung binh') || normalizedText.includes('vua phai')) return '3-5 tỷ VNĐ'
-    
-    // Default range
-    return '2-10 tỷ VNĐ'
-  }
-    
     // Tìm từ khóa số lượng
     if (normalizedText.includes('hai nguoi') || normalizedText.includes('2 nguoi') || normalizedText.includes('cho 2')) {
-      console.log(`✅ Found "hai người" -> 2`) // Debug
+      console.log(` Found "hai người" -> 2`) // Debug
       return 2
     }
     if (normalizedText.includes('ba nguoi') || normalizedText.includes('3 nguoi') || normalizedText.includes('cho 3')) {
-      console.log(`✅ Found "ba người" -> 3`) // Debug
+      console.log(` Found "ba người" -> 3`) // Debug
       return 3
     }
     if (normalizedText.includes('bon nguoi') || normalizedText.includes('4 nguoi') || normalizedText.includes('cho 4')) {
-      console.log(`✅ Found "bốn người" -> 4`) // Debug
+      console.log(` Found "bốn người" -> 4`) // Debug
       return 4
     }
     if (normalizedText.includes('gia dinh')) {
-      console.log(`✅ Found "gia đình" -> 4`) // Debug
+      console.log(` Found "gia đình" -> 4`) // Debug
       return 4 // Giả định gia đình 4 người
     }
 
-    console.log(`⚠️ No passenger count found, defaulting to 1`) // Debug
+    console.log(` No passenger count found, defaulting to 1`) // Debug
     return 1 // Mặc định 1 người
   }
 
   // Execute service actions
   const executeActions = async (actions: ServiceAction[], messageId: string) => {
-    console.log('🚀 Starting executeActions with:', actions.length, 'actions') // Debug
+    console.log(' Starting executeActions with:', actions.length, 'actions') // Debug
     setIsProcessing(true)
-    
+
     for (const action of actions) {
-      console.log('⚙️ Processing action:', action) // Debug
-      
+      console.log(' Processing action:', action) // Debug
+
       // Update action status to executing
-      setMessages(prev => prev.map(msg => 
-        msg.id === messageId 
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId
           ? { ...msg, actions: msg.actions?.map(a => a.id === action.id ? { ...a, status: 'executing' } : a) }
           : msg
       ))
@@ -1381,8 +1294,8 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       try {
         // Call the actual service API
         const apiUrl = getApiUrl(action.service, action.action)
-        console.log('📡 Calling API:', apiUrl, 'with params:', action.params) // Debug
-        
+        console.log(' Calling API:', apiUrl, 'with params:', action.params) // Debug
+
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1393,14 +1306,14 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         })
 
         const result = await response.json()
-        console.log('📤 API Response:', result) // Debug
-        
+        console.log(' API Response:', result) // Debug
+
         if (result.success) {
-          console.log('✅ Action completed successfully') // Debug
+          console.log(' Action completed successfully') // Debug
           // Update action status to completed
-          setMessages(prev => prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, actions: msg.actions?.map(a => 
+          setMessages(prev => prev.map(msg =>
+            msg.id === messageId
+              ? { ...msg, actions: msg.actions?.map(a =>
                   a.id === action.id ? { ...a, status: 'completed', result } : a
                 ) }
               : msg
@@ -1410,11 +1323,11 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
         }
 
       } catch (error) {
-        console.error('❌ Service execution failed:', error) // Debug
+        console.error(' Service execution failed:', error) // Debug
         // Update action status to failed
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, actions: msg.actions?.map(a => 
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId
+            ? { ...msg, actions: msg.actions?.map(a =>
                 a.id === action.id ? { ...a, status: 'failed', result: { error: error.message } } : a
               ) }
             : msg
@@ -1427,13 +1340,13 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
     // Add completion message
     const completedActions = actions.filter(a => a.status === 'completed').length
     const totalActions = actions.length
-    
+
     console.log(`🏁 ExecuteActions completed: ${completedActions}/${totalActions}`) // Debug
-    
+
     const completionMessage: Message = {
       id: `completion_${Date.now()}`,
       type: 'ai',
-      content: `✅ **Hoàn thành!** Tôi đã thực hiện ${completedActions}/${totalActions} yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
+      content: ` **Hoàn thành!** Tôi đã thực hiện ${completedActions}/${totalActions} yêu cầu của bạn. Bạn đã nhận được SVT tokens tương ứng. Có gì khác tôi có thể giúp không?`,
       timestamp: new Date()
     }
 
@@ -1453,8 +1366,6 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
       case 'resort':
         if (action === 'book_room') return `${baseUrl}/resort/book-room`
         if (action === 'spa_booking') return `${baseUrl}/resort/book-spa`
-        if (action === 'real_estate_consultation') return `${baseUrl}/resort/real-estate-consultation`
-        if (action === 'book_property_viewing') return `${baseUrl}/resort/book-property-viewing`
         return ''
       default:
         return ''
@@ -1474,22 +1385,27 @@ Hãy cho tôi biết thông tin còn thiếu nhé! 🎫`;
 
   // Enhanced AI response using Gemini with model fallback
   const generateGeminiResponse = async (userMessage: string): Promise<string> => {
-    const modelNames = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"];
-    
+    // Updated list of valid Gemini models (2024)
+    const modelNames = [
+      "gemini-1.5-flash",      // Fast and efficient
+      "gemini-1.5-pro",        // More capable  
+      "gemini-pro",  // Latest flash model
+      "gemini-1.0-pro"     // Latest pro model
+    ];
+
     for (const modelName of modelNames) {
       try {
         console.log(` Trying Gemini model: ${modelName}`);
-        
+
         // Try each model
         const currentModel = genAI.getGenerativeModel({ model: modelName });
-        
+
         // Enhanced System Prompt for better accuracy
         const systemPrompt = `Bạn là AI Agent tài chính chuyên nghiệp của Sovico Holdings.
 
 VAI TRÒ:
 - Tư vấn tài chính chính xác và thực thi dịch vụ tự động
 - Hiểu rõ về SVT (Sovico Tokens), HDBank, Vietjet, Resort services
-- Tư vấn bất động sản chuyên nghiệp với Phú Long Real Estate
 - Phân tích nhu cầu khách hàng và đưa ra giải pháp phù hợp
 
 KIẾN THỨC CHUYÊN MÔN:
@@ -1497,45 +1413,6 @@ KIẾN THỨC CHUYÊN MÔN:
 - HDBank: Ngân hàng liên kết, cung cấp thẻ tín dụng, vay vốn, chuyển khoản
 - Vietjet: Hãng hàng không, đặt vé máy bay nội địa và quốc tế
 - Resort: Dịch vụ nghỉ dưỡng, đặt phòng, spa, ẩm thực
-
-🏢 PHÚ LONG REAL ESTATE - KIẾN THỨC CHUYÊN SÂU:
-- Công ty thành viên của Tập đoàn Sovico, hơn 20 năm kinh nghiệm
-- Chuyên phát triển bất động sản nhà ở, nghỉ dưỡng, thương mại văn phòng
-- Đạt Top 50 Doanh nghiệp phát triển bền vững tiêu biểu Việt Nam 2025
-- Nhận giải thưởng quốc tế HR Asia 2025 và Asia Pacific Property Award 2025-2026
-
-DỰ ÁN NỔI BẬT CỦA PHÚ LONG:
-1. **Essensia Parkway** - Nguyễn Hữu Thọ, Nhà Bè, TP.HCM
-   - Căn hộ cao cấp, chuẩn sống Lux-Well
-   - Giá từ 3.5 tỷ VNĐ, đang mở bán
-   - Tiện ích: Sky Pool, Gym, Concierge
-
-2. **Essensia Sky** - Nguyễn Hữu Thọ, Nhà Bè, TP.HCM  
-   - Căn hộ cao cấp, "Nơi Đất Lành Cho Cuộc Sống Hoan Ca"
-   - Giá từ 4.2 tỷ VNĐ, đang mở bán
-   - Tiện ích: Sky Living, Panoramic View, Sky Bar
-
-3. **Dragon Riverside City** - Đại lộ Võ Văn Kiệt, TP.HCM
-   - Khu đô thị, "Thành phố 5 sao trong lòng Thành Phố"
-   - Giá từ 2.8 tỷ VNĐ, đang hoạt động
-   - Tiện ích: River View, Golf Course, Shopping Mall
-
-4. **Mailand Hanoi City** - Xã Sơn Đồng, Hà Nội
-   - Khu đô thị thông minh tại thủ đô
-   - Giá từ 2.5 tỷ VNĐ, đang mở bán
-   - Tiện ích: Smart City, Green Living, Cultural Center
-
-5. **Ariyana Tourism Complex** - Đà Nẵng
-   - Khu nghỉ dưỡng cao cấp với view biển
-   - Giá từ 1.8 tỷ VNĐ, đang hoạt động
-   - Tiện ích: Beach Resort, Golf Course, Conference Center
-
-DỊCH VỤ BẤT ĐỘNG SẢN PHÚ LONG:
-- Xem dự án miễn phí (100 SVT thưởng)
-- Tư vấn đầu tư bất động sản (200 SVT thưởng)
-- Tư vấn nhà ở, thương mại, nghỉ dưỡng
-- Hỗ trợ vay vốn mua nhà qua HDBank
-- Chuyển đổi SVT thành ưu đãi mua nhà
 
 QUY TẮC TRẢ LỜI:
 1. LUÔN trả lời chính xác về thông tin tài chính
@@ -1551,9 +1428,7 @@ QUY TẮC TRẢ LỜI:
 - Luôn kết thúc bằng câu hỏi để tương tác thêm
 
 VÍ DỤ TRẢ LỜI TỐT:
-
-**Tư vấn tài chính:**
-"📊 **Phân tích tài chính của bạn:**
+" **Phân tích tài chính của bạn:**
 
 • **SVT hiện tại:** 15,000 tokens
 • **Mức độ:** Silver (cần 35,000 để lên Gold)
@@ -1565,67 +1440,44 @@ VÍ DỤ TRẢ LỜI TỐT:
 2. Mở tài khoản tiết kiệm HDBank
 3. Đăng ký thẻ Visa Platinum
 
-Bạn muốn tôi hướng dẫn chi tiết bước nào?"
-
-**Tư vấn bất động sản:**
-"🏢 **Tư vấn đầu tư bất động sản Phú Long:**
-
-• **Ngân sách:** 5-8 tỷ VNĐ
-• **Mục đích:** Đầu tư dài hạn
-• **Vị trí ưu tiên:** TP.HCM
-
-**Dự án phù hợp:**
-1. **Essensia Parkway** - 3.5 tỷ VNĐ
-   - Chuẩn sống Lux-Well, tiềm năng tăng giá cao
-   - Tiện ích: Sky Pool, Gym, Concierge
-   
-2. **Dragon Riverside City** - 2.8 tỷ VNĐ
-   - Khu đô thị hoàn chỉnh, thanh khoản tốt
-   - Tiện ích: River View, Golf Course, Mall
-
-**Hỗ trợ tài chính:**
-• Vay HDBank lên đến 80% giá trị
-• Lãi suất ưu đãi cho khách hàng Sovico
-• SVT có thể đổi thành ưu đãi mua nhà
-
-Bạn muốn tôi đặt lịch xem dự án nào?"`;
+Bạn muốn tôi hướng dẫn chi tiết bước nào?"`;
 
         // Build comprehensive customer insights with financial data
         const prefs = prefsRef.current;
         const financialData = await fetchFinancialData();
-        
+
         // Build detailed customer profile
         const customerInsights = [
           // Basic Info
           userProfile?.name ? `Tên: ${userProfile.name}` : undefined,
           userProfile?.riskTolerance ? `Rủi ro: ${userProfile.riskTolerance}` : undefined,
           typeof userProfile?.sovicoTokens === 'number' ? `SVT: ${userProfile.sovicoTokens.toLocaleString('vi-VN')}` : undefined,
-          
+
           // Financial Status
           `Số dư: ${financialData.accountBalance.toLocaleString('vi-VN')} VNĐ`,
           `Thu nhập ước tính: ${financialData.monthlyIncome.toLocaleString('vi-VN')} VNĐ/tháng`,
           `Credit Score: ${financialData.creditScore}`,
           `Tổng nợ: ${financialData.totalDebt.toLocaleString('vi-VN')} VNĐ`,
-          
+
           // Spending Patterns
           `Chi tiêu tháng: ${financialData.spendingPattern.monthly?.toLocaleString('vi-VN') || '0'} VNĐ`,
           `Đầu tư hiện tại: ${financialData.investmentPortfolio.totalValue.toLocaleString('vi-VN')} VNĐ`,
-          
+
           // Travel Behavior
           `Số chuyến bay: ${financialData.flightCount}`,
           `Chi phí bay: ${financialData.flightSpending.toLocaleString('vi-VN')} VNĐ`,
           prefs?.preferredOrigin ? `Origin thường: ${prefs.preferredOrigin}` : undefined,
           prefs?.preferredDestination ? `Destination thường: ${prefs.preferredDestination}` : undefined,
           prefs?.typicalPassengers ? `Số khách hay đi: ${prefs.typicalPassengers}` : undefined,
-          
+
           // Investment Portfolio
           (financialData.investmentPortfolio.types as any)?.stocks > 0 ? `Cổ phiếu: ${(financialData.investmentPortfolio.types as any).stocks}` : undefined,
           (financialData.investmentPortfolio.types as any)?.bonds > 0 ? `Trái phiếu: ${(financialData.investmentPortfolio.types as any).bonds}` : undefined,
           (financialData.investmentPortfolio.types as any)?.mutual_funds > 0 ? `Quỹ đầu tư: ${(financialData.investmentPortfolio.types as any).mutual_funds}` : undefined,
-          
+
           // Loan History
           financialData.loanHistory.length > 0 ? `Khoản vay: ${financialData.loanHistory.length}` : undefined,
-          
+
           // Transaction Activity
           `Giao dịch: ${financialData.transactionHistory.length} lần`,
         ].filter(Boolean).join(' • ');
@@ -1653,52 +1505,68 @@ USER ASK: "${userMessage}"`;
         const result = await currentModel.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
-        
+
         console.log(` Success with ${modelName}! Response length:`, text.length);
         return text;
-        
+
       } catch (error: any) {
         console.warn(`⚠️ Model ${modelName} failed:`, error.message);
         
+        // Check for specific error types
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          console.log(`🚫 Model ${modelName} not available - trying next model`);
+          continue;
+        }
+        
+        if (error.message?.includes('quota') || error.message?.includes('limit')) {
+          console.log('🚫 Gemini quota exceeded - trying next model');
+          continue;
+        }
+        
+        if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+          console.log('🔑 Gemini API key invalid');
+          throw new Error('Gemini API key invalid');
+        }
+
         // If this is the last model, throw the error
         if (modelName === modelNames[modelNames.length - 1]) {
           throw error;
         }
-        
+
         // Otherwise continue to next model
         continue;
       }
     }
-    
+
     // This should never be reached, but just in case
     throw new Error('All Gemini models failed');
   };
 
   const generateLocalResponse = async (userMessage: string): Promise<string> => {
     const lowerMessage = userMessage.toLowerCase();
-    
+
     // Handle specific questions about SVT meaning
     if (lowerMessage.includes('svt là gì') || lowerMessage.includes('sovico token là gì')) {
-      return `🪙 **SVT (Sovico Token) là gì?**
+      return ` **SVT (Sovico Token) là gì?**
 
-**📋 Định nghĩa:**
+** Định nghĩa:**
 • **SVT** = Sovico Token - Token nội bộ của hệ sinh thái Sovico
 • **Mục đích:** Tích điểm, đổi quà, giao dịch trong hệ sinh thái
 
-**🎯 Công dụng chính:**
+** Công dụng chính:**
 • **Thanh toán:** Mua vé máy bay, đặt phòng resort
 • **Đổi quà:** Voucher ăn uống, spa, shopping
 • **Đầu tư:** Mua NFT, staking lãi suất
 • **Giao dịch:** Trade trên P2P marketplace
 
-**💰 Cách kiếm SVT:**
+** Cách kiếm SVT:**
 • Giao dịch HDBank: 0.1% số tiền → SVT
 • Bay Vietjet: 100-200 SVT/chuyến
 • Nghỉ Resort: 200-500 SVT/tối
 • Review dịch vụ: 50-200 SVT/review
 • Giới thiệu bạn bè: 1,000 SVT/người
 
-**📊 Level system:**
+** Level system:**
 • **Bronze:** 0-9,999 SVT
 • **Silver:** 10,000-49,999 SVT  
 • **Gold:** 50,000-199,999 SVT
@@ -1706,18 +1574,18 @@ USER ASK: "${userMessage}"`;
 
 Bạn muốn tôi hướng dẫn cách kiếm SVT hiệu quả không?`;
     }
-    
+
     // Handle strategy questions about flights, balance, and SVT
-    if (lowerMessage.includes('chiến lược') || lowerMessage.includes('strategy') || 
+    if (lowerMessage.includes('chiến lược') || lowerMessage.includes('strategy') ||
         lowerMessage.includes('kế hoạch') || lowerMessage.includes('plan') ||
         lowerMessage.includes('số chuyến bay') || lowerMessage.includes('số dư') ||
         lowerMessage.includes('số svt')) {
-      
+
       const currentSVT = userProfile?.sovicoTokens || 0;
-      const currentLevel = currentSVT >= 200000 ? 'Diamond' : 
-                          currentSVT >= 50000 ? 'Gold' : 
+      const currentLevel = currentSVT >= 200000 ? 'Diamond' :
+                          currentSVT >= 50000 ? 'Gold' :
                           currentSVT >= 10000 ? 'Silver' : 'Bronze';
-      
+
       // Get comprehensive financial data
       const financialData = await fetchFinancialData();
       const flightCount = financialData.flightCount;
@@ -1727,10 +1595,10 @@ Bạn muốn tôi hướng dẫn cách kiếm SVT hiệu quả không?`;
       const totalDebt = financialData.totalDebt;
       const investmentValue = financialData.investmentPortfolio.totalValue;
       const spendingPattern = financialData.spendingPattern;
-      
+
       return `📊 **Chiến lược tài chính cá nhân hóa cho bạn:**
 
-**📈 Tình hình hiện tại:**
+** Tình hình hiện tại:**
 • **SVT hiện có:** ${currentSVT.toLocaleString('vi-VN')} tokens (${currentLevel})
 • **Số chuyến bay:** ${flightCount} chuyến trong năm
 • **Số dư tài khoản:** ${accountBalance.toLocaleString('vi-VN')} VNĐ
@@ -1741,9 +1609,9 @@ Bạn muốn tôi hướng dẫn cách kiếm SVT hiệu quả không?`;
 • **Chi tiêu tháng:** ${spendingPattern.monthly?.toLocaleString('vi-VN') || '0'} VNĐ
 • **Giao dịch:** ${userProfile?.totalTransactions || 0} lần
 
-**🎯 Chiến lược tối ưu dựa trên profile:**
+** Chiến lược tối ưu dựa trên profile:**
 
-**✈️ Chiến lược bay (${flightCount} chuyến/năm):**
+** Chiến lược bay (${flightCount} chuyến/năm):**
 ${flightCount >= 15 ? 
   '• **Frequent Flyer:** Tối ưu hóa với Vietjet Gold/Platinum\n• Tích miles x2, ưu tiên chuyến quốc tế\n• Sử dụng SVT để upgrade hạng bay' :
   flightCount >= 8 ?
@@ -1769,7 +1637,7 @@ ${accountBalance >= 50000000 ?
 • 10% SVT để học hỏi = ${(accountBalance * 0.1 / 1000000).toFixed(0)}M VNĐ`
 }
 
-**🪙 Chiến lược SVT (${currentLevel} level):**
+** Chiến lược SVT (${currentLevel} level):**
 ${currentLevel === 'Diamond' ?
   '• **Diamond Strategy:** Tối ưu hóa lợi nhuận\n• Staking SVT để nhận lãi 8-12%/năm\n• Trade SVT trên P2P marketplace\n• Đầu tư NFT premium' :
   currentLevel === 'Gold' ?
@@ -1779,68 +1647,68 @@ ${currentLevel === 'Diamond' ?
   '• **Bronze Strategy:** Kích hoạt tài khoản\n• Mở tài khoản HDBank để kiếm SVT\n• Bay ít nhất 2-3 chuyến/năm\n• Hoàn thành daily tasks'
 }
 
-**📅 Kế hoạch 3 tháng tới:**
+** Kế hoạch 3 tháng tới:**
 1. **Tháng 1:** ${currentLevel === 'Bronze' ? 'Kích hoạt SVT, mở tài khoản HDBank' : 'Tối ưu hóa giao dịch hiện tại'}
 2. **Tháng 2:** ${flightCount < 5 ? 'Đặt thêm 2-3 chuyến bay' : 'Tối ưu hóa chuyến bay hiện có'}
 3. **Tháng 3:** ${currentLevel === 'Diamond' ? 'Đầu tư SVT advanced' : 'Nâng cấp level SVT'}
 
-**💡 Hành động ngay:**
+** Hành động ngay:**
 • Kiểm tra ưu đãi level ${currentLevel} hiện tại
 • Đặt lịch bay tiếp theo để tích SVT
 • Review portfolio đầu tư hiện tại
 
-**🔍 Phân tích chi tiết:**
+** Phân tích chi tiết:**
 • **Tỷ lệ nợ/thu nhập:** ${((totalDebt / monthlyIncome) * 100).toFixed(1)}% ${totalDebt / monthlyIncome > 0.4 ? '(Cao - cần giảm nợ)' : '(Tốt)'}
 • **Tỷ lệ tiết kiệm:** ${(((monthlyIncome - (spendingPattern.monthly || 0)) / monthlyIncome) * 100).toFixed(1)}% ${((monthlyIncome - (spendingPattern.monthly || 0)) / monthlyIncome) > 0.2 ? '(Tốt)' : '(Cần tăng tiết kiệm)'}
 • **Diversification:** ${investmentValue > 0 ? 'Có đầu tư' : 'Chưa đầu tư'} - ${investmentValue > 0 ? 'Tốt' : 'Cần bắt đầu đầu tư'}
 
 Bạn muốn tôi chi tiết hóa chiến lược nào?`;
     }
-    
+
     // Flight booking - Enhanced with context awareness
     const flightInfo = extractFlightInfoWithContext(userMessage);
-    
+
     if (flightInfo) {
       const { origin, destination, date, passengers } = flightInfo;
-      
+
       // Count missing information
       const missingInfo = [];
       if (!origin) missingInfo.push('điểm đi');
       if (!destination) missingInfo.push('điểm đến');
       if (!date) missingInfo.push('ngày bay');
-      
+
       // Smart questioning based on what's missing
       if (missingInfo.length > 0) {
         return askForMissingFlightInfo(missingInfo, origin, destination, date, passengers);
       }
-      
+
       // All information available - proceed with booking
       // Reset context after successful booking
       setFlightContext({});
       return generateFlightBookingResponse(origin, destination, date, passengers);
     }
-    
+
     // Legacy flight booking check (fallback)
-    if (lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') || 
+    if (lowerMessage.includes('vé máy bay') || lowerMessage.includes('đặt vé') ||
         lowerMessage.includes('bay') || lowerMessage.includes('vietjet')) {
-      
+
       // Check if all required info is present
       const hasOrigin = extractLocation(lowerMessage, 'origin')
-      const hasDestination = extractLocation(lowerMessage, 'destination') 
+      const hasDestination = extractLocation(lowerMessage, 'destination')
       const hasDate = extractDate(lowerMessage)
       const hasPassengerCount = extractPassengerCount(lowerMessage)
-      
+
       // Count missing information
       const missingInfo = [];
       if (!hasOrigin) missingInfo.push('điểm đi');
       if (!hasDestination) missingInfo.push('điểm đến');
       if (!hasDate) missingInfo.push('ngày bay');
-      
+
       // Smart questioning based on what's missing
       if (missingInfo.length > 0) {
         return askForMissingFlightInfo(missingInfo, hasOrigin, hasDestination, hasDate, hasPassengerCount);
       }
-      
+
       return ` **Agent đang xử lý đặt vé máy bay**
 
  **THÔNG BÁO: Agent mode ON** - Tôi sẽ thực hiện đặt vé ngay bây giờ!
@@ -1861,9 +1729,9 @@ Bạn muốn tôi chi tiết hóa chiến lược nào?`;
 
 ⚡ Bạn không cần làm gì thêm, Agent sẽ hoàn tất tất cả!`;
     }
-    
+
     // Card opening - Mở thẻ ngân hàng
-    if (lowerMessage.includes('mở thẻ') || lowerMessage.includes('làm thẻ') || 
+    if (lowerMessage.includes('mở thẻ') || lowerMessage.includes('làm thẻ') ||
         lowerMessage.includes('thẻ tín dụng') || lowerMessage.includes('thẻ visa')) {
       return ` **Agent mở thẻ HDBank ngay lập tức**
 
@@ -1890,7 +1758,7 @@ Bạn muốn tôi chi tiết hóa chiến lược nào?`;
 
 ⚡ Thẻ sẽ được giao trong 3-5 ngày làm việc!`;
     }
-    
+
     // Đầu tư
     if (lowerMessage.includes('đầu tư') || lowerMessage.includes('investment')) {
       return ` **Phân tích đầu tư cho bạn:**
@@ -1915,7 +1783,7 @@ Dựa trên profile và mức độ rủi ro:
 
 **Lưu ý:** Chỉ đầu tư số tiền có thể chấp nhận rủi ro!`;
     }
-    
+
     // Chi tiêu
     if (lowerMessage.includes('chi tiêu') || lowerMessage.includes('tiết kiệm')) {
       return `💰 **Kế hoạch tối ưu chi tiêu:**
@@ -1936,14 +1804,14 @@ Dựa trên profile và mức độ rủi ro:
 • Báo cáo chi tiêu theo danh mục
 • Cảnh báo khi vượt ngân sách`;
     }
-    
+
     // SVT Token - Enhanced with accurate information
     if (lowerMessage.includes('svt') || lowerMessage.includes('token') || lowerMessage.includes('sovico token')) {
       const currentSVT = userProfile?.sovicoTokens || 0;
-      const currentLevel = currentSVT >= 200000 ? 'Diamond' : 
-                          currentSVT >= 50000 ? 'Gold' : 
+      const currentLevel = currentSVT >= 200000 ? 'Diamond' :
+                          currentSVT >= 50000 ? 'Gold' :
                           currentSVT >= 10000 ? 'Silver' : 'Bronze';
-      
+
       return `🪙 **Phân tích SVT Token của bạn:**
 
 **📊 Thông tin hiện tại:**
@@ -1978,7 +1846,7 @@ ${currentLevel === 'Bronze' ? '• Cần 10,000 SVT để lên Silver' :
 
 Bạn muốn tôi hướng dẫn chi tiết cách nào?`;
     }
-    
+
     // HDBank - Enhanced with accurate information
     if (lowerMessage.includes('hdbank') || lowerMessage.includes('ngân hàng') || lowerMessage.includes('thẻ') || lowerMessage.includes('vay')) {
       return `🏦 **Dịch vụ HDBank cho bạn:**
@@ -2016,7 +1884,7 @@ Bạn muốn tôi hướng dẫn chi tiết cách nào?`;
 
 Bạn quan tâm đến sản phẩm nào?`;
     }
-    
+
     // Kế hoạch tài chính
     if (lowerMessage.includes('kế hoạch') || lowerMessage.includes('planning')) {
       return ` **Kế hoạch tài chính 2025:**
@@ -2038,10 +1906,10 @@ Bạn quan tâm đến sản phẩm nào?`;
 • Cài đặt alerts trên Sovico app
 • Monthly review với AI advisor`;
     }
-    
+
     // Default response - Enhanced with comprehensive financial data
     const financialData = await fetchFinancialData();
-    
+
     return `🤖 **AI Agent đang phân tích yêu cầu của bạn...**
 
 **📊 Dựa trên profile hiện tại:**
@@ -2099,10 +1967,10 @@ Bạn quan tâm đến sản phẩm nào?`;
 
       if (inputMessage.trim() === '000000') {
         // OTP correct - proceed with action
-        setMessages(prev => prev.map(msg => 
+        setMessages(prev => prev.map(msg =>
           msg.actions?.some(a => a.id === pendingOTPAction.id)
-            ? { ...msg, actions: msg.actions?.map(a => 
-                a.id === pendingOTPAction.id 
+            ? { ...msg, actions: msg.actions?.map(a =>
+                a.id === pendingOTPAction.id
                   ? { ...a, status: 'executing', otpVerified: true }
                   : a
               )}
@@ -2121,7 +1989,7 @@ Bạn quan tâm đến sản phẩm nào?`;
       } else {
         // OTP incorrect - increment attempts
         setOtpAttempts(prev => prev + 1);
-        
+
         // OTP incorrect - cancel action
         const cancelMessage: Message = {
           id: `cancel_${Date.now()}`,
@@ -2152,10 +2020,10 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
         };
 
         // Update action status to failed
-        setMessages(prev => prev.map(msg => 
+        setMessages(prev => prev.map(msg =>
           msg.actions?.some(a => a.id === pendingOTPAction.id)
-            ? { ...msg, actions: msg.actions?.map(a => 
-                a.id === pendingOTPAction.id 
+            ? { ...msg, actions: msg.actions?.map(a =>
+                a.id === pendingOTPAction.id
                   ? { ...a, status: 'failed', result: { error: 'OTP không chính xác' } }
                   : a
               )}
@@ -2191,15 +2059,15 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
     const actions = analyzeIntent(currentInput);
 
     setIsLoading(true);
-    
+
     try {
       // Luôn tạo AI response thông minh trước (dù có hay không có actions)
       let aiResponse = '';
-      
+
       if (useGemini) {
-        try {
+      try {
           aiResponse = await generateGeminiResponse(currentInput);
-        } catch (error) {
+      } catch (error) {
           console.error('Gemini failed, falling back to local response:', error);
           aiResponse = await generateLocalResponse(currentInput);
         }
@@ -2221,8 +2089,6 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
             case 'resort':
               if (a.action === 'book_room') return `🏨 Đặt phòng ${a.params.nights} đêm`
               if (a.action === 'spa_booking') return `💆‍♀️ Đặt lịch Spa`
-              if (a.action === 'real_estate_consultation') return `🏢 Tư vấn bất động sản ${a.params.consultation_type}`
-              if (a.action === 'book_property_viewing') return `🏠 Đặt lịch xem dự án ${a.params.project_name}`
               return `🏖️ Dịch vụ Resort`
             default:
               return '🔧 Dịch vụ khác'
@@ -2231,7 +2097,7 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
 
         // Check if any action requires OTP
         const requiresOTP = actions.some(a => a.requiresOTP);
-        
+
         if (requiresOTP) {
           aiResponse += `\n\n🔐 **BẢO MẬT: Xác thực OTP cần thiết**\n\n`;
           aiResponse += `**Các giao dịch cần xác thực:**\n• ${actionsList}\n\n`;
@@ -2255,16 +2121,16 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
 
       const finalMessages = [...newMessages, aiMessage];
       setMessages(finalMessages);
-      
+
       // Save to chat history after AI responds
       setTimeout(() => {
         saveChatToHistory(finalMessages);
       }, 1000);
-      
+
       // Nếu có actions, thực hiện chúng sau khi AI đã trả lời
       if (actions.length > 0) {
         const requiresOTP = actions.some(a => a.requiresOTP);
-        
+
         if (requiresOTP) {
           // Set pending OTP action and wait for user input
           const otpAction = actions.find(a => a.requiresOTP);
@@ -2282,9 +2148,9 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
 
     } catch (error: any) {
       console.error('Error generating AI response:', error);
-      
+
       let errorMessage = ' **Xin lỗi, AI gặp sự cố**\n\n';
-      
+
       if (error.message && error.message.includes('GoogleGenerativeAI')) {
         errorMessage += '🔧 **Vấn đề Gemini AI:**\n';
         errorMessage += '• API có thể bị giới hạn hoặc model không khả dụng\n';
@@ -2294,17 +2160,17 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
         errorMessage += '⚠️ **Lỗi không xác định:**\n';
         errorMessage += '• Vui lòng thử lại hoặc liên hệ support\n';
       }
-      
+
       const errorResponse: Message = {
         id: `error_${Date.now()}`,
         type: 'ai',
         content: errorMessage,
         timestamp: new Date()
       };
-      
+
       const finalMessages = [...newMessages, errorResponse];
       setMessages(finalMessages);
-      
+
       // Save error to history too
       setTimeout(() => {
         saveChatToHistory(finalMessages);
@@ -2326,7 +2192,7 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
           <div className="p-4 border-b border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">💬 Lịch sử chat</h3>
-              <button 
+              <button
                 onClick={() => setShowHistory(false)}
                 className="text-gray-400 hover:text-white"
               >
@@ -2340,7 +2206,7 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
               ➕ Chat mới
             </button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {chatHistory.length === 0 ? (
               <div className="text-center text-gray-400 py-8">
@@ -2349,8 +2215,8 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
               </div>
             ) : (
               chatHistory.map((chat) => (
-                <div 
-                  key={chat.id} 
+                <div
+                  key={chat.id}
                   className={`p-3 rounded-lg border cursor-pointer transition-colors group ${
                     currentChatId === chat.id 
                       ? 'bg-blue-600/20 border-blue-500' 
@@ -2480,7 +2346,7 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
                 <div className="whitespace-pre-line text-sm">
                   {message.content}
                 </div>
-                
+
                 {/* Display service actions if available */}
                 {message.actions && message.actions.length > 0 && (
                   <div className="mt-3 space-y-2">
@@ -2515,18 +2381,18 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
                     ))}
                   </div>
                 )}
-                
+
                 <div className="text-xs opacity-70 mt-2">
-                  {message.timestamp.toLocaleTimeString('vi-VN', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
+                  {message.timestamp.toLocaleTimeString('vi-VN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
                   })}
                 </div>
 
               </div>
             </div>
           ))}
-        
+
           {isLoading && (
             <div className="flex justify-start">
               <div className="bg-[#161B22] border border-gray-700 rounded-lg p-4">
@@ -2554,7 +2420,7 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
           )}
           <div ref={messagesEndRef} />
         </div>
-        
+
         {/* Quick Questions */}
         {messages.length <= 1 && (
           <div className="p-4 border-t border-gray-700">
@@ -2617,7 +2483,7 @@ ${pendingOTPAction.service === 'hdbank' && pendingOTPAction.action === 'transfer
               )}
             </button>
           </div>
-          
+
           <div className="flex justify-between items-center mt-3 text-xs text-gray-500">
             <span>🔒 Cuộc trò chuyện được mã hóa end-to-end</span>
             <div className="flex items-center space-x-4">

@@ -49,7 +49,7 @@ export const App: React.FC = () => {
         <div className="relative z-[10000] bg-gradient-to-r from-blue-900 to-slate-800 border-b border-blue-500/30 p-4 flex justify-between items-center shadow-lg">
           <div className="flex items-center space-x-6">
             <div className="text-white font-bold text-xl">
-              {selectedApp === 'dashboard' ? '🧠 AI Insight Dashboard' : '📱 One-Sovico Super App'}
+              {selectedApp === 'dashboard' ? ' AI Insight Dashboard' : ' One-Sovico Super App'}
             </div>
             
             {/* App Switcher for Admin */}

@@ -10,7 +10,7 @@ import ESGPrograms from '../components/ESGPrograms'
 import HDBankTransactions from '../components/HDBankTransactions'
 import HDBankCard from '../components/HDBankCard'
 import { ServiceModal } from '../components/ServiceModal'
-import { AIAgent } from '../components/AIAgent'
+// import { AIAgent } from '../components/AIAgent' // Removed - using AIFinancialAssistant instead
 import ImageIcon from '../components/ImageIcon'
 
 type Props = {
@@ -75,7 +75,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
   const [currentService, setCurrentService] = useState<'vietjet' | 'hdbank' | 'resort' | null>(null)
 
   // AI Agent states - Được phục vụ (Waiter style)
-  const [showAIAgent, setShowAIAgent] = useState(false)
+  // const [showAIAgent, setShowAIAgent] = useState(false) // Removed - using AIFinancialAssistant instead
 
   // Parallax and scroll effects for Welcome Screen
   useEffect(() => {
@@ -1380,63 +1380,7 @@ export const SuperApp: React.FC<Props> = ({ user, onLogout, onDashboard }) => {
       </main>
 
 
-      {/* AI Agent Modal - Được phục vụ (Waiter style) */}
-      {showAIAgent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-4xl h-[90vh] flex flex-col">
-            {/* AI Agent Header */}
-            <div className="flex justify-between items-center p-4 border-b border-gray-700 bg-gradient-to-r from-purple-600 to-blue-600">
-              <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-                <span>🤵</span>
-                <span>AI Agent - Trợ lý cá nhân</span>
-              </h2>
-              <button
-                onClick={() => setShowAIAgent(false)}
-                className="text-white hover:text-gray-300 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-
-            {/* AI Agent Content */}
-            <div className="flex-1 overflow-hidden">
-              <AIAgent
-                userData={userData}
-                onServiceAction={async (service, action, params) => {
-                  // Handle service actions through API
-                  const apiUrls = {
-                    vietjet: {
-                      book_flight: 'http://127.0.0.1:5000/api/service/vietjet/book-flight'
-                    },
-                    hdbank: {
-                      transfer: 'http://127.0.0.1:5000/api/service/hdbank/transfer',
-                      loan: 'http://127.0.0.1:5000/api/service/hdbank/loan'
-                    },
-                    resort: {
-                      book_room: 'http://127.0.0.1:5000/api/service/resort/book-room',
-                      spa_booking: 'http://127.0.0.1:5000/api/service/resort/book-spa'
-                    }
-                  }
-
-                  const apiUrl = apiUrls[service]?.[action]
-                  if (!apiUrl) throw new Error('API không hỗ trợ')
-
-                  const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params)
-                  })
-
-                  const result = await response.json()
-                  if (!result.success) throw new Error(result.message)
-
-                  return result
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* AI Agent Modal - Removed - using AIFinancialAssistant instead */}
     </div>
   )
 }
