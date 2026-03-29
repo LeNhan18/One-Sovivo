@@ -39,11 +39,17 @@ Mục dưới đây khớp với các module trong `client/src/App.tsx`, `module
 |-----------|
 | `BlockchainDashboard`: NFT Passport, thành tựu, simulation (theo triển khai) |
 
-**Tab "Chat Monitor"**
+**Tab "Chat Monitor"** (`AdminChatMonitor`)
 
 | Chức năng |
 |-----------|
-| `AdminChatMonitor`: xem / giám sát hội thoại AI khách hàng (khi backend và route hoạt động) |
+| Xem danh sách cuộc chat khách–AI, lọc trạng thái (ví dụ cần can thiệp), thống kê |
+| Xem chi tiết từng hội thoại: tin nhắn user, AI, và tin **can thiệp từ quản trị** (admin intervention) |
+| **Quản trị viên có thể gửi phản hồi / can thiệp** vào trong luồng chat (API `POST /api/admin/chat/<id>/intervene`), nội dung lưu dưới dạng tin admin (không chỉ đọc) |
+| Đánh dấu cuộc chat cần can thiệp (`/flag`), phân tích sentiment / mức độ hài lòng (khả năng hiển thị tùy dữ liệu) |
+| Làm mới danh sách định kỳ để theo dõi hội thoại mới |
+
+Cần backend đăng ký blueprint admin chat và database đầy đủ (bảng `ai_chat_history`, `ai_chat_messages`, v.v.).
 
 ### One-Sovico Super App (khách hàng)
 
